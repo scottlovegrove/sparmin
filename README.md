@@ -58,9 +58,38 @@ monkeydo bin/sparmin.prg vivoactive5
 In VS Code, use the *Monkey C: Build for Device* and *Monkey C: Run App*
 commands from the command palette instead.
 
+## Tests
+
+The device-independent core (state machine, lap logic, aggregation, HR folding,
+station config, payload) is covered by `(:test)` unit tests in
+`source/Tests.mc`. Build a test binary and run it in the simulator:
+
+```sh
+monkeyc -f monkey.jungle -o bin/sparmin-test.prg -y ~/.Garmin/ConnectIQ/developer_key -d vivoactive5 --unit-test
+monkeydo bin/sparmin-test.prg vivoactive5 -t
+```
+
+In VS Code, use *Monkey C: Run Tests* / the test explorer instead.
+
+## Design decisions
+
+- **Sport / sub-sport:** `SPORT_GENERIC` / `SUB_SPORT_GENERIC` (no GPS). This is a
+  starting choice — whether Garmin Connect renders the `station` lap developer
+  field depends on it, so validate on the physical devices and adjust in
+  `Recorder.mc` if the field doesn't show.
+- **Transition time:** recorded as explicit transition laps (a station lap closes,
+  a transition lap opens) so the FIT laps align 1:1 with the on-watch segments.
+- **Station labelling:** the `station` field is set to the *closing* lap's label
+  immediately before each `addLap()`/stop, so every lap carries its own station.
+- **Backend sync:** parked. `BackendClient` honours the payload contract and
+  `SessionManager.buildPayload()` produces it, but nothing POSTs yet.
+
 ## Notes
 
 - `resources/drawables/launcher_icon.png` is a generated placeholder — replace
   it with real artwork before publishing.
 - The `id` in `manifest.xml` is this app's permanent UUID; do not change it once
   the app is published to the Connect IQ Store.
+- **WSL / Ubuntu 24.04:** the SDK Manager and simulator link the old
+  webkit2gtk-4.0 stack that noble dropped; `~/connectiq-sdkmanager/run-*.sh`
+  launch them with the extracted libraries on `LD_LIBRARY_PATH`.

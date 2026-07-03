@@ -22,8 +22,17 @@
             <iq:product id="fr745"/>
         </iq:products>
 
-        <!-- System permissions the app requests at install time. -->
-        <iq:permissions/>
+        <!-- System permissions the app requests at install time.
+             Fit / FitContributor: activity recording + station lap fields.
+             Sensor/SensorHistory: live + fallback heart rate.
+             Communications: backend POST (currently parked — see BackendClient). -->
+        <iq:permissions>
+            <iq:uses-permission id="Fit"/>
+            <iq:uses-permission id="FitContributor"/>
+            <iq:uses-permission id="Sensor"/>
+            <iq:uses-permission id="SensorHistory"/>
+            <iq:uses-permission id="Communications"/>
+        </iq:permissions>
 
         <!-- Languages with translated string resources. -->
         <iq:languages>
