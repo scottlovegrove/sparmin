@@ -1,0 +1,26 @@
+# --- Connect IQ build output ---
+bin/
+gen/
+*.prg
+*.prg.debug.xml
+*.iq
+
+# --- Developer signing key (NEVER commit) ---
+*.der
+developer_key
+developer_key.der
+
+# --- Eclipse / legacy plugin metadata ---
+.settings/
+.project.bak
+.buildpath
+
+# --- VS Code Monkey C extension ---
+.vscode/*.log
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log

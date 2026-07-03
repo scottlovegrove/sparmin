@@ -1,0 +1,7 @@
+<properties>
+    <!--
+        Persistent application properties (Application.Properties). Example:
+
+        <property id="SampleSetting" type="boolean">false</property>
+    -->
+</properties>

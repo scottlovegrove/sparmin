@@ -1,0 +1,10 @@
+<settings>
+    <!--
+        User-facing app settings, editable in Garmin Connect / the simulator.
+        Each <setting> binds to a property declared in properties.xml. Example:
+
+        <setting propertyKey="@Properties.SampleSetting" title="@Strings.AppName">
+            <settingConfig type="boolean" />
+        </setting>
+    -->
+</settings>

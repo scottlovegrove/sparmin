@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Connect IQ application manifest.
+    Generated once, then hand-edited. The `id` is a stable per-app UUID and
+    must never change once the app is published, or the store treats it as a
+    different app. Add or remove supported devices in the <iq:products> list;
+    each id must match a device the installed SDK knows about.
+-->
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application
+        entry="SparminApp"
+        id="f3c85948a3494dccac4d28661e0550ab"
+        launcherIcon="@Drawables.LauncherIcon"
+        minApiLevel="3.1.0"
+        name="@Strings.AppName"
+        type="watch-app">
+
+        <!-- Devices this app is built for. Extend as needed. -->
+        <iq:products>
+            <iq:product id="fenix7"/>
+            <iq:product id="fenix7s"/>
+            <iq:product id="fenix7x"/>
+            <iq:product id="fr255"/>
+            <iq:product id="fr265"/>
+            <iq:product id="fr965"/>
+            <iq:product id="venu2"/>
+            <iq:product id="venu3"/>
+            <iq:product id="vivoactive5"/>
+        </iq:products>
+
+        <!-- System permissions the app requests at install time. -->
+        <iq:permissions/>
+
+        <!-- Languages with translated string resources. -->
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+
+        <!-- Optional barrel (library) dependencies go here. -->
+        <iq:barrels/>
+    </iq:application>
+</iq:manifest>

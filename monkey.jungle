@@ -1,0 +1,11 @@
+# Build configuration for the Sparmin Connect IQ app.
+#
+# The jungle file tells the compiler which manifest and source/resource
+# sets to use. The defaults below apply to every product. To override
+# resources or sources for a specific device, add per-product blocks, e.g.:
+#
+#   fenix7.resourcePath = $(fenix7.resourcePath);resources-fenix7
+#
+# See https://developer.garmin.com/connect-iq/monkey-c/build-configuration/
+
+project.manifest = manifest.xml
