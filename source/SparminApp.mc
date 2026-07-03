@@ -2,24 +2,31 @@ import Toybox.Application;
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-//! Application entry point. The manifest's `entry` attribute names this class.
+//! Application entry point. Owns the single SessionManager (with the real FIT
+//! recorder) that every view drives.
 class SparminApp extends Application.AppBase {
+
+    private var _session as SessionManager = new SessionManager(new Recorder());
 
     function initialize() {
         AppBase.initialize();
     }
 
-    //! Called on application start up.
     function onStart(state as Dictionary?) as Void {
     }
 
-    //! Called when the application is exiting.
     function onStop(state as Dictionary?) as Void {
     }
 
-    //! Return the initial view and its input delegate.
+    function getSessionManager() as SessionManager {
+        return _session;
+    }
+
+    //! The strip view is the home screen; it renders IDLE, TRANSITION and
+    //! STATION_ACTIVE. Confirm/summary/config are pushed on top as needed.
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {
-        return [new SparminView(), new SparminDelegate()];
+        var view = new StripView(_session);
+        return [view, new StripDelegate(view)];
     }
 }
 

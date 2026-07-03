@@ -190,6 +190,42 @@ function testHrFoldingRejectsInvalidAndTransition(logger) {
     return true;
 }
 
+// ---- Strip navigation (window sliding) ----
+
+(:test)
+function testStripWindowSlidesAtEdges(logger) {
+    var c = new StripController(Station.allIds(), 3); // 10 stations, window 3
+    Test.assertEqual(c.windowStart, 0);
+    c.moveFocus(1);
+    c.moveFocus(1);              // focus 2, still fully visible
+    Test.assertEqual(c.windowStart, 0);
+    c.moveFocus(1);              // focus 3 past the window -> slides
+    Test.assertEqual(c.focusedIndex, 3);
+    Test.assertEqual(c.windowStart, 1);
+    return true;
+}
+
+(:test)
+function testStripWrapsAtStart(logger) {
+    var c = new StripController(Station.allIds(), 3);
+    c.moveFocus(-1);             // wrap 0 -> 9
+    Test.assertEqual(c.focusedIndex, 9);
+    Test.assertEqual(c.windowStart, 7); // last three visible
+    return true;
+}
+
+(:test)
+function testStripReloadClampsFocus(logger) {
+    var c = new StripController(Station.allIds(), 3);
+    c.moveFocus(1);
+    c.moveFocus(1);
+    c.moveFocus(1);             // focus 3
+    c.reload(["finnish_sauna", "ice_cave"]);
+    Test.assertEqual(c.visibleCount, 2);
+    Test.assert(c.focusedIndex <= 1);
+    return true;
+}
+
 // ---- Payload ----
 
 (:test)

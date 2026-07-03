@@ -187,6 +187,22 @@ class SessionManager {
         return end - _sessionStart;
     }
 
+    //! Live master elapsed at `now` (epoch seconds) — for the running display.
+    function elapsedSeconds(now) {
+        if (_sessionStart == null) {
+            return 0;
+        }
+        return now - _sessionStart;
+    }
+
+    //! Live elapsed in the open station lap at `now`, or 0 when not in a station.
+    function stationElapsedSeconds(now) {
+        if (_state == STATE_STATION_ACTIVE && _open != null) {
+            return now - _open.startTime;
+        }
+        return 0;
+    }
+
     function transitionSeconds() {
         var sum = 0;
         for (var i = 0; i < _segments.size(); i += 1) {

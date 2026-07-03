@@ -34,8 +34,30 @@ module Station {
         "Outdoor lounger"
     ];
 
+    // Short tile labels for the strip, where a full name won't fit (especially
+    // on the 240px FR745). Index-aligned with IDS. Replaced by icons in the
+    // per-device resources, but a legible text fallback is fine.
+    const SHORT = [
+        "O.Cold",
+        "I.Cold",
+        "Hydro",
+        "Loungers",
+        "Salt",
+        "Steam",
+        "Fire/Ice",
+        "Finnish",
+        "Ice Cave",
+        "Outdoor"
+    ];
+
     function count() {
         return IDS.size();
+    }
+
+    //! Short tile label for an id; falls back to the full name.
+    function shortFor(id) {
+        var i = indexOf(id);
+        return i >= 0 ? SHORT[i] : nameFor(id);
     }
 
     //! Index of an id in the catalogue, or -1 if it is not a canonical id.
@@ -72,7 +94,7 @@ module Station {
     }
 
     //! A fresh copy of the full ordered id list (the default configuration).
-    function allIds() {
+    function allIds() as Lang.Array {
         var out = [];
         for (var i = 0; i < IDS.size(); i += 1) {
             out.add(IDS[i]);

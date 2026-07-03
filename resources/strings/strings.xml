@@ -1,5 +1,3 @@
 <resources>
     <string id="AppName">Sparmin</string>
-    <string id="Prompt">Hello Sparmin!</string>
-    <string id="MenuItem1">Item 1</string>
 </resources>
