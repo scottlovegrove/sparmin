@@ -17,6 +17,8 @@ class StripDelegate extends WatchUi.InputDelegate {
     private var _session as SessionManager;
     private var _ctrl as StripController;
     private var _isTouch as Lang.Boolean;
+    private var _dragStartX as Lang.Number = 0;
+    private var _dragStartVisual as Lang.Float = 0.0;
 
     function initialize(view as StripView) {
         InputDelegate.initialize();
@@ -59,17 +61,23 @@ class StripDelegate extends WatchUi.InputDelegate {
         return true;
     }
 
-    function onSwipe(evt as WatchUi.SwipeEvent) as Lang.Boolean {
+    //! Drag-to-scroll: the strip tracks the finger while dragging, then snaps to
+    //! the nearest tile on release (much smoother than one-tile-per-swipe).
+    function onDrag(evt as WatchUi.DragEvent) as Lang.Boolean {
         if (!_isTouch) {
             return false;
         }
-        var dir = evt.getDirection();
-        if (dir == WatchUi.SWIPE_LEFT) {
-            _ctrl.panWindow(1);
-            _view.animateToWindow();
-        } else if (dir == WatchUi.SWIPE_RIGHT) {
-            _ctrl.panWindow(-1);
-            _view.animateToWindow();
+        var coords = evt.getCoordinates();
+        var type = evt.getType();
+        if (type == WatchUi.DRAG_TYPE_START) {
+            _dragStartX = coords[0];
+            _dragStartVisual = _view.getVisualStart();
+            _view.beginDrag();
+        } else if (type == WatchUi.DRAG_TYPE_CONTINUE) {
+            var dx = coords[0] - _dragStartX;
+            _view.dragTo(_dragStartVisual - dx / _view.stepPx());
+        } else if (type == WatchUi.DRAG_TYPE_STOP) {
+            _view.snapToNearest();
         }
         return true;
     }

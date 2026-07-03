@@ -121,6 +121,54 @@ class StripView extends WatchUi.View {
         return v < 0.0 ? -v : v;
     }
 
+    // ---- Touch drag scrolling (finger-tracking, then snap) ----
+
+    function getVisualStart() as Lang.Float {
+        return _visualStart;
+    }
+
+    //! Pixels per tile (tile width + gap) — converts a drag delta to tiles.
+    function stepPx() as Lang.Float {
+        return _stripTileW(_ctrl.visibleCount) + _stripGap();
+    }
+
+    //! Begin a drag: cancel any running snap animation so it tracks the finger.
+    function beginDrag() as Void {
+        _stopAnim();
+    }
+
+    //! Move the strip to an unsnapped position while the finger is down.
+    function dragTo(visual as Lang.Float) as Void {
+        _visualStart = _clampVisual(visual);
+        WatchUi.requestUpdate();
+    }
+
+    //! On release, snap to the nearest tile and ease into place.
+    function snapToNearest() as Void {
+        var target = (_visualStart + 0.5).toNumber();
+        var maxStart = _maxStart();
+        if (target < 0) { target = 0; }
+        if (target > maxStart) { target = maxStart; }
+        _ctrl.windowStart = target;
+        animateToWindow();
+    }
+
+    private function _maxStart() as Lang.Number {
+        var m = _ctrl.count() - _ctrl.visibleCount;
+        return (m < 0) ? 0 : m;
+    }
+
+    private function _clampVisual(v as Lang.Float) as Lang.Float {
+        if (v < 0.0) {
+            return 0.0;
+        }
+        var maxStart = _maxStart();
+        if (v > maxStart) {
+            return maxStart.toFloat();
+        }
+        return v;
+    }
+
     function onUpdate(dc as Graphics.Dc) as Void {
         _w = dc.getWidth();
         _h = dc.getHeight();
