@@ -84,6 +84,12 @@ In VS Code, use *Monkey C: Run Tests* / the test explorer instead.
 - **Backend sync:** parked. `BackendClient` honours the payload contract and
   `SessionManager.buildPayload()` produces it, but nothing POSTs yet.
 
+## Publishing
+
+The app currently targets just the vívoactive 5 and Forerunner 745. To submit to
+the Connect IQ Store (broadening the device list, shared fallback resources,
+store assets, signing, review), see [docs/store-submission.md](docs/store-submission.md).
+
 ## Notes
 
 - `resources/drawables/launcher_icon.png` is a generated placeholder — replace
