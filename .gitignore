@@ -15,8 +15,9 @@ developer_key.der
 .project.bak
 .buildpath
 
-# --- VS Code Monkey C extension ---
-.vscode/*.log
+# --- VS Code: ignore local machine settings, keep shared recommendations ---
+.vscode/*
+!.vscode/extensions.json
 
 # --- OS cruft ---
 .DS_Store

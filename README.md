@@ -6,10 +6,14 @@ written in [Monkey C](https://developer.garmin.com/connect-iq/monkey-c/).
 ## Prerequisites
 
 - **Connect IQ SDK** — install via the [SDK Manager](https://developer.garmin.com/connect-iq/sdk/).
-- **A developer key** — generate one and keep it out of version control:
+- **A developer key** — one key signs all your Connect IQ apps, so keep it
+  outside your repos (this project expects it at `~/.Garmin/ConnectIQ/developer_key`).
+  The VS Code *Monkey C* extension can generate one, or by hand:
   ```sh
-  openssl genrsa -out developer_key.pem 4096
-  openssl pkcs8 -topk8 -inform PEM -outform DER -in developer_key.pem -out developer_key.der -nocrypt
+  openssl genrsa -out ~/.Garmin/ConnectIQ/developer_key.pem 4096
+  openssl pkcs8 -topk8 -inform PEM -outform DER \
+      -in ~/.Garmin/ConnectIQ/developer_key.pem \
+      -out ~/.Garmin/ConnectIQ/developer_key -nocrypt
   ```
 - **VS Code** with the official *Monkey C* extension (recommended), or the
   command-line SDK tools (`monkeyc`, `connectiq`, `monkeydo`).
@@ -43,12 +47,12 @@ Device- or language-specific overrides live in sibling folders (e.g.
 Using the SDK command-line tools (adjust `--device` / paths to taste):
 
 ```sh
-# Compile for the simulator
-monkeyc -f monkey.jungle -o bin/sparmin.prg -y developer_key.der -d fenix7
+# Compile for the simulator (monkeyc is on PATH via ~/.bashrc once an SDK is active)
+monkeyc -f monkey.jungle -o bin/sparmin.prg -y ~/.Garmin/ConnectIQ/developer_key -d vivoactive5
 
 # Launch the Connect IQ simulator, then side-load the build
 connectiq
-monkeydo bin/sparmin.prg fenix7
+monkeydo bin/sparmin.prg vivoactive5
 ```
 
 In VS Code, use the *Monkey C: Build for Device* and *Monkey C: Run App*
