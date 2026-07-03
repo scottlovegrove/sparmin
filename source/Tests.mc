@@ -226,6 +226,55 @@ function testStripReloadClampsFocus(logger) {
     return true;
 }
 
+// ---- Crash / resume persistence ----
+
+(:test)
+function testNoSnapshotWhenIdle(logger) {
+    Application.Storage.deleteValue(SESSION_SNAP_KEY);
+    Test.assertEqual(hasSessionSnapshot(), false);
+    return true;
+}
+
+(:test)
+function testPersistAndRestore(logger) {
+    Application.Storage.deleteValue(SESSION_SNAP_KEY);
+    var sm = new SessionManager(new FakeRecorder());
+    sm.startSession(1000);
+    sm.selectStation("finnish_sauna", 1010);   // trans[1000,1010], open finnish
+    Test.assert(hasSessionSnapshot());
+
+    // Simulate a relaunch: a fresh manager restores the persisted model.
+    var sm2 = new SessionManager(new FakeRecorder());
+    sm2.restore(loadSessionSnapshot());
+    Test.assertEqual(sm2.getState(), STATE_STATION_ACTIVE);
+    Test.assertEqual(sm2.getActiveStationId(), "finnish_sauna");
+    Test.assertEqual(sm2.getSessionStart(), 1000);
+
+    // Continue on the restored manager and check the totals line up.
+    sm2.stopPress(1130);    // finnish 120 -> transition
+    sm2.stopPress(1130);    // -> confirm
+    sm2.confirmEnd(1140);   // trans 10 -> summary
+    Test.assertEqual(sm2.getState(), STATE_SUMMARY);
+    Test.assertEqual(sm2.totalSeconds(), 140);
+    Test.assertEqual(sm2.transitionSeconds(), 20);
+    var aggs = sm2.stationAggregates();
+    Test.assertEqual(aggs.size(), 1);
+    Test.assertEqual(aggs[0].totalSeconds, 120);
+    return true;
+}
+
+(:test)
+function testSnapshotClearedOnConfirm(logger) {
+    Application.Storage.deleteValue(SESSION_SNAP_KEY);
+    var sm = new SessionManager(new FakeRecorder());
+    sm.startSession(0);
+    Test.assert(hasSessionSnapshot());
+    sm.stopPress(0);        // -> confirm
+    sm.confirmEnd(0);       // -> summary, snapshot cleared
+    Test.assertEqual(hasSessionSnapshot(), false);
+    return true;
+}
+
 // ---- Payload ----
 
 (:test)

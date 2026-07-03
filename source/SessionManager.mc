@@ -1,4 +1,5 @@
 import Toybox.Lang;
+import Toybox.Application;
 
 //! Session states (§5). These drive both the UI and the FIT recorder.
 enum {
@@ -7,6 +8,19 @@ enum {
     STATE_STATION_ACTIVE,
     STATE_CONFIRM_END,
     STATE_SUMMARY
+}
+
+//! Storage key for the crash/resume snapshot (§6.5).
+const SESSION_SNAP_KEY = "sessionSnapshot";
+
+//! True if a snapshot of an in-progress session is persisted (checked on launch
+//! before deciding whether to offer resume).
+function hasSessionSnapshot() as Lang.Boolean {
+    return Application.Storage.getValue(SESSION_SNAP_KEY) != null;
+}
+
+function loadSessionSnapshot() {
+    return Application.Storage.getValue(SESSION_SNAP_KEY);
 }
 
 //! Owns the whole state machine, drives the FIT recorder through the injected
@@ -69,6 +83,46 @@ class SessionManager {
             return;
         }
         _beginSession(now);
+        _persist();
+    }
+
+    //! Rebuild the in-memory model from a persisted snapshot (§6.5). Does not
+    //! touch the recorder — the caller reconnects the FIT session separately.
+    function restore(snap as Lang.Dictionary) as Void {
+        _state = snap["state"];
+        _sessionStart = snap["sessionStart"];
+        _sessionEnd = snap["sessionEnd"];
+        _sessionId = snap["sessionId"];
+        _openLabel = snap["openLabel"];
+        _activeStationId = snap["activeStationId"];
+        _segments = [];
+        var segs = snap["segments"] as Lang.Array;
+        for (var i = 0; i < segs.size(); i += 1) {
+            _segments.add(segmentFromDict(segs[i] as Lang.Dictionary));
+        }
+        var open = snap["open"];
+        _open = (open != null) ? segmentFromDict(open as Lang.Dictionary) : null;
+    }
+
+    private function _persist() as Void {
+        var segs = [];
+        for (var i = 0; i < _segments.size(); i += 1) {
+            segs.add(_segments[i].toDict());
+        }
+        Application.Storage.setValue(SESSION_SNAP_KEY, {
+            "state" => _state,
+            "sessionStart" => _sessionStart,
+            "sessionEnd" => _sessionEnd,
+            "sessionId" => _sessionId,
+            "openLabel" => _openLabel,
+            "activeStationId" => _activeStationId,
+            "segments" => segs,
+            "open" => (_open != null) ? _open.toDict() : null
+        });
+    }
+
+    private function _clearPersist() as Void {
+        Application.Storage.deleteValue(SESSION_SNAP_KEY);
     }
 
     //! Select a station tile. Behaviour depends on the current state:
@@ -80,13 +134,9 @@ class SessionManager {
         if (_state == STATE_IDLE) {
             _beginSession(now);
             _openStation(stationId, now);
-            return;
-        }
-        if (_state == STATE_TRANSITION) {
+        } else if (_state == STATE_TRANSITION) {
             _openStation(stationId, now);
-            return;
-        }
-        if (_state == STATE_STATION_ACTIVE) {
+        } else if (_state == STATE_STATION_ACTIVE) {
             if (_activeStationId != null && _activeStationId.equals(stationId)) {
                 _boundary(null, LABEL_TRANSITION, now);
                 _activeStationId = null;
@@ -94,8 +144,10 @@ class SessionManager {
             } else {
                 _openStation(stationId, now);
             }
+        } else {
+            return;   // no-op state: nothing to persist
         }
-        // any other state: no-op
+        _persist();
     }
 
     //! Context-dependent stop button.
@@ -106,14 +158,17 @@ class SessionManager {
             _boundary(null, LABEL_TRANSITION, now);
             _activeStationId = null;
             _state = STATE_TRANSITION;
+            _persist();
         } else if (_state == STATE_TRANSITION) {
             _state = STATE_CONFIRM_END;
+            _persist();
         }
     }
 
     function cancelEnd() {
         if (_state == STATE_CONFIRM_END) {
             _state = STATE_TRANSITION;
+            _persist();
         }
     }
 
@@ -131,6 +186,7 @@ class SessionManager {
         _sessionEnd = now;
         _activeStationId = null;
         _state = STATE_SUMMARY;
+        _clearPersist();   // recording saved — no in-progress session to resume
     }
 
     function dismissSummary() {

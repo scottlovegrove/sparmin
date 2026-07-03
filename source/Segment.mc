@@ -61,4 +61,28 @@ class Segment {
         }
         return (hrSum + hrCount / 2) / hrCount;
     }
+
+    //! Storage-serialisable snapshot (for crash/resume, §6.5).
+    function toDict() as Lang.Dictionary {
+        return {
+            "stationId" => stationId,
+            "startTime" => startTime,
+            "endTime" => endTime,
+            "hrMin" => hrMin,
+            "hrMax" => hrMax,
+            "hrSum" => hrSum,
+            "hrCount" => hrCount
+        };
+    }
+}
+
+//! Rebuild a Segment from its toDict() snapshot.
+function segmentFromDict(d as Lang.Dictionary) as Segment {
+    var s = new Segment(d["stationId"], d["startTime"]);
+    s.endTime = d["endTime"];
+    s.hrMin = d["hrMin"];
+    s.hrMax = d["hrMax"];
+    s.hrSum = d["hrSum"];
+    s.hrCount = d["hrCount"];
+    return s;
 }
