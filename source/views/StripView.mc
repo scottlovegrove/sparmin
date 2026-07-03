@@ -282,6 +282,13 @@ class StripView extends WatchUi.View {
     private function _drawTimers(dc as Graphics.Dc, state) as Void {
         var now = Time.now().value();
         if (state == STATE_IDLE) {
+            // Name the focused tile (button devices) so icon-only tiles are
+            // identifiable as the focus cursor moves across them.
+            if (!_isTouch) {
+                dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(_w / 2, _h * 0.46, Graphics.FONT_TINY, _focusedName(),
+                            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             dc.drawText(_w / 2, _h * 0.58, Graphics.FONT_NUMBER_MEDIUM, "00:00",
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -300,15 +307,23 @@ class StripView extends WatchUi.View {
                         "Total " + Fmt.duration(_session.elapsedSeconds(now)),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else {
-            // TRANSITION
+            // TRANSITION: name the focused tile (buttons), or note the between-
+            // stations state (touch, which has no focus cursor).
+            var label = _isTouch ? "Between stations" : _focusedName();
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, _h * 0.46, Graphics.FONT_TINY, "Between stations",
+            dc.drawText(_w / 2, _h * 0.46, Graphics.FONT_TINY, label,
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             dc.drawText(_w / 2, _h * 0.58, Graphics.FONT_NUMBER_MEDIUM,
                         Fmt.duration(_session.elapsedSeconds(now)),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
+    }
+
+    //! Name of the currently focused tile (button devices), or "" if none.
+    private function _focusedName() as Lang.String {
+        var id = _ctrl.focusedId();
+        return (id != null) ? Station.nameFor(id) : "";
     }
 
     private function _drawHr(dc as Graphics.Dc, state) as Void {
