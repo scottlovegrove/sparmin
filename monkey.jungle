@@ -9,3 +9,8 @@
 # See https://developer.garmin.com/connect-iq/monkey-c/build-configuration/
 
 project.manifest = manifest.xml
+
+# Per-device drawables live in resources-vivoactive5/ and resources-fr745/.
+# Connect IQ auto-includes resources-<deviceId> qualifier folders, so no
+# explicit resourcePath wiring is needed — shared resources/ holds strings +
+# settings; each device folder holds its own icons + right-sized launcher.

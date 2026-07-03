@@ -20,6 +20,8 @@ class StripView extends WatchUi.View {
     private var _isTouch as Lang.Boolean;
     private var _w as Lang.Number = 0;
     private var _h as Lang.Number = 0;
+    private var _iconSyms as Lang.Dictionary;         // stationId -> Rez.Drawables symbol
+    private var _iconCache as Lang.Dictionary = {};   // stationId -> BitmapResource (or null)
 
     function initialize(session as SessionManager) {
         View.initialize();
@@ -28,6 +30,28 @@ class StripView extends WatchUi.View {
         _isTouch = System.getDeviceSettings().isTouchScreen;
         var tiles = _isTouch ? 4 : 3;      // roomy tiles: VA5 4, FR745 3 (§2)
         _ctrl = new StripController(StationConfig.load(), tiles);
+        _iconSyms = {
+            "outdoor_cold_plunge" => Rez.Drawables.st_outdoor_cold_plunge,
+            "indoor_cold_plunge" => Rez.Drawables.st_indoor_cold_plunge,
+            "hydro_pool" => Rez.Drawables.st_hydro_pool,
+            "heated_loungers" => Rez.Drawables.st_heated_loungers,
+            "salt_sauna" => Rez.Drawables.st_salt_sauna,
+            "steam_room" => Rez.Drawables.st_steam_room,
+            "fire_ice_room" => Rez.Drawables.st_fire_ice_room,
+            "finnish_sauna" => Rez.Drawables.st_finnish_sauna,
+            "ice_cave" => Rez.Drawables.st_ice_cave,
+            "outdoor_lounger" => Rez.Drawables.st_outdoor_lounger
+        };
+    }
+
+    //! Lazily load + cache the station icon bitmap for an id (null if none).
+    private function _iconFor(id) {
+        if (_iconCache.hasKey(id)) {
+            return _iconCache[id];
+        }
+        var bmp = _iconSyms.hasKey(id) ? WatchUi.loadResource(_iconSyms[id]) : null;
+        _iconCache.put(id, bmp);
+        return bmp;
     }
 
     function getController() as StripController { return _ctrl; }
@@ -173,7 +197,9 @@ class StripView extends WatchUi.View {
             var isActive = (activeId != null && activeId.equals(id));
             var isFocused = (!_isTouch && i == _ctrl.focusedIndex);
 
-            dc.setColor(isActive ? Graphics.COLOR_BLUE : Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+            // Dark tiles so the icons (designed on near-black) stay legible; the
+            // active station gets a lighter blue-grey fill.
+            dc.setColor(isActive ? 0x2D5A78 : 0x1C2128, Graphics.COLOR_TRANSPARENT);
             dc.fillRoundedRectangle(x, top, tileW, tileH, 8);
 
             if (isFocused) {
@@ -183,9 +209,15 @@ class StripView extends WatchUi.View {
                 dc.setPenWidth(1);
             }
 
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(x + tileW / 2, top + tileH / 2, Graphics.FONT_XTINY, Station.shortFor(id),
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            var bmp = _iconFor(id);
+            if (bmp != null) {
+                dc.drawBitmap(x + (tileW - bmp.getWidth()) / 2,
+                              top + (tileH - bmp.getHeight()) / 2, bmp);
+            } else {
+                dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(x + tileW / 2, top + tileH / 2, Graphics.FONT_XTINY, Station.shortFor(id),
+                            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
         }
 
         // Scroll chevrons in the side margins when there are more tiles.
