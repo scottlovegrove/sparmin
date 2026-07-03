@@ -41,7 +41,7 @@ module Station {
         "O.Cold",
         "I.Cold",
         "Hydro",
-        "Loungers",
+        "Heated",
         "Salt",
         "Steam",
         "Fire/Ice",

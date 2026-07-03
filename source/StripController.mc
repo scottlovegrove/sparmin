@@ -52,6 +52,11 @@ class StripController {
         return (idx >= 0 && idx < count()) ? visibleIds[idx] : null;
     }
 
+    //! stationId at an absolute index in the visible list, or null.
+    function idAtIndex(i as Lang.Number) {
+        return (i >= 0 && i < visibleIds.size()) ? visibleIds[i] : null;
+    }
+
     //! Re-apply a (possibly reordered/hidden) config, keeping focus in range.
     function reload(newVisibleIds as Lang.Array) as Void {
         visibleIds = newVisibleIds;

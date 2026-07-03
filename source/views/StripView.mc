@@ -14,6 +14,8 @@ class StripView extends WatchUi.View {
     private var _session as SessionManager;
     private var _ctrl as StripController;
     private var _timer as Timer.Timer?;
+    private var _animTimer as Timer.Timer?;
+    private var _visualStart as Lang.Float = 0.0;  // eased window position, in tiles
     private var _hrDisplay;                // Number or null
     private var _isTouch as Lang.Boolean;
     private var _w as Lang.Number = 0;
@@ -24,7 +26,7 @@ class StripView extends WatchUi.View {
         _session = session;
         _hrDisplay = null;
         _isTouch = System.getDeviceSettings().isTouchScreen;
-        var tiles = _isTouch ? 5 : 3;      // VA5 fits 5, FR745 3 (§2)
+        var tiles = _isTouch ? 4 : 3;      // roomy tiles: VA5 4, FR745 3 (§2)
         _ctrl = new StripController(StationConfig.load(), tiles);
     }
 
@@ -35,6 +37,7 @@ class StripView extends WatchUi.View {
     function onShow() as Void {
         // Pick up any station-config changes made on the config screen.
         _ctrl.reload(StationConfig.load());
+        _visualStart = _ctrl.windowStart.toFloat();
         _timer = new Timer.Timer();
         _timer.start(method(:onTick), 1000, true);
     }
@@ -44,6 +47,7 @@ class StripView extends WatchUi.View {
             _timer.stop();
             _timer = null;
         }
+        _stopAnim();
     }
 
     function onTick() as Void {
@@ -51,6 +55,46 @@ class StripView extends WatchUi.View {
         _session.foldHr(HrSampler.currentForStats(info));   // ignored unless STATION_ACTIVE
         _hrDisplay = HrSampler.currentForDisplay(info);
         WatchUi.requestUpdate();
+    }
+
+    //! Ease the strip toward the controller's current window. Called by the
+    //! delegate after a swipe / focus move. A large jump (wrap-around) snaps.
+    function animateToWindow() as Void {
+        var target = _ctrl.windowStart.toFloat();
+        if (_absf(_visualStart - target) > _ctrl.visibleCount + 1) {
+            _visualStart = target;
+            _stopAnim();
+            WatchUi.requestUpdate();
+            return;
+        }
+        if (_animTimer == null) {
+            _animTimer = new Timer.Timer();
+            _animTimer.start(method(:onAnimTick), 33, true);
+        }
+        WatchUi.requestUpdate();
+    }
+
+    function onAnimTick() as Void {
+        var target = _ctrl.windowStart.toFloat();
+        var diff = target - _visualStart;
+        if (_absf(diff) < 0.04) {
+            _visualStart = target;
+            _stopAnim();
+        } else {
+            _visualStart += diff * 0.35;   // exponential ease-out
+        }
+        WatchUi.requestUpdate();
+    }
+
+    private function _stopAnim() as Void {
+        if (_animTimer != null) {
+            _animTimer.stop();
+            _animTimer = null;
+        }
+    }
+
+    private function _absf(v as Lang.Float) as Lang.Float {
+        return v < 0.0 ? -v : v;
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
@@ -74,43 +118,68 @@ class StripView extends WatchUi.View {
         return y > _h * 0.72 && y < _h * 0.93;
     }
 
-    //! Map a tapped point to the stationId under it, or null if outside the strip.
+    // Strip geometry, shared by drawing and hit-testing so taps always line up.
+    // Tiles are inset from the round bezel with gaps between them.
+    private function _stripMargin() as Lang.Float { return _w * 0.05; }
+    private function _stripGap() as Lang.Float { return _w * 0.02; }
+    private function _stripTop() as Lang.Float { return _h * 0.14; }
+    private function _stripTileH() as Lang.Float { return _h * 0.24; }
+    private function _stripTileW(n as Lang.Number) as Lang.Float {
+        return (_w - 2 * _stripMargin() - (n - 1) * _stripGap()) / n;
+    }
+
+    //! Map a tapped point to the stationId under it, or null if outside the
+    //! strip. Uses the same eased geometry as drawing so taps match what's shown.
     function stationIdAtPoint(coords as Lang.Array) {
         if (_w == 0) { return null; }
         var n = _ctrl.visibleCount;
         if (n <= 0) { return null; }
-        var top = (_h * 0.13).toNumber();
-        var tileH = (_h * 0.26).toNumber();
+        var top = _stripTop();
+        var tileH = _stripTileH();
+        var tileW = _stripTileW(n);
+        var step = tileW + _stripGap();
+        var x = coords[0];
         var y = coords[1];
         if (y < top || y > top + tileH) { return null; }
-        var tileW = _w / n;
-        var k = coords[0] / tileW;
-        if (k < 0 || k >= n) { return null; }
-        return _ctrl.idAtSlot(k);
+        var first = _visualStart.toNumber() - 1;
+        var last = _visualStart.toNumber() + n + 1;
+        for (var i = first; i <= last; i += 1) {
+            if (i < 0 || i >= _ctrl.count()) { continue; }
+            var tx = _stripMargin() + (i - _visualStart) * step;
+            if (x >= tx && x <= tx + tileW) {
+                return _ctrl.idAtIndex(i);
+            }
+        }
+        return null;
     }
 
     private function _drawStrip(dc as Graphics.Dc, state) as Void {
         var n = _ctrl.visibleCount;
         if (n <= 0) { return; }
-        var tileW = _w / n;
-        var tileH = (_h * 0.26).toNumber();
-        var top = (_h * 0.13).toNumber();
-        var pad = 4;
+        var top = _stripTop();
+        var tileH = _stripTileH();
+        var tileW = _stripTileW(n);
+        var step = tileW + _stripGap();
         var activeId = _session.getActiveStationId();
-        for (var k = 0; k < n; k += 1) {
-            var id = _ctrl.idAtSlot(k);
+        // Render one extra tile each side so partials slide in during animation.
+        var first = _visualStart.toNumber() - 1;
+        var last = _visualStart.toNumber() + n + 1;
+        for (var i = first; i <= last; i += 1) {
+            if (i < 0 || i >= _ctrl.count()) { continue; }
+            var id = _ctrl.idAtIndex(i);
             if (id == null) { continue; }
-            var x = k * tileW;
+            var x = _stripMargin() + (i - _visualStart) * step;
+            if (x + tileW < 0 || x > _w) { continue; }   // fully off-screen
             var isActive = (activeId != null && activeId.equals(id));
-            var isFocused = (!_isTouch && (_ctrl.windowStart + k) == _ctrl.focusedIndex);
+            var isFocused = (!_isTouch && i == _ctrl.focusedIndex);
 
             dc.setColor(isActive ? Graphics.COLOR_BLUE : Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.fillRoundedRectangle(x + pad, top, tileW - 2 * pad, tileH, 6);
+            dc.fillRoundedRectangle(x, top, tileW, tileH, 8);
 
             if (isFocused) {
                 dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
                 dc.setPenWidth(3);
-                dc.drawRoundedRectangle(x + pad, top, tileW - 2 * pad, tileH, 6);
+                dc.drawRoundedRectangle(x, top, tileW, tileH, 8);
                 dc.setPenWidth(1);
             }
 
@@ -119,7 +188,7 @@ class StripView extends WatchUi.View {
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        // Scroll chevrons when there are more tiles beyond the window.
+        // Scroll chevrons in the side margins when there are more tiles.
         var midY = top + tileH / 2;
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         if (_ctrl.windowStart > 0) {

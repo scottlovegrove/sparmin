@@ -38,8 +38,8 @@ class StripDelegate extends WatchUi.InputDelegate {
             return false;
         }
         // Button device (FR745)
-        if (key == WatchUi.KEY_UP) { _ctrl.moveFocus(-1); WatchUi.requestUpdate(); return true; }
-        if (key == WatchUi.KEY_DOWN) { _ctrl.moveFocus(1); WatchUi.requestUpdate(); return true; }
+        if (key == WatchUi.KEY_UP) { _ctrl.moveFocus(-1); _view.animateToWindow(); return true; }
+        if (key == WatchUi.KEY_DOWN) { _ctrl.moveFocus(1); _view.animateToWindow(); return true; }
         if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) { _selectStation(_ctrl.focusedId()); return true; }
         if (key == WatchUi.KEY_ESC || key == WatchUi.KEY_LAP) { return _back(); }
         if (key == WatchUi.KEY_MENU) { _openConfig(); return true; }
@@ -66,10 +66,10 @@ class StripDelegate extends WatchUi.InputDelegate {
         var dir = evt.getDirection();
         if (dir == WatchUi.SWIPE_LEFT) {
             _ctrl.panWindow(1);
-            WatchUi.requestUpdate();
+            _view.animateToWindow();
         } else if (dir == WatchUi.SWIPE_RIGHT) {
             _ctrl.panWindow(-1);
-            WatchUi.requestUpdate();
+            _view.animateToWindow();
         }
         return true;
     }
