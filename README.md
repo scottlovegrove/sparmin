@@ -73,10 +73,11 @@ In VS Code, use *Monkey C: Run Tests* / the test explorer instead.
 
 ## Design decisions
 
-- **Sport / sub-sport:** `SPORT_GENERIC` / `SUB_SPORT_GENERIC` (no GPS). This is a
-  starting choice — whether Garmin Connect renders the `station` lap developer
-  field depends on it, so validate on the physical devices and adjust in
-  `Recorder.mc` if the field doesn't show.
+- **Sport / sub-sport:** `SPORT_TRAINING` / `SUB_SPORT_BREATHING` (Breathwork) —
+  an HR/time-based recovery activity with no distance (`SPORT_GENERIC` recorded
+  as a distance activity and showed "0 miles"). This choice also affects whether
+  Garmin Connect renders the `station` lap developer field, so re-validate the
+  labels on-device whenever it changes, and adjust in `Recorder.mc`.
 - **Transition time:** recorded as explicit transition laps (a station lap closes,
   a transition lap opens) so the FIT laps align 1:1 with the on-watch segments.
 - **Station labelling:** the `station` field is set to the *closing* lap's label

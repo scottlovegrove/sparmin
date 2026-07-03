@@ -12,11 +12,13 @@ import Toybox.FitContributor;
 //! markLap()/finish() (§6.4).
 class Recorder {
 
-    // The sport/sub-sport is load-bearing: whether Garmin Connect renders the
-    // station lap field depends on it, and it must not demand a GPS fix for an
-    // indoor activity. Validate on-device and adjust here (§6.2, README).
-    const SPORT = Activity.SPORT_GENERIC;
-    const SUB_SPORT = Activity.SUB_SPORT_GENERIC;
+    // The sport/sub-sport is load-bearing: it must not read as a distance/GPS
+    // activity (SPORT_GENERIC showed "0 miles" in Garmin Connect), and whether
+    // the station lap field renders depends on it too. Breathwork is an HR- and
+    // time-based recovery activity with no distance — a good fit for a thermal
+    // spa. Validate on-device and adjust here (§6.2, README).
+    const SPORT = Activity.SPORT_TRAINING;
+    const SUB_SPORT = Activity.SUB_SPORT_BREATHING;
     const FIELD_NAME = "station";
     const FIELD_ID = 0;
 
