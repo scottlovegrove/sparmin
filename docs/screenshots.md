@@ -26,8 +26,10 @@ buttons in the sim; on a touch device tiles/tick are tapped.
 1. **Idle strip ⭐** — a fresh launch lands here. The activity strip across the
    top is the app's signature screen.
 2. **Active session ⭐**
-   - First set a heart rate so the shot isn't `HR --`: **Simulation → Sensors**,
-     Heart Rate ≈ 120. Do this *before* going active.
+   - First set a heart rate so the shot isn't `HR --`: **Simulation → Activity
+     Data**, Heart Rate ≈ 120. (If live HR still reads blank, also set
+     **Simulation → Activity Monitoring** — the history fallback.) HR only draws
+     in the active/transition states, not idle.
    - Select an activity tile (touch: tap; buttons: focus + Start) → it goes
      active and the timer starts.
    - Select a **second** activity to auto-switch, let each run ~30–60 s, so the
