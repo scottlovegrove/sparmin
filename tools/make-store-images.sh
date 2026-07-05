@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Generate the Connect IQ Store listing images from the app art:
-#   submission/hero.png   1440x720  (hero banner, <2 MB)
-#   submission/cover.png  1440x720  (cover image, <300 KB — same design)
+#   submission/hero.png            1440x720  (hero banner, <2 MB)
+#   submission/cover.png           1440x720  (cover image, <300 KB — same design)
+#   submission/icon-24bit.png       128x128  (store app icon, AMOLED / 24-bit)
+#   submission/icon-64color.png     128x128  (store app icon, MIP / 64-colour)
 #
 # Dark spa banner: the blue/orange split-drop brand mark (from icons/app_icon.svg)
 # + "Sparmin" wordmark + tagline, over a band of the real activity icons on
@@ -63,7 +65,28 @@ PY
 mkdir -p submission
 rsvg-convert -w 1440 -h 720 "$tmp/hero.svg" -o submission/hero.png
 cp submission/hero.png submission/cover.png
+
+# Store app icons (128x128): the split-drop brand mark on a dark tile. The Store
+# takes one 24-bit variant (AMOLED) and one 64-colour variant (MIP).
+cat > "$tmp/appicon.svg" <<'SVG'
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#123043"/><stop offset="1" stop-color="#06121b"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" fill="url(#bg)"/>
+  <g transform="translate(12.8,12.8) scale(1.6)">
+    <path d="M32 6 A 26 26 0 0 1 32 58" fill="none" stroke="#37A6E0" stroke-width="9" stroke-linecap="round"/>
+    <path d="M32 6 A 26 26 0 0 0 32 58" fill="none" stroke="#F5822A" stroke-width="9" stroke-linecap="round"/>
+    <path d="M32 24 C 37 32 40 36 40 40 A 8 8 0 1 1 24 40 C 24 36 27 32 32 24 Z" fill="#FFFFFF"/>
+  </g>
+</svg>
+SVG
+rsvg-convert -w 128 -h 128 "$tmp/appicon.svg" -o submission/icon-24bit.png
+magick submission/icon-24bit.png -colors 64 -strip submission/icon-64color.png
+
 echo "generated:"
-for f in submission/hero.png submission/cover.png; do
-    echo "  $f  $(magick identify -format '%wx%h' "$f") $(du -k "$f" | cut -f1)kB"
+for f in submission/hero.png submission/cover.png submission/icon-24bit.png submission/icon-64color.png; do
+    echo "  $f  $(magick identify -format '%wx%h %k colours' "$f") $(du -k "$f" | cut -f1)kB"
 done
