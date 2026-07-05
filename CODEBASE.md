@@ -55,6 +55,7 @@ source/
 │                         # Also holds `class StationAggregate`.
 ├─ Recorder.mc            # ONLY ActivityRecording/FitContributor wrapper.
 │                         # SPORT/SUB_SPORT constants live here (Breathwork).
+│                         # Lap-scope "station" field + session-scope "summary".
 ├─ Station.mc             # module: immutable 10-station catalogue (ids/names/
 │                         # short labels). Canonical ids — never remap.
 ├─ StationConfig.mc       # module: hide/reorder visible ids in Storage; pure
@@ -94,7 +95,9 @@ IDLE ──start/select──▶ TRANSITION ──select station──▶ STATIO
 
 - **Lap contract:** the `station` FitContributor field is set to the *closing*
   lap's label immediately before each `addLap()`/`finish()`, so every lap
-  carries its own station. Transition periods are their own laps.
+  carries its own station. Transition periods are their own laps. On `finish()`
+  a session-scope `summary` field also gets `SessionManager.summaryText()` (one
+  compact line: total, per-station time/visits/HR, transitions).
 - **Timekeeping:** every transition takes an explicit `now` (epoch seconds);
   durations are derived from boundaries, never a ticking counter — correct
   across suspend/resume. Tests pass fixed timestamps; the app passes

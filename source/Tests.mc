@@ -15,6 +15,7 @@ class FakeRecorder {
     public var discarded;
     public var lapLabels as Lang.Array = [];  // labels passed to markLap(), in order
     public var finishLabel;  // label passed to finish()
+    public var finishSummary;  // summary string passed to finish()
 
     function initialize() {
         started = false;
@@ -22,12 +23,13 @@ class FakeRecorder {
         discarded = false;
         lapLabels = [];
         finishLabel = null;
+        finishSummary = null;
     }
 
     function isActive() { return started && !stopped; }
     function startSession() { started = true; }
     function markLap(label) { lapLabels.add(label); }
-    function finish(label) { finishLabel = label; stopped = true; }
+    function finish(label, summary) { finishLabel = label; finishSummary = summary; stopped = true; }
     function discard() { discarded = true; }
 }
 
@@ -123,6 +125,29 @@ function testFullSessionFlowAndLabels(logger) {
 
     sm.dismissSummary();
     Test.assertEqual(sm.getState(), STATE_IDLE);
+    return true;
+}
+
+(:test)
+function testSummaryText(logger) {
+    var rec = new FakeRecorder();
+    var sm = new SessionManager(rec);
+
+    sm.startSession(1000);
+    sm.selectStation("finnish_sauna", 1010);   // trans 10
+    sm.selectStation("ice_cave", 1130);        // finnish 120 (auto-switch)
+    sm.selectStation("finnish_sauna", 1150);   // ice_cave 20 (auto-switch)
+    sm.stopPress(1210);                         // finnish +60 -> total 180, visits 2
+    sm.stopPress(1210);                         // -> confirm
+    sm.confirmEnd(1220);                        // trans 10
+
+    var text = sm.summaryText();
+    // Summary captured at finish() must match what summaryText() reports.
+    Test.assertEqual(rec.finishSummary, text);
+    Test.assert(text.find("Total 03:40") != null);
+    Test.assert(text.find("Finnish sauna 03:00 x2") != null);  // repeat folded
+    Test.assert(text.find("Ice cave 00:20") != null);
+    Test.assert(text.find("Trans 00:20") != null);
     return true;
 }
 

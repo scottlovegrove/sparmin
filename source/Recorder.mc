@@ -21,13 +21,20 @@ class Recorder {
     const SUB_SPORT = Activity.SUB_SPORT_BREATHING;
     const FIELD_NAME = "station";
     const FIELD_ID = 0;
+    // Session-scope field carrying the end-of-session summary line, so the whole
+    // visit is legible on the saved activity (the lap field is per-station only).
+    const SUMMARY_FIELD_NAME = "summary";
+    const SUMMARY_FIELD_ID = 1;
+    const SUMMARY_MAX = 240;
 
     private var _session;
     private var _stationField;
+    private var _summaryField;
 
     function initialize() {
         _session = null;
         _stationField = null;
+        _summaryField = null;
     }
 
     function isActive() {
@@ -50,6 +57,15 @@ class Recorder {
                 :count => Station.maxNameLength()
             }
         );
+        _summaryField = _session.createField(
+            SUMMARY_FIELD_NAME,
+            SUMMARY_FIELD_ID,
+            FitContributor.DATA_TYPE_STRING,
+            {
+                :mesgType => FitContributor.MESG_TYPE_SESSION,
+                :count => SUMMARY_MAX
+            }
+        );
         _session.start();
     }
 
@@ -61,15 +77,19 @@ class Recorder {
         }
     }
 
-    //! Label the final lap, then stop and persist the activity.
-    function finish(label) {
+    //! Label the final lap, attach the session summary, then stop and persist.
+    function finish(label, summary) {
         _setField(label);
+        if (_summaryField != null && summary != null) {
+            _summaryField.setData(summary);
+        }
         if (_session != null) {
             _session.stop();
             _session.save();
         }
         _session = null;
         _stationField = null;
+        _summaryField = null;
     }
 
     function discard() {
@@ -78,6 +98,7 @@ class Recorder {
         }
         _session = null;
         _stationField = null;
+        _summaryField = null;
     }
 
     function _setField(label) {

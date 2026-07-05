@@ -35,6 +35,10 @@ class SessionManager {
 
     const LABEL_TRANSITION = "transition";
 
+    //! Max length of the session-summary string written to the FIT session field.
+    //! Bounds the FIT string buffer (see Recorder); longer summaries are truncated.
+    const SUMMARY_MAX = 240;
+
     private var _recorder;
     private var _state;
     private var _segments as Lang.Array = [];  // Array<Segment>, closed laps in order
@@ -173,17 +177,19 @@ class SessionManager {
     }
 
     //! CONFIRM_END -> SUMMARY: close the final lap, stop and save the activity.
+    //! The final segment is closed first so summaryText() reflects the whole
+    //! session; _openLabel is unchanged, so the FIT closing-lap label still holds.
     function confirmEnd(now) {
         if (_state != STATE_CONFIRM_END) {
             return;
         }
-        _recorder.finish(_openLabel);
         if (_open != null) {
             _open.close(now);
             _segments.add(_open);
             _open = null;
         }
         _sessionEnd = now;
+        _recorder.finish(_openLabel, summaryText());
         _activeStationId = null;
         _state = STATE_SUMMARY;
         _clearPersist();   // recording saved — no in-progress session to resume
@@ -300,6 +306,28 @@ class SessionManager {
             agg.addSegment(s);
         }
         return order;
+    }
+
+    //! One compact line summarising the whole session, written to the FIT
+    //! session field so it surfaces on the activity (§5). Mirrors the on-watch
+    //! summary content. Capped at SUMMARY_MAX chars so it can't overflow the FIT
+    //! string buffer.
+    function summaryText() as Lang.String {
+        var out = "Total " + Fmt.duration(totalSeconds());
+        var aggs = stationAggregates();
+        for (var i = 0; i < aggs.size(); i += 1) {
+            var a = aggs[i];
+            out += " · " + a.displayName + " " + Fmt.duration(a.totalSeconds);
+            if (a.visits > 1) {
+                out += " x" + a.visits.format("%d");
+            }
+            out += " (HR " + Fmt.hr(a.hrAvg()) + "/" + Fmt.hr(a.hrMax) + ")";
+        }
+        out += " · Trans " + Fmt.duration(transitionSeconds());
+        if (out.length() > SUMMARY_MAX) {
+            out = out.substring(0, SUMMARY_MAX) as Lang.String;
+        }
+        return out;
     }
 
     //! Build the §12 backend payload as a JSON-serialisable Dictionary.
