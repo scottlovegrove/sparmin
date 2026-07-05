@@ -6,10 +6,10 @@ import Toybox.System;
 import Toybox.Timer;
 import Toybox.Time;
 
-//! Home screen: renders IDLE / TRANSITION / STATION_ACTIVE (§9 views 1–2). The
-//! station strip sits at the top; master + station timers and live HR below.
+//! Home screen: renders IDLE / TRANSITION / IN_ACTIVITY (§9 views 1–2). The
+//! activity strip sits at the top; master + activity timers and live HR below.
 //! Custom-drawn so one view adapts to both round displays. A 1 s timer refreshes
-//! the display and folds the live HR sample into the open station lap.
+//! the display and folds the live HR sample into the open activity lap.
 class StripView extends WatchUi.View {
     private var _session as SessionManager;
     private var _ctrl as StripController;
@@ -20,8 +20,8 @@ class StripView extends WatchUi.View {
     private var _isTouch as Lang.Boolean;
     private var _w as Lang.Number = 0;
     private var _h as Lang.Number = 0;
-    private var _iconSyms as Lang.Dictionary;         // stationId -> Rez.Drawables symbol
-    private var _iconCache as Lang.Dictionary = {};   // stationId -> BitmapResource (or null)
+    private var _iconSyms as Lang.Dictionary;         // activityId -> Rez.Drawables symbol
+    private var _iconCache as Lang.Dictionary = {};   // activityId -> BitmapResource (or null)
     private var _touchLocked as Lang.Boolean = false; // water-safe touch-lock (§ StripDelegate)
 
     function initialize(session as SessionManager) {
@@ -30,7 +30,7 @@ class StripView extends WatchUi.View {
         _hrDisplay = null;
         _isTouch = System.getDeviceSettings().isTouchScreen;
         var tiles = _isTouch ? 4 : 3;      // roomy tiles: VA5 4, FR745 3 (§2)
-        _ctrl = new StripController(StationConfig.load(), tiles);
+        _ctrl = new StripController(ActivityConfig.load(), tiles);
         _iconSyms = {
             "outdoor_cold_plunge" => Rez.Drawables.st_outdoor_cold_plunge,
             "indoor_cold_plunge" => Rez.Drawables.st_indoor_cold_plunge,
@@ -45,7 +45,7 @@ class StripView extends WatchUi.View {
         };
     }
 
-    //! Lazily load + cache the station icon bitmap for an id (null if none).
+    //! Lazily load + cache the activity icon bitmap for an id (null if none).
     private function _iconFor(id) {
         if (_iconCache.hasKey(id)) {
             return _iconCache[id];
@@ -65,8 +65,8 @@ class StripView extends WatchUi.View {
     function toggleTouchLock() as Void { _touchLocked = !_touchLocked; }
 
     function onShow() as Void {
-        // Pick up any station-config changes made on the config screen.
-        _ctrl.reload(StationConfig.load());
+        // Pick up any activity-config changes made on the config screen.
+        _ctrl.reload(ActivityConfig.load());
         // A touch-lock only guards a live session; a finished one (back at IDLE)
         // must leave the strip unlocked, else the lock lingers with no way off it.
         if (_session.getState() == STATE_IDLE) {
@@ -87,7 +87,7 @@ class StripView extends WatchUi.View {
 
     function onTick() as Void {
         var info = Activity.getActivityInfo();
-        _session.foldHr(HrSampler.currentForStats(info));   // ignored unless STATION_ACTIVE
+        _session.foldHr(HrSampler.currentForStats(info));   // ignored unless IN_ACTIVITY
         _hrDisplay = HrSampler.currentForDisplay(info);
         WatchUi.requestUpdate();
     }
@@ -212,7 +212,7 @@ class StripView extends WatchUi.View {
         dc.fillRoundedRectangle(cx - bw / 2, cy, bw, bh, 3);            // body
     }
 
-    //! True when a tap lands on the idle footer (the "Edit stations" target).
+    //! True when a tap lands on the idle footer (the "Edit activities" target).
     function isFooterTap(coords as Lang.Array) as Lang.Boolean {
         var y = coords[1];
         return y > _h * 0.72 && y < _h * 0.93;
@@ -228,9 +228,9 @@ class StripView extends WatchUi.View {
         return (_w - 2 * _stripMargin() - (n - 1) * _stripGap()) / n;
     }
 
-    //! Map a tapped point to the stationId under it, or null if outside the
+    //! Map a tapped point to the activityId under it, or null if outside the
     //! strip. Uses the same eased geometry as drawing so taps match what's shown.
-    function stationIdAtPoint(coords as Lang.Array) {
+    function activityIdAtPoint(coords as Lang.Array) {
         if (_w == 0) { return null; }
         var n = _ctrl.visibleCount;
         if (n <= 0) { return null; }
@@ -260,7 +260,7 @@ class StripView extends WatchUi.View {
         var tileH = _stripTileH();
         var tileW = _stripTileW(n);
         var step = tileW + _stripGap();
-        var activeId = _session.getActiveStationId();
+        var activeId = _session.getActiveActivityId();
         // Render one extra tile each side so partials slide in during animation.
         var first = _visualStart.toNumber() - 1;
         var last = _visualStart.toNumber() + n + 1;
@@ -274,7 +274,7 @@ class StripView extends WatchUi.View {
             var isFocused = (!_isTouch && i == _ctrl.focusedIndex);
 
             // Dark tiles so the icons (designed on near-black) stay legible; the
-            // active station gets a lighter blue-grey fill.
+            // active activity gets a lighter blue-grey fill.
             dc.setColor(isActive ? 0x2D5A78 : 0x1C2128, Graphics.COLOR_TRANSPARENT);
             dc.fillRoundedRectangle(x, top, tileW, tileH, 8);
 
@@ -291,7 +291,7 @@ class StripView extends WatchUi.View {
                               top + (tileH - bmp.getHeight()) / 2, bmp);
             } else {
                 dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(x + tileW / 2, top + tileH / 2, Graphics.FONT_XTINY, Station.shortFor(id),
+                dc.drawText(x + tileW / 2, top + tileH / 2, Graphics.FONT_XTINY, SpaActivity.shortFor(id),
                             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             }
         }
@@ -336,13 +336,13 @@ class StripView extends WatchUi.View {
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }
-        if (state == STATE_STATION_ACTIVE) {
+        if (state == STATE_IN_ACTIVITY) {
             dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, _h * 0.46, _labelFont(), Station.nameFor(_session.getActiveStationId()),
+            dc.drawText(_w / 2, _h * 0.46, _labelFont(), SpaActivity.nameFor(_session.getActiveActivityId()),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             dc.drawText(_w / 2, _h * 0.58, _numFont(),
-                        Fmt.duration(_session.stationElapsedSeconds(now)),
+                        Fmt.duration(_session.activityElapsedSeconds(now)),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(_w / 2, _h * 0.71, Graphics.FONT_XTINY,
@@ -350,8 +350,8 @@ class StripView extends WatchUi.View {
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else {
             // TRANSITION: name the focused tile (buttons), or note the between-
-            // stations state (touch, which has no focus cursor).
-            var label = _isTouch ? "Between stations" : _focusedName();
+            // activities state (touch, which has no focus cursor).
+            var label = _isTouch ? "Between activities" : _focusedName();
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(_w / 2, _h * 0.46, _labelFont(), label,
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -365,7 +365,7 @@ class StripView extends WatchUi.View {
     //! Name of the currently focused tile (button devices), or "" if none.
     private function _focusedName() as Lang.String {
         var id = _ctrl.focusedId();
-        return (id != null) ? Station.nameFor(id) : "";
+        return (id != null) ? SpaActivity.nameFor(id) : "";
     }
 
     private function _drawHr(dc as Graphics.Dc, state) as Void {
@@ -377,7 +377,7 @@ class StripView extends WatchUi.View {
 
     private function _drawHint(dc as Graphics.Dc) as Void {
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        var msg = _isTouch ? "Tap a station to start" : "Select a station to start";
+        var msg = _isTouch ? "Tap an activity to start" : "Select an activity to start";
         // ≥240px keeps the original 0.68h line. On smaller screens the fixed 0.68/
         // 0.58 gap is too tight for the number glyph, so anchor the hint just below
         // the actual timer height instead of colliding with it.

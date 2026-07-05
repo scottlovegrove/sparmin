@@ -61,7 +61,7 @@ commands from the command palette instead.
 ## Tests
 
 The device-independent core (state machine, lap logic, aggregation, HR folding,
-station config, payload) is covered by `(:test)` unit tests in
+activity config, payload) is covered by `(:test)` unit tests in
 `source/Tests.mc`. Build a test binary and run it in the simulator:
 
 ```sh
@@ -76,12 +76,12 @@ In VS Code, use *Monkey C: Run Tests* / the test explorer instead.
 - **Sport / sub-sport:** `SPORT_TRAINING` / `SUB_SPORT_BREATHING` (Breathwork) —
   an HR/time-based recovery activity with no distance (`SPORT_GENERIC` recorded
   as a distance activity and showed "0 miles"). This choice also affects whether
-  Garmin Connect renders the `station` lap developer field, so re-validate the
+  Garmin Connect renders the `activity` lap developer field, so re-validate the
   labels on-device whenever it changes, and adjust in `Recorder.mc`.
-- **Transition time:** recorded as explicit transition laps (a station lap closes,
+- **Transition time:** recorded as explicit transition laps (an activity lap closes,
   a transition lap opens) so the FIT laps align 1:1 with the on-watch segments.
-- **Station labelling:** the `station` field is set to the *closing* lap's label
-  immediately before each `addLap()`/stop, so every lap carries its own station.
+- **Activity labelling:** the `activity` field is set to the *closing* lap's label
+  immediately before each `addLap()`/stop, so every lap carries its own activity.
 - **Backend sync:** parked. `BackendClient` honours the payload contract and
   `SessionManager.buildPayload()` produces it, but nothing POSTs yet.
 

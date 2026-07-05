@@ -5,7 +5,7 @@ import Toybox.ActivityMonitor;
 //! Heart-rate acquisition and validity filtering. Stat folding itself lives on
 //! Segment; this module decides what counts as a usable reading.
 //!
-//! Only the live activity sample feeds per-station stats. The history fallback
+//! Only the live activity sample feeds per-activity stats. The history fallback
 //! is display-only — folding it into stats would pollute them with stale values
 //! (§8).
 module HrSampler {
@@ -20,7 +20,7 @@ module HrSampler {
     }
 
     //! Display-only HR: the live sample, else the most recent non-invalid sample
-    //! from HR history. Never feed the result into per-station stats.
+    //! from HR history. Never feed the result into per-activity stats.
     function currentForDisplay(info) {
         var live = currentForStats(info);
         if (live != null) {

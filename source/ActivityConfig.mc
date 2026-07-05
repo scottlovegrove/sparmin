@@ -1,16 +1,16 @@
 import Toybox.Lang;
 import Toybox.Application;
 
-//! User-configurable display order + visibility for the station strip, stored as
-//! an ordered array of visible stationIds (order = display order, absence =
+//! User-configurable display order + visibility for the activity strip, stored as
+//! an ordered array of visible activityIds (order = display order, absence =
 //! hidden). Pure display layer: it never affects recorded data — a hidden
-//! station simply can't be selected, and its canonical id is untouched.
+//! activity simply can't be selected, and its canonical id is untouched.
 //!
 //! The mutation helpers are pure (list in → new list out) so they can be unit
 //! tested without Storage; load/save wrap them onto Application.Storage.
-module StationConfig {
+module ActivityConfig {
 
-    const STORAGE_KEY = "stationConfig";
+    const STORAGE_KEY = "activityConfig";
 
     //! Ordered visible ids. Falls back to the full catalogue on first run or if
     //! the stored value is missing/corrupt. Stale or duplicate ids are filtered
@@ -18,31 +18,31 @@ module StationConfig {
     function load() as Lang.Array {
         var stored = Application.Storage.getValue(STORAGE_KEY);
         if (!(stored instanceof Array)) {
-            return Station.allIds();
+            return SpaActivity.allIds();
         }
         var arr = stored as Lang.Array;
         var out = [];
         for (var i = 0; i < arr.size(); i += 1) {
             var id = arr[i];
-            if (Station.isValidId(id) && out.indexOf(id) < 0) {
+            if (SpaActivity.isValidId(id) && out.indexOf(id) < 0) {
                 out.add(id);
             }
         }
-        return out.size() > 0 ? out : Station.allIds();
+        return out.size() > 0 ? out : SpaActivity.allIds();
     }
 
     function save(visibleIds) {
         Application.Storage.setValue(STORAGE_KEY, visibleIds);
     }
 
-    //! Toggle a station's visibility. Hiding is blocked when it would empty the
-    //! strip (at least one station must remain). Showing appends at the end.
+    //! Toggle a activity's visibility. Hiding is blocked when it would empty the
+    //! strip (at least one activity must remain). Showing appends at the end.
     //! Returns the new list (unchanged if the hide was blocked).
     function toggle(visibleIds as Lang.Array, id) as Lang.Array {
         var idx = visibleIds.indexOf(id);
         if (idx >= 0) {
             if (visibleIds.size() <= 1) {
-                return visibleIds; // can't hide the last visible station
+                return visibleIds; // can't hide the last visible activity
             }
             var out = [];
             for (var i = 0; i < visibleIds.size(); i += 1) {
@@ -52,7 +52,7 @@ module StationConfig {
             }
             return out;
         }
-        if (!Station.isValidId(id)) {
+        if (!SpaActivity.isValidId(id)) {
             return visibleIds;
         }
         var shown = [];

@@ -5,7 +5,7 @@ import Toybox.Application;
 enum {
     STATE_IDLE,
     STATE_TRANSITION,
-    STATE_STATION_ACTIVE,
+    STATE_IN_ACTIVITY,
     STATE_CONFIRM_END,
     STATE_SUMMARY
 }
@@ -47,7 +47,7 @@ class SessionManager {
     private var _sessionStart;   // epoch seconds, or null
     private var _sessionEnd;     // epoch seconds, or null
     private var _sessionId;      // String, or null
-    private var _activeStationId;// convenience mirror for the UI
+    private var _activeActivityId;// convenience mirror for the UI
 
     function initialize(recorder) {
         _recorder = recorder;
@@ -62,20 +62,20 @@ class SessionManager {
         _sessionStart = null;
         _sessionEnd = null;
         _sessionId = null;
-        _activeStationId = null;
+        _activeActivityId = null;
     }
 
     // ---- Queries ----
 
     function getState() { return _state; }
     function getSessionId() { return _sessionId; }
-    function getActiveStationId() { return _activeStationId; }
+    function getActiveActivityId() { return _activeActivityId; }
     function getOpenSegment() { return _open; }
     function getSessionStart() { return _sessionStart; }
 
     function isRecording() {
         return _state == STATE_TRANSITION
-            || _state == STATE_STATION_ACTIVE
+            || _state == STATE_IN_ACTIVITY
             || _state == STATE_CONFIRM_END;
     }
 
@@ -98,7 +98,7 @@ class SessionManager {
         _sessionEnd = snap["sessionEnd"];
         _sessionId = snap["sessionId"];
         _openLabel = snap["openLabel"];
-        _activeStationId = snap["activeStationId"];
+        _activeActivityId = snap["activeActivityId"];
         _segments = [];
         var segs = snap["segments"] as Lang.Array;
         for (var i = 0; i < segs.size(); i += 1) {
@@ -119,7 +119,7 @@ class SessionManager {
             "sessionEnd" => _sessionEnd,
             "sessionId" => _sessionId,
             "openLabel" => _openLabel,
-            "activeStationId" => _activeStationId,
+            "activeActivityId" => _activeActivityId,
             "segments" => segs,
             "open" => (_open != null) ? _open.toDict() : null
         });
@@ -129,24 +129,24 @@ class SessionManager {
         Application.Storage.deleteValue(SESSION_SNAP_KEY);
     }
 
-    //! Select a station tile. Behaviour depends on the current state:
-    //!  - IDLE:            start the session, then open the station lap.
-    //!  - TRANSITION:      open the station lap.
-    //!  - STATION_ACTIVE, same station:      close it -> TRANSITION.
-    //!  - STATION_ACTIVE, different station: auto-switch, zero gap.
-    function selectStation(stationId, now) {
+    //! Select a activity tile. Behaviour depends on the current state:
+    //!  - IDLE:            start the session, then open the activity lap.
+    //!  - TRANSITION:      open the activity lap.
+    //!  - IN_ACTIVITY, same activity:      close it -> TRANSITION.
+    //!  - IN_ACTIVITY, different activity: auto-switch, zero gap.
+    function selectActivity(activityId, now) {
         if (_state == STATE_IDLE) {
             _beginSession(now);
-            _openStation(stationId, now);
+            _openActivity(activityId, now);
         } else if (_state == STATE_TRANSITION) {
-            _openStation(stationId, now);
-        } else if (_state == STATE_STATION_ACTIVE) {
-            if (_activeStationId != null && _activeStationId.equals(stationId)) {
+            _openActivity(activityId, now);
+        } else if (_state == STATE_IN_ACTIVITY) {
+            if (_activeActivityId != null && _activeActivityId.equals(activityId)) {
                 _boundary(null, LABEL_TRANSITION, now);
-                _activeStationId = null;
+                _activeActivityId = null;
                 _state = STATE_TRANSITION;
             } else {
-                _openStation(stationId, now);
+                _openActivity(activityId, now);
             }
         } else {
             return;   // no-op state: nothing to persist
@@ -155,12 +155,12 @@ class SessionManager {
     }
 
     //! Context-dependent stop button.
-    //!  - STATION_ACTIVE: close the station lap -> TRANSITION.
+    //!  - IN_ACTIVITY: close the activity lap -> TRANSITION.
     //!  - TRANSITION:     -> CONFIRM_END.
     function stopPress(now) {
-        if (_state == STATE_STATION_ACTIVE) {
+        if (_state == STATE_IN_ACTIVITY) {
             _boundary(null, LABEL_TRANSITION, now);
-            _activeStationId = null;
+            _activeActivityId = null;
             _state = STATE_TRANSITION;
             _persist();
         } else if (_state == STATE_TRANSITION) {
@@ -190,7 +190,7 @@ class SessionManager {
         }
         _sessionEnd = now;
         _recorder.finish(_openLabel, summaryText());
-        _activeStationId = null;
+        _activeActivityId = null;
         _state = STATE_SUMMARY;
         _clearPersist();   // recording saved — no in-progress session to resume
     }
@@ -201,9 +201,9 @@ class SessionManager {
         }
     }
 
-    //! Fold a live HR reading into the open station lap (station laps only).
+    //! Fold a live HR reading into the open activity lap (activity laps only).
     function foldHr(hr) {
-        if (_state == STATE_STATION_ACTIVE && _open != null && hr != null) {
+        if (_state == STATE_IN_ACTIVITY && _open != null && hr != null) {
             _open.foldHr(hr);
         }
     }
@@ -218,24 +218,24 @@ class SessionManager {
         _recorder.startSession();
         _open = new Segment(null, now);
         _openLabel = LABEL_TRANSITION;
-        _activeStationId = null;
+        _activeActivityId = null;
         _state = STATE_TRANSITION;
     }
 
-    private function _openStation(stationId, now) {
-        _boundary(stationId, Station.nameFor(stationId), now);
-        _activeStationId = stationId;
-        _state = STATE_STATION_ACTIVE;
+    private function _openActivity(activityId, now) {
+        _boundary(activityId, SpaActivity.nameFor(activityId), now);
+        _activeActivityId = activityId;
+        _state = STATE_IN_ACTIVITY;
     }
 
     //! Close the open lap (labelled with its own label) and open a new one.
-    private function _boundary(newStationId, newLabel, now) {
+    private function _boundary(newActivityId, newLabel, now) {
         _recorder.markLap(_openLabel);
         if (_open != null) {
             _open.close(now);
             _segments.add(_open);
         }
-        _open = new Segment(newStationId, now);
+        _open = new Segment(newActivityId, now);
         _openLabel = newLabel;
     }
 
@@ -257,9 +257,9 @@ class SessionManager {
         return now - _sessionStart;
     }
 
-    //! Live elapsed in the open station lap at `now`, or 0 when not in a station.
-    function stationElapsedSeconds(now) {
-        if (_state == STATE_STATION_ACTIVE && _open != null) {
+    //! Live elapsed in the open activity lap at `now`, or 0 when not in a activity.
+    function activityElapsedSeconds(now) {
+        if (_state == STATE_IN_ACTIVITY && _open != null) {
             return now - _open.startTime;
         }
         return 0;
@@ -268,39 +268,39 @@ class SessionManager {
     function transitionSeconds() {
         var sum = 0;
         for (var i = 0; i < _segments.size(); i += 1) {
-            if (!_segments[i].isStation()) {
+            if (!_segments[i].isActivity()) {
                 sum += _segments[i].durationSeconds();
             }
         }
         return sum;
     }
 
-    //! Chronological station segments only (transition laps excluded).
-    function stationSegments() as Lang.Array {
+    //! Chronological activity segments only (transition laps excluded).
+    function activitySegments() as Lang.Array {
         var out = [];
         for (var i = 0; i < _segments.size(); i += 1) {
             var s = _segments[i];
-            if (s.isStation()) {
+            if (s.isActivity()) {
                 out.add(s);
             }
         }
         return out;
     }
 
-    //! One StationAggregate per station, repeat visits summed, in first-visit
+    //! One ActivityAggregate per activity, repeat visits summed, in first-visit
     //! order.
-    function stationAggregates() as Lang.Array {
-        var order = [];                    // Array<StationAggregate>
-        var byId = {} as Lang.Dictionary;  // stationId -> StationAggregate
+    function activityAggregates() as Lang.Array {
+        var order = [];                    // Array<ActivityAggregate>
+        var byId = {} as Lang.Dictionary;  // activityId -> ActivityAggregate
         for (var i = 0; i < _segments.size(); i += 1) {
             var s = _segments[i];
-            if (!s.isStation()) {
+            if (!s.isActivity()) {
                 continue;
             }
-            var agg = byId[s.stationId];
+            var agg = byId[s.activityId];
             if (agg == null) {
-                agg = new StationAggregate(s.stationId);
-                byId[s.stationId] = agg;
+                agg = new ActivityAggregate(s.activityId);
+                byId[s.activityId] = agg;
                 order.add(agg);
             }
             agg.addSegment(s);
@@ -314,7 +314,7 @@ class SessionManager {
     //! string buffer.
     function summaryText() as Lang.String {
         var out = "Total " + Fmt.duration(totalSeconds());
-        var aggs = stationAggregates();
+        var aggs = activityAggregates();
         for (var i = 0; i < aggs.size(); i += 1) {
             var a = aggs[i];
             out += " · " + a.displayName + " " + Fmt.duration(a.totalSeconds);
@@ -332,17 +332,17 @@ class SessionManager {
 
     //! Build the §12 backend payload as a JSON-serialisable Dictionary.
     function buildPayload() as Lang.Dictionary {
-        var stations = [];
-        var aggs = stationAggregates();
+        var activities = [];
+        var aggs = activityAggregates();
         for (var i = 0; i < aggs.size(); i += 1) {
-            stations.add(aggs[i].toDict());
+            activities.add(aggs[i].toDict());
         }
         var segs = [];
-        var chron = stationSegments();
+        var chron = activitySegments();
         for (var i = 0; i < chron.size(); i += 1) {
             var s = chron[i];
             segs.add({
-                "stationId" => s.stationId,
+                "activityId" => s.activityId,
                 "startedAt" => Iso.fromEpoch(s.startTime),
                 "endedAt" => Iso.fromEpoch(s.endTime),
                 "hrAvg" => s.hrAvg(),
@@ -356,16 +356,16 @@ class SessionManager {
             "endedAt" => Iso.fromEpoch(_sessionEnd),
             "totalSeconds" => totalSeconds(),
             "transitionSeconds" => transitionSeconds(),
-            "stations" => stations,
+            "activities" => activities,
             "segments" => segs
         };
     }
 }
 
-//! Per-station rollup used by the summary screen and the backend payload.
-//! Repeat visits to the same station fold into one of these.
-class StationAggregate {
-    public var stationId;
+//! Per-activity rollup used by the summary screen and the backend payload.
+//! Repeat visits to the same activity fold into one of these.
+class ActivityAggregate {
+    public var activityId;
     public var displayName;
     public var totalSeconds;
     public var visits;
@@ -374,9 +374,9 @@ class StationAggregate {
     public var hrMin;
     public var hrMax;
 
-    function initialize(stationId) {
-        me.stationId = stationId;
-        me.displayName = Station.nameFor(stationId);
+    function initialize(activityId) {
+        me.activityId = activityId;
+        me.displayName = SpaActivity.nameFor(activityId);
         me.totalSeconds = 0;
         me.visits = 0;
         me.hrSum = 0;
@@ -407,7 +407,7 @@ class StationAggregate {
 
     function toDict() {
         return {
-            "stationId" => stationId,
+            "activityId" => activityId,
             "displayName" => displayName,
             "totalSeconds" => totalSeconds,
             "visits" => visits,

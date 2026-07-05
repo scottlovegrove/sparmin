@@ -4,7 +4,7 @@ import Toybox.Application;
 //! "Water-safe touch" preference + the double-tap rule that backs it.
 //!
 //! On a wet touchscreen (e.g. climbing out of a hydro pool) warm droplets fire
-//! spurious single taps that the app reads as real station selections. When the
+//! spurious single taps that the app reads as real activity selections. When the
 //! preference is on, tile actuation and the confirm-end tick require a deliberate
 //! *double* tap of the same target within a short window, so a lone droplet tap
 //! is ignored (the strip also offers a button-driven touch-lock for full
@@ -12,7 +12,7 @@ import Toybox.Application;
 //!
 //! `confirmsTap` is pure (no Storage / device APIs) so the double-tap rule is
 //! unit-tested in one place; load/save wrap the flag onto Application.Storage,
-//! mirroring StationConfig.
+//! mirroring ActivityConfig.
 module TouchConfig {
 
     const STORAGE_KEY = "waterSafe";

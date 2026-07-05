@@ -1,10 +1,10 @@
 import Toybox.Lang;
 
 //! Pure strip navigation: the focus cursor (button devices) and the visible
-//! window over the configured station list. No drawing, no device APIs — the
+//! window over the configured activity list. No drawing, no device APIs — the
 //! edge-sliding rule (§4) is unit-testable here.
 class StripController {
-    public var visibleIds as Lang.Array;  // configured, ordered visible stationIds
+    public var visibleIds as Lang.Array;  // configured, ordered visible activityIds
     public var focusedIndex as Lang.Number;
     public var windowStart as Lang.Number;
     public var visibleCount as Lang.Number;
@@ -46,13 +46,13 @@ class StripController {
         windowStart = _clampStart(windowStart + delta);
     }
 
-    //! stationId shown in window slot k (0 .. visibleCount-1), or null.
+    //! activityId shown in window slot k (0 .. visibleCount-1), or null.
     function idAtSlot(k as Lang.Number) {
         var idx = windowStart + k;
         return (idx >= 0 && idx < count()) ? visibleIds[idx] : null;
     }
 
-    //! stationId at an absolute index in the visible list, or null.
+    //! activityId at an absolute index in the visible list, or null.
     function idAtIndex(i as Lang.Number) {
         return (i >= 0 && i < visibleIds.size()) ? visibleIds[i] : null;
     }

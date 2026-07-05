@@ -74,7 +74,7 @@ family that has a folder, which keeps the mapping explicit.
 
 `tools/rasterise-icons.sh` regenerates all folders from `icons/*.svg`:
 
-- **Station icons** scale with the screen — `icon = round(0.133·minDim + 12)`,
+- **Activity icons** scale with the screen — `icon = round(0.133·minDim + 12)`,
   the line through the two hand-tuned originals (44px @ 240px, 64px @ 390px).
 - **Launcher icon** is the only manifest-declared (size-sensitive) asset, so a
   mismatch produces a benign "will be scaled" build note. Each family's launcher
@@ -130,8 +130,8 @@ you can never update the published app.
 From the spec's acceptance criteria (§13, §15), at minimum:
 
 - A **full real session on a physical watch** records a FIT activity that
-  appears in Garmin Connect with one lap per station, correct durations, per-lap
-  HR, and the station labels showing (validates the sport/sub-sport choice).
+  appears in Garmin Connect with one lap per activity, correct durations, per-lap
+  HR, and the activity labels showing (validates the sport/sub-sport choice).
 - **MIP colour legibility** on the real FR745 (the simulator only approximates
   its palette).
 - **Memory headroom** on the smallest supported device (CIQ enforces a per-app
@@ -163,7 +163,7 @@ options in the developer docs. For a personal spa logger, free is the norm.
 
 ## Sparmin-specific notes
 
-- The **backend** (Strava station labels) is a separate deliverable and doesn't
+- The **backend** (Strava activity labels) is a separate deliverable and doesn't
   gate store submission. The watch queues its POST and retries, so a missing
   backend degrades gracefully — fine to publish the watch app first.
 - Because the app records a **real FIT activity**, behave well with Garmin

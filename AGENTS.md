@@ -6,7 +6,7 @@
 > human-facing build/run + design-decisions doc.
 
 A personal Garmin **Connect IQ** watch app (Monkey C) for logging thermal spa
-sessions as a FIT activity, one lap per station. Targets the vívoactive 5 (390px
+sessions as a FIT activity, one lap per activity. Targets the vívoactive 5 (390px
 touch) and Forerunner 745 (240px, 5 buttons).
 
 ## Build & Run
@@ -44,8 +44,8 @@ to the watch's `GARMIN/APPS/`.
   dynamic dictionaries/arrays to `Lang.Dictionary` / `Lang.Array` and annotate
   return types to avoid "container access" warnings. `hidden`/`class`/etc. are
   reserved words — don't name locals after them.
-- **Canonical station ids.** `stationId`s in `Station.mc` are permanent.
-  Hiding/reordering (`StationConfig`) is a pure display layer — it must never
+- **Canonical activity ids.** `activityId`s in `SpaActivity.mc` are permanent.
+  Hiding/reordering (`ActivityConfig`) is a pure display layer — it must never
   remap or drop an id. The id written to the FIT lap field and the backend
   payload always comes from the catalogue.
 - **Keep the core device-API-free.** `SessionManager` and the duration/
@@ -55,9 +55,9 @@ to the watch's `GARMIN/APPS/`.
 - **Timekeeping.** Pass an explicit `now` (epoch seconds) into every state
   transition; derive durations from boundaries. Never accumulate a ticking
   counter — it drifts across suspend/resume.
-- **FIT lap labelling.** Set the `station` FitContributor field to the *closing*
+- **FIT lap labelling.** Set the `activity` FitContributor field to the *closing*
   lap's label immediately before each `addLap()`/`finish()`, so every lap
-  carries its own station.
+  carries its own activity.
 - **No device hardcoding.** Adapt from `System.getDeviceSettings()` (touch vs
   buttons, width) — never `if (device == …)`.
 - **Per-family resources.** Drawables resolve by **screen family**, not device:
@@ -84,7 +84,7 @@ monkeydo bin/Sparmin-test.prg vivoactive5 -t
 - **When you add or change core logic, add/adjust a test.** The whole point of
   the device-API-free core is that it's pinned by unit tests.
 - **Device-dependent behaviour is NOT sim-testable** — sport/sub-sport rendering
-  and station labels in Garmin Connect, MIP colour legibility (FR745), memory
+  and activity labels in Garmin Connect, MIP colour legibility (FR745), memory
   headroom, and the crash-resume FIT reconnect can only be validated on the
   physical watch. Flag these when you touch them; don't claim them verified from
   the simulator.

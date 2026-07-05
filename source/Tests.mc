@@ -5,7 +5,7 @@ import Toybox.Application;
 //! Unit tests for the device-independent core (§13). Build/run with --unit-test
 //! in the simulator. These cover the state machine, lap-boundary logic, duration
 //! and aggregation derivation, HR stat folding, payload construction, and the
-//! station-config helpers — none of which touch device sensor/UI APIs.
+//! activity-config helpers — none of which touch device sensor/UI APIs.
 
 //! A stand-in for Recorder so SessionManager runs without ActivityRecording. It
 //! records the labels handed to it so we can assert the FIT labelling order.
@@ -33,22 +33,22 @@ class FakeRecorder {
     function discard() { discarded = true; }
 }
 
-// ---- Station config ----
+// ---- SpaActivity config ----
 
 (:test)
 function testDefaultConfigIsFullCatalogue(logger) {
-    Application.Storage.deleteValue(StationConfig.STORAGE_KEY);
-    var cfg = StationConfig.load();
-    Test.assertEqual(cfg.size(), Station.count());
+    Application.Storage.deleteValue(ActivityConfig.STORAGE_KEY);
+    var cfg = ActivityConfig.load();
+    Test.assertEqual(cfg.size(), SpaActivity.count());
     Test.assertEqual(cfg[0], "outdoor_cold_plunge");
     Test.assertEqual(cfg[cfg.size() - 1], "outdoor_lounger");
     return true;
 }
 
 (:test)
-function testCannotHideLastStation(logger) {
+function testCannotHideLastActivity(logger) {
     var one = ["finnish_sauna"];
-    var after = StationConfig.toggle(one, "finnish_sauna");
+    var after = ActivityConfig.toggle(one, "finnish_sauna");
     Test.assertEqual(after.size(), 1); // blocked; unchanged
     Test.assertEqual(after[0], "finnish_sauna");
     return true;
@@ -57,10 +57,10 @@ function testCannotHideLastStation(logger) {
 (:test)
 function testHideThenShow(logger) {
     var ids = ["outdoor_cold_plunge", "hydro_pool", "steam_room"];
-    var afterHide = StationConfig.toggle(ids, "hydro_pool");
+    var afterHide = ActivityConfig.toggle(ids, "hydro_pool");
     Test.assertEqual(afterHide.size(), 2);
     Test.assertEqual(afterHide.indexOf("hydro_pool"), -1);
-    var shown = StationConfig.toggle(afterHide, "hydro_pool");
+    var shown = ActivityConfig.toggle(afterHide, "hydro_pool");
     Test.assertEqual(shown.size(), 3);
     Test.assertEqual(shown[shown.size() - 1], "hydro_pool"); // appended
     return true;
@@ -69,7 +69,7 @@ function testHideThenShow(logger) {
 (:test)
 function testReorderMovesOnlyOrder(logger) {
     var ids = ["outdoor_cold_plunge", "indoor_cold_plunge", "hydro_pool"];
-    var moved = StationConfig.move(ids, 0, 2);
+    var moved = ActivityConfig.move(ids, 0, 2);
     Test.assertEqual(moved.size(), 3);
     Test.assertEqual(moved[0], "indoor_cold_plunge");
     Test.assertEqual(moved[1], "hydro_pool");
@@ -129,11 +129,11 @@ function testFullSessionFlowAndLabels(logger) {
     sm.startSession(1000);
     Test.assertEqual(sm.getState(), STATE_TRANSITION);
 
-    sm.selectStation("finnish_sauna", 1010);       // trans[1000,1010]=10
-    Test.assertEqual(sm.getState(), STATE_STATION_ACTIVE);
+    sm.selectActivity("finnish_sauna", 1010);       // trans[1000,1010]=10
+    Test.assertEqual(sm.getState(), STATE_IN_ACTIVITY);
 
-    sm.selectStation("ice_cave", 1130);            // finnish[1010,1130]=120 (auto-switch)
-    Test.assertEqual(sm.getState(), STATE_STATION_ACTIVE);
+    sm.selectActivity("ice_cave", 1130);            // finnish[1010,1130]=120 (auto-switch)
+    Test.assertEqual(sm.getState(), STATE_IN_ACTIVITY);
 
     sm.stopPress(1150);                             // ice_cave[1130,1150]=20 -> transition
     Test.assertEqual(sm.getState(), STATE_TRANSITION);
@@ -165,9 +165,9 @@ function testSummaryText(logger) {
     var sm = new SessionManager(rec);
 
     sm.startSession(1000);
-    sm.selectStation("finnish_sauna", 1010);   // trans 10
-    sm.selectStation("ice_cave", 1130);        // finnish 120 (auto-switch)
-    sm.selectStation("finnish_sauna", 1150);   // ice_cave 20 (auto-switch)
+    sm.selectActivity("finnish_sauna", 1010);   // trans 10
+    sm.selectActivity("ice_cave", 1130);        // finnish 120 (auto-switch)
+    sm.selectActivity("finnish_sauna", 1150);   // ice_cave 20 (auto-switch)
     sm.stopPress(1210);                         // finnish +60 -> total 180, visits 2
     sm.stopPress(1210);                         // -> confirm
     sm.confirmEnd(1220);                        // trans 10
@@ -186,13 +186,13 @@ function testSummaryText(logger) {
 function testAutoSwitchIsZeroGap(logger) {
     var sm = new SessionManager(new FakeRecorder());
     sm.startSession(0);
-    sm.selectStation("finnish_sauna", 10);
-    sm.selectStation("ice_cave", 40);   // auto-switch at t=40
-    var segs = sm.stationSegments();
+    sm.selectActivity("finnish_sauna", 10);
+    sm.selectActivity("ice_cave", 40);   // auto-switch at t=40
+    var segs = sm.activitySegments();
     Test.assertEqual(segs.size(), 1);   // ice_cave still open, not yet closed
     // close it out to inspect both
     sm.stopPress(50);
-    segs = sm.stationSegments();
+    segs = sm.activitySegments();
     Test.assertEqual(segs.size(), 2);
     Test.assertEqual(segs[0].endTime, segs[1].startTime); // zero gap
     return true;
@@ -202,20 +202,20 @@ function testAutoSwitchIsZeroGap(logger) {
 function testAggregateRepeatVisits(logger) {
     var sm = new SessionManager(new FakeRecorder());
     sm.startSession(0);
-    sm.selectStation("finnish_sauna", 10);  // trans 10
-    sm.selectStation("ice_cave", 40);       // finnish 30
-    sm.selectStation("finnish_sauna", 60);  // ice 20
+    sm.selectActivity("finnish_sauna", 10);  // trans 10
+    sm.selectActivity("ice_cave", 40);       // finnish 30
+    sm.selectActivity("finnish_sauna", 60);  // ice 20
     sm.stopPress(100);                       // finnish 40
     sm.stopPress(100);
     sm.confirmEnd(100);                      // trans 0
 
-    var aggs = sm.stationAggregates();
+    var aggs = sm.activityAggregates();
     Test.assertEqual(aggs.size(), 2);
     // finnish first-seen -> index 0
-    Test.assertEqual(aggs[0].stationId, "finnish_sauna");
+    Test.assertEqual(aggs[0].activityId, "finnish_sauna");
     Test.assertEqual(aggs[0].visits, 2);
     Test.assertEqual(aggs[0].totalSeconds, 70); // 30 + 40
-    Test.assertEqual(aggs[1].stationId, "ice_cave");
+    Test.assertEqual(aggs[1].activityId, "ice_cave");
     Test.assertEqual(aggs[1].visits, 1);
     Test.assertEqual(aggs[1].totalSeconds, 20);
     Test.assertEqual(sm.transitionSeconds(), 10);
@@ -230,7 +230,7 @@ function testHrFoldingRejectsInvalidAndTransition(logger) {
     var sm = new SessionManager(new FakeRecorder());
     sm.startSession(0);
     sm.foldHr(200);                     // in TRANSITION -> ignored
-    sm.selectStation("finnish_sauna", 10);
+    sm.selectActivity("finnish_sauna", 10);
     sm.foldHr(80);
     sm.foldHr(null);                    // invalid -> ignored
     sm.foldHr(100);
@@ -238,7 +238,7 @@ function testHrFoldingRejectsInvalidAndTransition(logger) {
     sm.stopPress(30);
     sm.confirmEnd(30);
 
-    var aggs = sm.stationAggregates();
+    var aggs = sm.activityAggregates();
     Test.assertEqual(aggs.size(), 1);
     Test.assertEqual(aggs[0].hrAvg(), 90); // (80+100)/2, 200 excluded
     Test.assertEqual(aggs[0].hrMin, 80);
@@ -250,7 +250,7 @@ function testHrFoldingRejectsInvalidAndTransition(logger) {
 
 (:test)
 function testStripWindowSlidesAtEdges(logger) {
-    var c = new StripController(Station.allIds(), 3); // 10 stations, window 3
+    var c = new StripController(SpaActivity.allIds(), 3); // 10 activities, window 3
     Test.assertEqual(c.windowStart, 0);
     c.moveFocus(1);
     c.moveFocus(1);              // focus 2, still fully visible
@@ -263,7 +263,7 @@ function testStripWindowSlidesAtEdges(logger) {
 
 (:test)
 function testStripWrapsAtStart(logger) {
-    var c = new StripController(Station.allIds(), 3);
+    var c = new StripController(SpaActivity.allIds(), 3);
     c.moveFocus(-1);             // wrap 0 -> 9
     Test.assertEqual(c.focusedIndex, 9);
     Test.assertEqual(c.windowStart, 7); // last three visible
@@ -272,7 +272,7 @@ function testStripWrapsAtStart(logger) {
 
 (:test)
 function testStripReloadClampsFocus(logger) {
-    var c = new StripController(Station.allIds(), 3);
+    var c = new StripController(SpaActivity.allIds(), 3);
     c.moveFocus(1);
     c.moveFocus(1);
     c.moveFocus(1);             // focus 3
@@ -296,14 +296,14 @@ function testPersistAndRestore(logger) {
     Application.Storage.deleteValue(SESSION_SNAP_KEY);
     var sm = new SessionManager(new FakeRecorder());
     sm.startSession(1000);
-    sm.selectStation("finnish_sauna", 1010);   // trans[1000,1010], open finnish
+    sm.selectActivity("finnish_sauna", 1010);   // trans[1000,1010], open finnish
     Test.assert(hasSessionSnapshot());
 
     // Simulate a relaunch: a fresh manager restores the persisted model.
     var sm2 = new SessionManager(new FakeRecorder());
     sm2.restore(loadSessionSnapshot());
-    Test.assertEqual(sm2.getState(), STATE_STATION_ACTIVE);
-    Test.assertEqual(sm2.getActiveStationId(), "finnish_sauna");
+    Test.assertEqual(sm2.getState(), STATE_IN_ACTIVITY);
+    Test.assertEqual(sm2.getActiveActivityId(), "finnish_sauna");
     Test.assertEqual(sm2.getSessionStart(), 1000);
 
     // Continue on the restored manager and check the totals line up.
@@ -313,7 +313,7 @@ function testPersistAndRestore(logger) {
     Test.assertEqual(sm2.getState(), STATE_SUMMARY);
     Test.assertEqual(sm2.totalSeconds(), 140);
     Test.assertEqual(sm2.transitionSeconds(), 20);
-    var aggs = sm2.stationAggregates();
+    var aggs = sm2.activityAggregates();
     Test.assertEqual(aggs.size(), 1);
     Test.assertEqual(aggs[0].totalSeconds, 120);
     return true;
@@ -337,7 +337,7 @@ function testSnapshotClearedOnConfirm(logger) {
 function testBuildPayloadShape(logger) {
     var sm = new SessionManager(new FakeRecorder());
     sm.startSession(1000);
-    sm.selectStation("finnish_sauna", 1010);
+    sm.selectActivity("finnish_sauna", 1010);
     sm.stopPress(1130);
     sm.stopPress(1130);
     sm.confirmEnd(1140);
@@ -346,12 +346,12 @@ function testBuildPayloadShape(logger) {
     Test.assert(p["sessionId"] != null);
     Test.assertEqual(p["totalSeconds"], 140);
     Test.assertEqual(p["transitionSeconds"], 20); // [1000,1010]=10 + [1130,1140]=10
-    var stations = p["stations"] as Lang.Array;
+    var activities = p["activities"] as Lang.Array;
     var segments = p["segments"] as Lang.Array;
-    Test.assertEqual(stations.size(), 1);
-    Test.assertEqual(segments.size(), 1);    // station laps only
+    Test.assertEqual(activities.size(), 1);
+    Test.assertEqual(segments.size(), 1);    // activity laps only
     var firstSeg = segments[0] as Lang.Dictionary;
-    Test.assertEqual(firstSeg["stationId"], "finnish_sauna");
+    Test.assertEqual(firstSeg["activityId"], "finnish_sauna");
     Test.assert(p["startedAt"] != null);
     Test.assert(p["endedAt"] != null);
     return true;

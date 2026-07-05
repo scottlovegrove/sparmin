@@ -1,11 +1,11 @@
 import Toybox.Lang;
 
 //! One recorded lap in the in-memory model, mirroring a FIT lap. A null
-//! stationId marks a transition (non-station) lap. Times are epoch seconds so
+//! activityId marks a transition (non-activity) lap. Times are epoch seconds so
 //! durations stay wall-clock correct across suspend/resume — never derived from
 //! a ticking counter.
 class Segment {
-    public var stationId;   // String, or null for a transition lap
+    public var activityId;   // String, or null for a transition lap
     public var startTime;   // Number (epoch seconds)
     public var endTime;     // Number (epoch seconds), or null while open
     public var hrMin;       // Number, or null
@@ -13,8 +13,8 @@ class Segment {
     public var hrSum;       // Number
     public var hrCount;     // Number
 
-    function initialize(stationId, startTime) {
-        me.stationId = stationId;
+    function initialize(activityId, startTime) {
+        me.activityId = activityId;
         me.startTime = startTime;
         me.endTime = null;
         me.hrMin = null;
@@ -31,8 +31,8 @@ class Segment {
         return endTime == null;
     }
 
-    function isStation() {
-        return stationId != null;
+    function isActivity() {
+        return activityId != null;
     }
 
     function durationSeconds() {
@@ -65,7 +65,7 @@ class Segment {
     //! Storage-serialisable snapshot (for crash/resume, §6.5).
     function toDict() as Lang.Dictionary {
         return {
-            "stationId" => stationId,
+            "activityId" => activityId,
             "startTime" => startTime,
             "endTime" => endTime,
             "hrMin" => hrMin,
@@ -78,7 +78,7 @@ class Segment {
 
 //! Rebuild a Segment from its toDict() snapshot.
 function segmentFromDict(d as Lang.Dictionary) as Segment {
-    var s = new Segment(d["stationId"], d["startTime"]);
+    var s = new Segment(d["activityId"], d["startTime"]);
     s.endTime = d["endTime"];
     s.hrMin = d["hrMin"];
     s.hrMax = d["hrMax"];

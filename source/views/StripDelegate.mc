@@ -8,11 +8,11 @@ import Toybox.System;
 //! the SELECT behaviour (losing the coordinates), so tile selection could never
 //! see where you tapped.
 //!
-//! Touch (VA5):   tap a tile to select; tap the footer (idle) to edit stations;
+//! Touch (VA5):   tap a tile to select; tap the footer (idle) to edit activities;
 //!                swipe to pan; top-right button (KEY_ENTER) = Stop; bottom-right
 //!                (KEY_ESC) = Back/exit.
 //! Buttons (FR745): Up/Down move focus; Start selects the focused tile; Back/Lap
-//!                is the context Stop; Menu edits stations.
+//!                is the context Stop; Menu edits activities.
 //!
 //! With water-safe touch on (TouchConfig): a tile actuates only on a *second*
 //! tap of the same tile within DOUBLE_TAP_MS, and the bottom-right button
@@ -50,7 +50,7 @@ class StripDelegate extends WatchUi.InputDelegate {
         // Button device (FR745)
         if (key == WatchUi.KEY_UP) { _ctrl.moveFocus(-1); _view.animateToWindow(); return true; }
         if (key == WatchUi.KEY_DOWN) { _ctrl.moveFocus(1); _view.animateToWindow(); return true; }
-        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) { _selectStation(_ctrl.focusedId()); return true; }
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) { _selectActivity(_ctrl.focusedId()); return true; }
         if (key == WatchUi.KEY_ESC || key == WatchUi.KEY_LAP) { return _back(); }
         if (key == WatchUi.KEY_MENU) { _openConfig(); return true; }
         return false;
@@ -68,14 +68,14 @@ class StripDelegate extends WatchUi.InputDelegate {
             _openConfig();
             return true;
         }
-        var id = _view.stationIdAtPoint(coords);
+        var id = _view.activityIdAtPoint(coords);
         if (id == null) {
             return true;
         }
         if (TouchConfig.isWaterSafe() && !_confirmsSecondTap(id)) {
             return true;   // first tap arms; a droplet won't produce the second
         }
-        _selectStation(id);
+        _selectActivity(id);
         return true;
     }
 
@@ -115,11 +115,11 @@ class StripDelegate extends WatchUi.InputDelegate {
 
     // ---- Helpers ----
 
-    private function _selectStation(id) as Void {
+    private function _selectActivity(id) as Void {
         if (id == null) {
             return;
         }
-        _session.selectStation(id, now());
+        _session.selectActivity(id, now());
         WatchUi.requestUpdate();
     }
 

@@ -10,8 +10,8 @@
 
 **Sparmin** — a personal Garmin **Connect IQ watch app** (Monkey C) for logging
 thermal spa sessions (saunas, cold plunges, pools). It records the whole visit
-as a real **FIT activity** via `ActivityRecording`, marks a **lap per station**,
-tags each lap with the station via a **FitContributor** developer field, shows
+as a real **FIT activity** via `ActivityRecording`, marks a **lap per activity**,
+tags each lap with the activity via a **FitContributor** developer field, shows
 live HR, and (deferred) can POST a summary to a backend for Strava labelling.
 
 - **Type:** `watch-app`. **Primary hardware:** vívoactive 5 (390px AMOLED,
@@ -34,8 +34,8 @@ live HR, and (deferred) can POST a summary to a backend for Strava labelling.
 ├─ resources-<deviceFamily>/  # 15 per-screen-family drawable folders, e.g.
 │                             # resources-round-390x390, resources-round-240x240,
 │                             # resources-rectangle-240x240, resources-semioctagon-176x176
-│                             # — each: right-sized station icons + launcher.
-├─ icons/                     # SVG source art (10 stations + app_icon) — see note
+│                             # — each: right-sized activity icons + launcher.
+├─ icons/                     # SVG source art (10 activities + app_icon) — see note
 ├─ tools/                     # rasterise-icons.sh (regen family folders),
 │                             # list-products.sh (regen manifest device list)
 ├─ docs/store-submission.md   # How to publish to the Connect IQ Store
@@ -64,19 +64,19 @@ source/
 │                         # getInitialView() -> StripView + StripDelegate. getApp().
 ├─ SessionManager.mc      # THE state machine (§ below) + in-memory model +
 │                         # aggregation + payload + Storage persistence.
-│                         # Also holds `class StationAggregate`.
+│                         # Also holds `class ActivityAggregate`.
 ├─ Recorder.mc            # ONLY ActivityRecording/FitContributor wrapper.
 │                         # SPORT/SUB_SPORT constants live here (Breathwork).
-│                         # Lap-scope "station" field + session-scope "summary".
-├─ Station.mc             # module: immutable 10-station catalogue (ids/names/
+│                         # Lap-scope "activity" field + session-scope "summary".
+├─ SpaActivity.mc         # module: immutable 10-activity catalogue (ids/names/
 │                         # short labels). Canonical ids — never remap.
-├─ StationConfig.mc       # module: hide/reorder visible ids in Storage; pure
+├─ ActivityConfig.mc      # module: hide/reorder visible ids in Storage; pure
 │                         # toggle()/move() helpers (unit-tested).
 ├─ TouchConfig.mc         # module: "water-safe touch" flag in Storage + pure
 │                         # confirmsTap() double-tap rule (unit-tested).
 ├─ StripController.mc     # pure strip nav: focus cursor + visible window +
 │                         # edge-slide rule. idAtIndex() for animated render.
-├─ Segment.mc             # one lap: stationId(null=transition), times, HR stats,
+├─ Segment.mc             # one lap: activityId(null=transition), times, HR stats,
 │                         # foldHr(), toDict()/segmentFromDict() (crash-resume).
 ├─ HrSampler.mc           # module: live-vs-display HR, invalid-sample rejection.
 ├─ BackendClient.mc       # PARKED: POST + offline queue. Unwired (backend deferred).
@@ -84,11 +84,11 @@ source/
 ├─ Uuid.mc / Iso.mc       # module: session id (v4) + ISO-8601 UTC.
 ├─ Tests.mc               # 20 (:test) cases + FakeRecorder. Run in the simulator.
 └─ views/
-   ├─ StripView.mc        # home screen (IDLE/TRANSITION/STATION_ACTIVE): strip,
+   ├─ StripView.mc        # home screen (IDLE/TRANSITION/IN_ACTIVITY): strip,
    │  StripDelegate.mc    # timers, HR, icons, drag-scroll animation, focus label
    ├─ ConfirmEndView.mc   # guarded end: tick/cross drawn as line shapes (MIP-safe)
    │  ConfirmEndDelegate.mc
-   ├─ SummaryView.mc      # scrollable per-station breakdown
+   ├─ SummaryView.mc      # scrollable per-activity breakdown
    │  SummaryDelegate.mc
    └─ ConfigView.mc       # MoveModeView (reorder). ConfigDelegate.mc holds the
       ConfigDelegate.mc    # Menu2 hub + HideMenuDelegate (checkbox) + MoveModeDelegate
@@ -99,7 +99,7 @@ source/
 Five states drive **both the UI and the FIT recorder**:
 
 ```
-IDLE ──start/select──▶ TRANSITION ──select station──▶ STATION_ACTIVE
+IDLE ──start/select──▶ TRANSITION ──select activity──▶ IN_ACTIVITY
                           ▲  │  ▲                          │  (select other
                           │  │  └──────── stop ────────────┘   = auto-switch)
                           │  │ stop
@@ -107,11 +107,11 @@ IDLE ──start/select──▶ TRANSITION ──select station──▶ STATIO
                        CONFIRM_END ──confirm(save FIT)──▶ SUMMARY ──dismiss──▶ IDLE
 ```
 
-- **Lap contract:** the `station` FitContributor field is set to the *closing*
+- **Lap contract:** the `activity` FitContributor field is set to the *closing*
   lap's label immediately before each `addLap()`/`finish()`, so every lap
-  carries its own station. Transition periods are their own laps. On `finish()`
+  carries its own activity. Transition periods are their own laps. On `finish()`
   a session-scope `summary` field also gets `SessionManager.summaryText()` (one
-  compact line: total, per-station time/visits/HR, transitions).
+  compact line: total, per-activity time/visits/HR, transitions).
 - **Timekeeping:** every transition takes an explicit `now` (epoch seconds);
   durations are derived from boundaries, never a ticking counter — correct
   across suspend/resume. Tests pass fixed timestamps; the app passes
@@ -145,8 +145,8 @@ still works. Off = single-tap, `KEY_ESC` a mid-session no-op (unchanged).
 
 ## Icons / resources
 
-Station tiles render bitmaps (dark tile so the icons pop). `StripView` maps
-`stationId -> Rez.Drawables.st_<id>`, lazy-loads/caches them, and draws each at
+Activity tiles render bitmaps (dark tile so the icons pop). `StripView` maps
+`activityId -> Rez.Drawables.st_<id>`, lazy-loads/caches them, and draws each at
 native px centred in its tile — so **icon size must scale with the screen**.
 `tools/rasterise-icons.sh` rasterises `icons/*.svg` with **`rsvg-convert`**
 (ImageMagick's internal SVG renderer drops the strokes these icons are made of),
@@ -164,7 +164,7 @@ or the supported families change.
   `bin/Sparmin-test.prg`, then `monkeydo bin/Sparmin-test.prg vivoactive5 -t`.
 - **What's covered (16 tests, `Tests.mc`):** state transitions + no-ops,
   zero-gap auto-switch, aggregation w/ repeat visits, transition time, HR folding
-  (null/invalid rejection), FIT lap-label order, payload shape, station-config
+  (null/invalid rejection), FIT lap-label order, payload shape, activity-config
   (default/hide-last-guard/reorder), strip window-sliding, persist→restore.
 - `FakeRecorder` (in `Tests.mc`) stands in for `Recorder`, so the state machine
   runs without `ActivityRecording`. The device-dependent bits (FIT reconnect,
@@ -182,16 +182,16 @@ or the supported families change.
 ## Conventions
 
 - **Filenames = class name**, PascalCase `.mc` (`SessionManager.mc`). `module`s
-  (Station, StationConfig, HrSampler, Fmt, Uuid, Iso) are lower-utility.
+  (SpaActivity, ActivityConfig, HrSampler, Fmt, Uuid, Iso) are lower-utility.
 - Light type annotations; dynamic dictionaries cast to `Lang.Dictionary`/`Array`
   to avoid "container access" warnings — **builds must stay 0-warning**.
-- `stationId`s are canonical and permanent — reordering/hiding never remaps them.
+- `activityId`s are canonical and permanent — reordering/hiding never remaps them.
 - The recorder-agnostic core stays device-API-free (inject `Recorder`).
 
 ## Deferred / on-device-validation (not done in the sim)
 
 - **Sport/sub-sport** = `SPORT_TRAINING`/`SUB_SPORT_BREATHING` (Breathwork). It
-  also governs whether Garmin Connect renders the station lap field — re-verify
+  also governs whether Garmin Connect renders the activity lap field — re-verify
   labels on-device if it changes (`Recorder.mc`).
 - **Crash resume** — persistence is done; the resume prompt + FIT reconnect are
   parked (only testable on hardware).

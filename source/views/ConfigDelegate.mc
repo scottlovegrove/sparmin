@@ -1,7 +1,7 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-//! Hub for the station-config screens (§4a), reached from the idle strip. Routes
+//! Hub for the activity-config screens (§4a), reached from the idle strip. Routes
 //! to the show/hide checkbox menu and the reorder move-mode view.
 class ConfigDelegate extends WatchUi.Menu2InputDelegate {
 
@@ -13,12 +13,12 @@ class ConfigDelegate extends WatchUi.Menu2InputDelegate {
         var id = item.getId();
         if (id.equals("hide")) {
             var menu = new WatchUi.CheckboxMenu({ :title => "Show / hide" });
-            var cfg = StationConfig.load();
-            var all = Station.allIds();
+            var cfg = ActivityConfig.load();
+            var all = SpaActivity.allIds();
             for (var i = 0; i < all.size(); i += 1) {
                 var sid = all[i];
                 menu.addItem(new WatchUi.CheckboxMenuItem(
-                    Station.nameFor(sid), null, sid, cfg.indexOf(sid) >= 0, null));
+                    SpaActivity.nameFor(sid), null, sid, cfg.indexOf(sid) >= 0, null));
             }
             WatchUi.pushView(menu, new HideMenuDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("reorder")) {
@@ -33,7 +33,7 @@ class ConfigDelegate extends WatchUi.Menu2InputDelegate {
 
 //! Show/hide checkbox menu (§4a). A CheckboxMenu is driven by a
 //! Menu2InputDelegate; the toggled item arrives as a CheckboxMenuItem. Persists
-//! on each toggle and refuses to hide the last station (restores the checkbox).
+//! on each toggle and refuses to hide the last activity (restores the checkbox).
 class HideMenuDelegate extends WatchUi.Menu2InputDelegate {
 
     function initialize() {
@@ -43,12 +43,12 @@ class HideMenuDelegate extends WatchUi.Menu2InputDelegate {
     function onSelect(item as WatchUi.MenuItem) as Void {
         var cb = item as WatchUi.CheckboxMenuItem;
         var sid = cb.getId();
-        var cfg = StationConfig.load();
-        var updated = StationConfig.toggle(cfg, sid);
+        var cfg = ActivityConfig.load();
+        var updated = ActivityConfig.toggle(cfg, sid);
         if (updated.size() == cfg.size() && !cb.isChecked()) {
-            cb.setChecked(true);   // hiding the last station was blocked
+            cb.setChecked(true);   // hiding the last activity was blocked
         } else {
-            StationConfig.save(updated);
+            ActivityConfig.save(updated);
         }
     }
 }

@@ -18,7 +18,7 @@ class MoveModeView extends WatchUi.View {
 
     function initialize() {
         View.initialize();
-        ids = StationConfig.load();
+        ids = ActivityConfig.load();
         focus = 0;
         picked = -1;
     }
@@ -30,7 +30,7 @@ class MoveModeView extends WatchUi.View {
             if (target < 0 || target >= ids.size()) {
                 return;
             }
-            ids = StationConfig.move(ids, picked, target);
+            ids = ActivityConfig.move(ids, picked, target);
             picked = target;
             focus = target;
         } else {
@@ -58,7 +58,7 @@ class MoveModeView extends WatchUi.View {
 
     function dropAt(idx as Lang.Number) as Void {
         if (picked >= 0) {
-            ids = StationConfig.move(ids, picked, idx);
+            ids = ActivityConfig.move(ids, picked, idx);
         }
         picked = -1;
         focus = idx;
@@ -66,7 +66,7 @@ class MoveModeView extends WatchUi.View {
     }
 
     function save() as Void {
-        StationConfig.save(ids);
+        ActivityConfig.save(ids);
     }
 
     function indexAtPoint(coords as Lang.Array) as Lang.Number {
@@ -105,7 +105,7 @@ class MoveModeView extends WatchUi.View {
                 dc.fillRoundedRectangle(_w * 0.06, y - _lineH / 2 + 2, _w * 0.88, _lineH - 4, 4);
             }
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, y, Graphics.FONT_XTINY, Station.nameFor(ids[i]),
+            dc.drawText(_w / 2, y, Graphics.FONT_XTINY, SpaActivity.nameFor(ids[i]),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             y += _lineH;
         }

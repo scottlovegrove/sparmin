@@ -1,10 +1,10 @@
 import Toybox.Lang;
 
-//! Canonical, immutable station catalogue. The ids are permanent — they are
+//! Canonical, immutable activity catalogue. The ids are permanent — they are
 //! written into FIT lap developer fields and the backend payload, so they must
 //! never change, remap, or drop. Display order and visibility are configurable
-//! (see StationConfig); this catalogue is not.
-module Station {
+//! (see ActivityConfig); this catalogue is not.
+module SpaActivity {
 
     // Index-aligned id/name arrays. The declaration order is the default
     // display order.

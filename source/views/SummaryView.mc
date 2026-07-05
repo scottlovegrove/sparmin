@@ -3,7 +3,7 @@ import Toybox.WatchUi;
 import Toybox.Graphics;
 
 //! Read-only end-of-session summary (§5 SUMMARY): total time, one aggregate line
-//! per station (repeat visits folded), a transition-time line, and the per-visit
+//! per activity (repeat visits folded), a transition-time line, and the per-visit
 //! HR. Scrollable when the list is taller than the screen. The FIT file has
 //! already been saved on confirm.
 class SummaryView extends WatchUi.View {
@@ -38,7 +38,7 @@ class SummaryView extends WatchUi.View {
     private function _buildLines() as Lang.Array {
         var lines = [];
         lines.add("Total  " + Fmt.duration(_session.totalSeconds()));
-        var aggs = _session.stationAggregates();
+        var aggs = _session.activityAggregates();
         for (var i = 0; i < aggs.size(); i += 1) {
             var a = aggs[i];
             var head = a.displayName + "  " + Fmt.duration(a.totalSeconds);

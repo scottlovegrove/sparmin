@@ -23,7 +23,7 @@ class SparminApp extends Application.AppBase {
     }
 
     //! The strip view is the home screen; it renders IDLE, TRANSITION and
-    //! STATION_ACTIVE. Confirm/summary/config are pushed on top as needed.
+    //! IN_ACTIVITY. Confirm/summary/config are pushed on top as needed.
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {
         var view = new StripView(_session);
         return [view, new StripDelegate(view)];
