@@ -307,6 +307,20 @@ class StripView extends WatchUi.View {
         }
     }
 
+    // The big timer and the name/label fonts are fixed-pixel Garmin fonts, so on
+    // a small screen (208px) they eat too much height and collide, and on a large
+    // AMOLED (454px) they look undersized. Scale the tier by screen width. The
+    // 240px (FR745) and 390px (vívoactive 5) primaries keep their original tiers
+    // (NUMBER_MEDIUM / TINY), so their layout is unchanged.
+    private function _numFont() as Graphics.FontDefinition {
+        if (_w >= 416) { return Graphics.FONT_NUMBER_HOT; }
+        if (_w >= 232) { return Graphics.FONT_NUMBER_MEDIUM; }
+        return Graphics.FONT_NUMBER_MILD;
+    }
+    private function _labelFont() as Graphics.FontDefinition {
+        return (_w >= 240) ? Graphics.FONT_TINY : Graphics.FONT_XTINY;
+    }
+
     private function _drawTimers(dc as Graphics.Dc, state) as Void {
         var now = Time.now().value();
         if (state == STATE_IDLE) {
@@ -314,20 +328,20 @@ class StripView extends WatchUi.View {
             // identifiable as the focus cursor moves across them.
             if (!_isTouch) {
                 dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(_w / 2, _h * 0.46, Graphics.FONT_TINY, _focusedName(),
+                dc.drawText(_w / 2, _h * 0.46, _labelFont(), _focusedName(),
                             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             }
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, _h * 0.58, Graphics.FONT_NUMBER_MEDIUM, "00:00",
+            dc.drawText(_w / 2, _h * 0.58, _numFont(), "00:00",
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }
         if (state == STATE_STATION_ACTIVE) {
             dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, _h * 0.46, Graphics.FONT_TINY, Station.nameFor(_session.getActiveStationId()),
+            dc.drawText(_w / 2, _h * 0.46, _labelFont(), Station.nameFor(_session.getActiveStationId()),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, _h * 0.58, Graphics.FONT_NUMBER_MEDIUM,
+            dc.drawText(_w / 2, _h * 0.58, _numFont(),
                         Fmt.duration(_session.stationElapsedSeconds(now)),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
@@ -339,10 +353,10 @@ class StripView extends WatchUi.View {
             // stations state (touch, which has no focus cursor).
             var label = _isTouch ? "Between stations" : _focusedName();
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, _h * 0.46, Graphics.FONT_TINY, label,
+            dc.drawText(_w / 2, _h * 0.46, _labelFont(), label,
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, _h * 0.58, Graphics.FONT_NUMBER_MEDIUM,
+            dc.drawText(_w / 2, _h * 0.58, _numFont(),
                         Fmt.duration(_session.elapsedSeconds(now)),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
@@ -364,7 +378,16 @@ class StripView extends WatchUi.View {
     private function _drawHint(dc as Graphics.Dc) as Void {
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         var msg = _isTouch ? "Tap a station to start" : "Select a station to start";
-        dc.drawText(_w / 2, _h * 0.68, Graphics.FONT_XTINY, msg,
+        // ≥240px keeps the original 0.68h line. On smaller screens the fixed 0.68/
+        // 0.58 gap is too tight for the number glyph, so anchor the hint just below
+        // the actual timer height instead of colliding with it.
+        var hintY = _h * 0.68;
+        if (_w < 240) {
+            var below = _h * 0.58 + dc.getFontHeight(_numFont()) / 2
+                        + dc.getFontHeight(Graphics.FONT_XTINY) / 2 + _h * 0.005;
+            if (below > hintY) { hintY = below; }
+        }
+        dc.drawText(_w / 2, hintY, Graphics.FONT_XTINY, msg,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // Footer: settings affordance (tap target on touch; Menu on buttons).
