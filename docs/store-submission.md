@@ -92,8 +92,10 @@ it, and add the manifest entry.
 - **App icon** — the Store listing needs a real icon (ours is still a
   placeholder teal disc). Replace `launcher_icon.png` in each drawable folder
   and provide whatever hero/store-icon sizes the portal asks for.
-- **Screenshots** — capture from the simulator (File → Save screenshot) for the
-  device classes you support. The portal states the required dimensions.
+- **Screenshots** — capture from the simulator (File → Save screenshot). They're
+  per-listing, not per-device, so a small hero set covering the app's states is
+  enough — see [screenshots.md](screenshots.md). The portal states the required
+  dimensions.
 - **Text** — app name, short + long description, category, keywords, and a
   "what's new" note per release.
 
