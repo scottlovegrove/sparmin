@@ -14,9 +14,12 @@ as a real **FIT activity** via `ActivityRecording`, marks a **lap per station**,
 tags each lap with the station via a **FitContributor** developer field, shows
 live HR, and (deferred) can POST a summary to a backend for Strava labelling.
 
-- **Type:** `watch-app`. **Targets:** vívoactive 5 (390px AMOLED, touch) and
-  Forerunner 745 (240px MIP, 5 buttons) — deliberately opposite ends of the
-  input/display spectrum. Manifest `minApiLevel 3.1.0`.
+- **Type:** `watch-app`. **Primary hardware:** vívoactive 5 (390px AMOLED,
+  touch) and Forerunner 745 (240px MIP, 5 buttons) — deliberately opposite ends
+  of the input/display spectrum, and the two devices side-loaded/tested.
+  **Store range:** all 120 Connect IQ wrist watches meeting `minApiLevel 3.1.0`,
+  covered by 15 screen-family resource folders (see below). Nothing is
+  device-hardcoded, so widening the range is a resources + manifest change only.
 - **SDK:** Connect IQ 9.2.0. Signed with `~/.Garmin/ConnectIQ/developer_key`.
 - **Design axiom:** the recorder-agnostic **core is free of device APIs** so it
   is unit-testable; only `Recorder`, views, and samplers touch Toybox device
@@ -28,21 +31,30 @@ live HR, and (deferred) can POST a summary to a backend for Strava labelling.
 /
 ├─ source/                    # All Monkey C. See tree below.
 ├─ resources/                 # SHARED: strings/ + settings/ only (no drawables)
-├─ resources-vivoactive5/     # 390px drawables: 64px icons + 56px launcher
-├─ resources-fr745/           # 240px drawables: 44px icons + 40px launcher
+├─ resources-<deviceFamily>/  # 15 per-screen-family drawable folders, e.g.
+│                             # resources-round-390x390, resources-round-240x240,
+│                             # resources-rectangle-240x240, resources-semioctagon-176x176
+│                             # — each: right-sized station icons + launcher.
 ├─ icons/                     # SVG source art (10 stations + app_icon) — see note
+├─ tools/                     # rasterise-icons.sh (regen family folders),
+│                             # list-products.sh (regen manifest device list)
 ├─ docs/store-submission.md   # How to publish to the Connect IQ Store
-├─ manifest.xml               # app id (permanent UUID), products, permissions
-├─ monkey.jungle              # build config (per-device dirs auto-selected)
-├─ build.sh                   # builds both watches -> bin/Sparmin-<device>.prg
+├─ manifest.xml               # app id (permanent UUID), 120 products, permissions
+├─ monkey.jungle              # build config (family dirs auto-selected)
+├─ build.sh                   # ./build.sh (primaries) | fleet | test | all
 ├─ README.md                  # build/run, tests, design decisions
 └─ .vscode/extensions.json    # recommends garmin.monkey-c
 ```
 
-Per-device drawables use Connect IQ **resource qualifiers**: a folder named
-`resources-<deviceId>` is auto-merged for that device (no jungle wiring). There
-is **no shared drawable fallback**, so adding a device to the manifest requires
-giving it a `resources-<deviceId>` folder (see docs/store-submission.md §2).
+Drawables use Connect IQ **resource qualifiers by screen family**: a folder
+named `resources-<deviceFamily>` (the `deviceFamily` from each device's SDK
+`compiler.json`, e.g. `round-390x390`) is auto-merged for **every device in that
+family** — no jungle wiring, no per-device folders. There is **no shared
+drawable fallback**: every supported device must belong to a family that has a
+folder. `tools/rasterise-icons.sh` regenerates all 15 folders from the SVGs;
+`tools/list-products.sh` regenerates the manifest's `<iq:products>` list. Adding
+a device that lands in an existing family needs only a manifest entry; a device
+in a new family also needs a new size row in `rasterise-icons.sh`.
 
 ## `source/` tree
 
@@ -134,11 +146,17 @@ still works. Off = single-tap, `KEY_ESC` a mid-session no-op (unchanged).
 ## Icons / resources
 
 Station tiles render bitmaps (dark tile so the icons pop). `StripView` maps
-`stationId -> Rez.Drawables.st_<id>` and lazy-loads/caches them. PNGs are
-rasterised from `icons/*.svg` with **`rsvg-convert`** (ImageMagick's internal
-SVG renderer drops strokes, which these icons are mostly made of): 64px for VA5,
-44px for FR745, plus 56/40px launchers. Re-run those conversions if the SVGs
-change.
+`stationId -> Rez.Drawables.st_<id>`, lazy-loads/caches them, and draws each at
+native px centred in its tile — so **icon size must scale with the screen**.
+`tools/rasterise-icons.sh` rasterises `icons/*.svg` with **`rsvg-convert`**
+(ImageMagick's internal SVG renderer drops the strokes these icons are made of),
+one size per screen family: `icon = round(0.133·minDim + 12)`, which passes
+through the two hand-tuned originals (44px @ 240px, 64px @ 390px). The
+**launcher** is the only manifest-declared (size-sensitive) asset — it's set to
+each family's most-common launcher size, with `round-390x390`/`round-240x240`
+pinned to the exact vívoactive 5 / FR745 sizes so `./build.sh` stays 0-warning.
+Other devices get a benign "will be scaled" note. Re-run the script if the SVGs
+or the supported families change.
 
 ## Testing
 

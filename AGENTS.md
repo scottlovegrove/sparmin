@@ -12,8 +12,10 @@ touch) and Forerunner 745 (240px, 5 buttons).
 ## Build & Run
 
 ```bash
-./build.sh                 # build both watches -> bin/Sparmin-<device>.prg
-./build.sh test            # + the unit-test binary (bin/Sparmin-test.prg)
+./build.sh                 # primary side-load watches (vivoactive5, fr745)
+./build.sh fleet           # compile-check one device per screen family (15)
+./build.sh test            # primaries + the unit-test binary (bin/Sparmin-test.prg)
+./build.sh all             # fleet + test
 
 # single device (debug):
 monkeyc -f monkey.jungle -o bin/x.prg -y ~/.Garmin/ConnectIQ/developer_key -d vivoactive5 -w
@@ -58,10 +60,14 @@ to the watch's `GARMIN/APPS/`.
   carries its own station.
 - **No device hardcoding.** Adapt from `System.getDeviceSettings()` (touch vs
   buttons, width) — never `if (device == …)`.
-- **Per-device resources.** Adding a device to `manifest.xml` requires a
-  `resources-<deviceId>/` folder — there is no shared drawable fallback (see
-  `docs/store-submission.md §2`). Re-rasterise icons from `icons/*.svg` with
-  **`rsvg-convert`** (ImageMagick's built-in SVG renderer drops strokes).
+- **Per-family resources.** Drawables resolve by **screen family**, not device:
+  `resources-<deviceFamily>/` (e.g. `resources-round-390x390/`) covers every
+  device in that family. There is no shared drawable fallback, so a device in a
+  new family needs a new folder — generate all folders with
+  `tools/rasterise-icons.sh` (a size row per family) and regenerate the manifest
+  device list with `tools/list-products.sh`. Icons are rasterised from
+  `icons/*.svg` with **`rsvg-convert`** (ImageMagick's built-in SVG renderer
+  drops strokes). See `docs/store-submission.md §2`.
 
 ## Testing
 

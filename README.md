@@ -87,14 +87,18 @@ In VS Code, use *Monkey C: Run Tests* / the test explorer instead.
 
 ## Publishing
 
-The app currently targets just the vívoactive 5 and Forerunner 745. To submit to
-the Connect IQ Store (broadening the device list, shared fallback resources,
-store assets, signing, review), see [docs/store-submission.md](docs/store-submission.md).
+The app is built for **120 Connect IQ wrist watches** (every watch-app device
+meeting `minApiLevel 3.1.0`), covered by 15 per-screen-family drawable folders;
+the vívoactive 5 and Forerunner 745 are the two primary side-load/test devices.
+To submit to the Connect IQ Store (store assets, signing, review — plus how the
+device list and family folders are generated), see
+[docs/store-submission.md](docs/store-submission.md).
 
 ## Notes
 
-- `resources/drawables/launcher_icon.png` is a generated placeholder — replace
-  it with real artwork before publishing.
+- The launcher icon (`launcher_icon.png` in each `resources-<family>/drawables/`,
+  generated from `icons/app_icon.svg`) is a placeholder — replace the SVG with
+  real artwork and re-run `tools/rasterise-icons.sh` before publishing.
 - The `id` in `manifest.xml` is this app's permanent UUID; do not change it once
   the app is published to the Connect IQ Store.
 - **WSL / Ubuntu 24.04:** the SDK Manager and simulator link the old

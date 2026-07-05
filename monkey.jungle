@@ -10,7 +10,9 @@
 
 project.manifest = manifest.xml
 
-# Per-device drawables live in resources-vivoactive5/ and resources-fr745/.
-# Connect IQ auto-includes resources-<deviceId> qualifier folders, so no
-# explicit resourcePath wiring is needed — shared resources/ holds strings +
-# settings; each device folder holds its own icons + right-sized launcher.
+# Drawables live in per-screen-family folders (resources-round-390x390/,
+# resources-round-240x240/, resources-rectangle-240x240/, … — see
+# tools/rasterise-icons.sh). Connect IQ auto-includes resources-<deviceFamily>
+# qualifier folders, so no explicit resourcePath wiring is needed — shared
+# resources/ holds strings + settings; each family folder holds right-sized
+# station icons + launcher.

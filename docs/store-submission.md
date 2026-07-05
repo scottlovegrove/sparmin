@@ -13,9 +13,9 @@ publishing.
 
 ## TL;DR checklist
 
-- [ ] Broaden the device list in `manifest.xml` (`<iq:products>`) to the watches you want to support.
-- [ ] Add a **shared fallback** drawable set so every listed device builds (see §2).
-- [ ] Confirm every listed device compiles, and check memory on the smallest one.
+- [x] Broaden the device list in `manifest.xml` (`<iq:products>`) — now 120 wrist watches (`tools/list-products.sh`).
+- [x] Add per-screen-family drawable folders so every listed device builds (see §2).
+- [ ] Confirm every listed device compiles (`./build.sh fleet`), and check memory on the smallest one (fr55, 208px).
 - [ ] Replace the placeholder launcher icon with real app-icon art.
 - [ ] Prepare store listing assets: icon, screenshots, description, "what's new".
 - [ ] Review the requested permissions and drop any you don't use.
@@ -42,51 +42,50 @@ It's listed in `manifest.xml`:
 </iq:products>
 ```
 
-You don't have to hand-type these. In VS Code with the Monkey C extension, run
-**"Monkey C: Edit Products"** (or the manifest editor) — it gives a checklist of
-every device the installed SDK knows about, with a "select all compatible"
-option. Compatibility is filtered by `minApiLevel` in the manifest (currently
-`3.1.0`), so watches older than that are excluded automatically.
+The list is generated, not hand-typed: `tools/list-products.sh` prints every
+watch-app device whose max firmware meets `minApiLevel` (currently `3.1.0`),
+excluding Edge cycling computers and handheld GPS units. It currently yields
+**120 devices**. (In VS Code the Monkey C extension's **"Edit Products"** editor
+does the same interactively.) To regenerate after an SDK update:
+
+```sh
+tools/list-products.sh > /tmp/products.txt   # paste into <iq:products>
+```
 
 Two things to keep in mind as you widen the list:
 
 - **Every listed device must build.** The compiler resolves resources per
-  device; if a device has no matching drawables it fails. That's what the shared
-  fallback in §2 is for.
+  device; if a device belongs to a screen family with no drawables folder it
+  fails. That's what the per-family folders in §2 provide.
 - **Every listed device is a support commitment.** The Store only offers the app
   to devices you list, and users will expect it to work. Test at least one
-  representative of each screen class (small round MIP, large round AMOLED, …).
+  representative of each screen class (`./build.sh fleet` builds one per family).
 
-## 2. Shared fallback resources
+## 2. Per-screen-family drawable folders
 
-Right now each device has its **own** drawables folder
-(`resources-vivoactive5/`, `resources-fr745/`) and there is **no shared
-fallback** — deliberately, for a clean two-device build. If you add a third
-device to the manifest today, it won't build (unresolved `Rez.Drawables.st_*`
-and launcher icon).
+Each **screen family** (not each device) has its own drawables folder —
+`resources-round-390x390/`, `resources-round-240x240/`,
+`resources-rectangle-240x240/`, `resources-semioctagon-176x176/`, and so on (15
+in total). Connect IQ auto-selects the folder matching a device's `deviceFamily`
+qualifier, so **one folder covers every device in that family** — no per-device
+folders, no `monkey.jungle` wiring. There is deliberately **no shared
+`resources/drawables/` fallback**: every supported device must belong to a
+family that has a folder, which keeps the mapping explicit.
 
-To go store-wide, add a default set that any device falls back to, and let the
-tuned folders override only where you care:
+`tools/rasterise-icons.sh` regenerates all folders from `icons/*.svg`:
 
-```
-resources/drawables/            ← shared fallback (used by any device)
-  drawables.xml                 ← declares LauncherIcon + st_* bitmaps
-  launcher_icon.png             ← a mid-size default (e.g. 64x64)
-  st_*.png                      ← default icon set (e.g. 64px)
-resources-round-240x240/        ← optional: tune small round MIP watches as a group
-resources-fr745/                ← device-specific tuning (overrides the above)
-```
+- **Station icons** scale with the screen — `icon = round(0.133·minDim + 12)`,
+  the line through the two hand-tuned originals (44px @ 240px, 64px @ 390px).
+- **Launcher icon** is the only manifest-declared (size-sensitive) asset, so a
+  mismatch produces a benign "will be scaled" build note. Each family's launcher
+  is its most-common size; `round-390x390`/`round-240x240` are pinned to the
+  exact vívoactive 5 / FR745 sizes so the primary `./build.sh` is 0-warning.
+  Across the full fleet, devices whose exact launcher size differs from their
+  family default will emit that benign note — that's expected, not an error.
 
-Connect IQ auto-selects the most specific matching folder. Qualifiers work by
-**screen shape and size**, not just device id — e.g. `resources-round-390x390`
-covers *every* round 390px watch, so you cover a whole family with one folder
-instead of one-per-device. The rasterisation is already scripted (see the
-`rsvg-convert` calls in the Phase-3 commit) — re-run it at whatever sizes the
-groups need.
-
-Adding the fallback reintroduces a benign build note ("resources will be
-overridden with higher precedence") on the tuned devices — that's the override
-working, not an error.
+To add a device: if it lands in an existing family, just add the manifest entry.
+If it introduces a **new** family, add a size row to `rasterise-icons.sh`, re-run
+it, and add the manifest entry.
 
 ## 3. Store listing assets
 
