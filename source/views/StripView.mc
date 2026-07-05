@@ -377,7 +377,15 @@ class StripView extends WatchUi.View {
 
     private function _drawHint(dc as Graphics.Dc) as Void {
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        var msg = _isTouch ? "Tap an activity to start" : "Select an activity to start";
+        var msg;
+        if (!_isTouch) {
+            msg = "Select an activity to start";
+        } else if (TouchConfig.isWaterSafe()) {
+            // Water-safe touch requires a deliberate double tap to actuate a tile.
+            msg = "Double-tap an activity to start";
+        } else {
+            msg = "Tap an activity to start";
+        }
         // ≥240px keeps the original 0.68h line. On smaller screens the fixed 0.68/
         // 0.58 gap is too tight for the number glyph, so anchor the hint just below
         // the actual timer height instead of colliding with it.
