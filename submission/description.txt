@@ -1,46 +1,25 @@
 Sparmin — Spa & Thermal Session Logger
 
-Turn a sauna, bathhouse or thermal spa visit into a proper Garmin activity.
-Sparmin records your whole session as a FIT activity and times every place you
-spend time separately — each sauna, steam room, cold plunge, hydro pool or
-lounger — so you finish with a clear per-activity breakdown instead of one
-shapeless block of time.
+Turn a sauna, bathhouse or thermal spa visit into a proper Garmin activity. Sparmin records your whole session as a FIT activity and times every place you spend time separately — each sauna, steam room, cold plunge, hydro pool or lounger — so you finish with a clear per-activity breakdown instead of one shapeless block of time.
 
 How it works
 
-Open the app when you arrive and tap the activity you're starting. Sparmin
-begins timing it and shows your live heart rate. Move to the next spot and tap
-it — the app switches automatically, with no gap. Step out between activities
-and it tracks that as transition time too. When you're done, stop the session
-to see a summary: total time, plus the time, visit count and heart rate for
-each activity, and your total transition time. The whole visit is saved to
-Garmin Connect as an activity.
+Open the app when you arrive and tap the activity you're starting. Sparmin begins timing it and shows your live heart rate. Move to the next spot and tap it — the app switches automatically, with no gap. Step out between activities and it tracks that as transition time too. When you're done, stop the session to see a summary: total time, plus the time, visit count and heart rate for each activity, and your total transition time. The whole visit is saved to Garmin Connect as an activity.
 
 Features
 
-- Records your whole visit as a Garmin activity, timing each spot separately
-  (sauna, cold plunge, steam room, hydro pool, loungers and more).
-- Live heart rate during the session, plus average and maximum heart rate for
-  every activity in the summary.
-- Automatic, zero-gap switching when you move from one activity to the next,
-  with separate transition timing in between.
+- Records your whole visit as a Garmin activity, timing each spot separately (sauna, cold plunge, steam room, hydro pool, loungers and more).
+- Live heart rate during the session, plus average and maximum heart rate for every activity in the summary.
+- Automatic, zero-gap switching when you move from one activity to the next, with separate transition timing in between.
 - End-of-session summary on the watch with a per-activity breakdown.
-- Customise your list: show, hide and reorder the activities you actually use,
-  so the ones you visit are front and centre.
+- Customise your list: show, hide and reorder the activities you actually use, so the ones you visit are front and centre.
 - Adapts to your watch — round or rectangular, touchscreen or buttons.
 
 Water-safe touch (touchscreen watches)
 
-Spa screens get wet, and warm droplets on a touchscreen can fire off taps you
-never made — enough to start or switch an activity by accident. Sparmin has an
-optional Water-safe touch mode for this. Turn it on in Settings and two things
-change:
+Spa screens get wet, and warm droplets on a touchscreen can fire off taps you never made — enough to start or switch an activity by accident. Sparmin has an optional Water-safe touch mode for this. Turn it on in Settings and two things change:
 
-- Selecting an activity (or confirming the end of a session) needs a deliberate
-  double tap of the same tile, so a stray droplet tap is ignored.
-- A touch-lock lets you disable the screen entirely for a full soak; the app
-  shows a padlock while locked, and the physical Stop button still works, so you
-  can always end the session even with the touchscreen off.
+- Selecting an activity (or confirming the end of a session) needs a deliberate double tap of the same tile, so a stray droplet tap is ignored.
+- A touch-lock lets you disable the screen entirely for a full soak; the app shows a padlock while locked, and the physical Stop button still works, so you can always end the session even with the touchscreen off.
 
-It's off by default, so nothing changes unless you want it. On button watches
-there's nothing to enable — the buttons are already splash-proof.
+It's off by default, so nothing changes unless you want it. On button watches there's nothing to enable — the buttons are already splash-proof.
