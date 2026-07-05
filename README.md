@@ -73,7 +73,7 @@ In VS Code, use *Monkey C: Run Tests* / the test explorer instead.
 
 ## Design decisions
 
-- **Sport / sub-sport:** `SPORT_TRAINING` / `SUB_SPORT_BREATHING` (Breathwork) —
+- **Sport / sub-sport:** `SPORT_TRAINING` / `SUB_SPORT_CARDIO_TRAINING` (Cardio) —
   an HR/time-based recovery activity with no distance (`SPORT_GENERIC` recorded
   as a distance activity and showed "0 miles"). This choice also affects whether
   Garmin Connect renders the `activity` lap developer field, so re-validate the

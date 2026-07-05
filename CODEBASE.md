@@ -68,7 +68,7 @@ source/
 │                         # aggregation + payload + Storage persistence.
 │                         # Also holds `class ActivityAggregate`.
 ├─ Recorder.mc            # ONLY ActivityRecording/FitContributor wrapper.
-│                         # SPORT/SUB_SPORT constants live here (Breathwork).
+│                         # SPORT/SUB_SPORT constants live here (Cardio training).
 │                         # Lap-scope "activity" field + session-scope "summary".
 ├─ SpaActivity.mc         # module: immutable 10-activity catalogue (ids/names/
 │                         # short labels). Canonical ids — never remap.
@@ -192,7 +192,7 @@ or the supported families change.
 
 ## Deferred / on-device-validation (not done in the sim)
 
-- **Sport/sub-sport** = `SPORT_TRAINING`/`SUB_SPORT_BREATHING` (Breathwork). It
+- **Sport/sub-sport** = `SPORT_TRAINING`/`SUB_SPORT_CARDIO_TRAINING` (Cardio). It
   also governs whether Garmin Connect renders the activity lap field — re-verify
   labels on-device if it changes (`Recorder.mc`).
 - **Crash resume** — persistence is done; the resume prompt + FIT reconnect are
