@@ -17,9 +17,11 @@ live HR, and (deferred) can POST a summary to a backend for Strava labelling.
 - **Type:** `watch-app`. **Primary hardware:** vívoactive 5 (390px AMOLED,
   touch) and Forerunner 745 (240px MIP, 5 buttons) — deliberately opposite ends
   of the input/display spectrum, and the two devices side-loaded/tested.
-  **Store range:** all 120 Connect IQ wrist watches meeting `minApiLevel 3.1.0`,
-  covered by 15 screen-family resource folders (see below). Nothing is
-  device-hardcoded, so widening the range is a resources + manifest change only.
+  **Store range:** 94 Connect IQ wrist watches submitted (of 120 SDK-eligible
+  meeting `minApiLevel 3.1.0`; the newest 26 are deferred by Store-catalogue lag
+  — see docs/store-submission.md §1), covered by 15 screen-family resource
+  folders. Nothing is device-hardcoded, so widening is a resources + manifest
+  change only.
 - **SDK:** Connect IQ 9.2.0. Signed with `~/.Garmin/ConnectIQ/developer_key`.
 - **Design axiom:** the recorder-agnostic **core is free of device APIs** so it
   is unit-testable; only `Recorder`, views, and samplers touch Toybox device
@@ -39,7 +41,7 @@ live HR, and (deferred) can POST a summary to a backend for Strava labelling.
 ├─ tools/                     # rasterise-icons.sh (regen family folders),
 │                             # list-products.sh (regen manifest device list)
 ├─ docs/store-submission.md   # How to publish to the Connect IQ Store
-├─ manifest.xml               # app id (permanent UUID), 120 products, permissions
+├─ manifest.xml               # app id (permanent UUID), 94 products (of 120 eligible)
 ├─ monkey.jungle              # build config (family dirs auto-selected)
 ├─ build.sh                   # ./build.sh (primaries) | fleet | test | all
 ├─ README.md                  # build/run, tests, design decisions

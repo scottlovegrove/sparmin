@@ -13,7 +13,7 @@ publishing.
 
 ## TL;DR checklist
 
-- [x] Broaden the device list in `manifest.xml` (`<iq:products>`) — now 120 wrist watches (`tools/list-products.sh`).
+- [x] Broaden the device list in `manifest.xml` (`<iq:products>`) — 94 submitted of 120 SDK-eligible (`tools/list-products.sh`); newest 26 deferred by Store-catalogue lag (see §1).
 - [x] Add per-screen-family drawable folders so every listed device builds (see §2).
 - [ ] Confirm every listed device compiles (`./build.sh fleet`), and check memory on the smallest one (fr55, 208px).
 - [ ] Replace the placeholder launcher icon with real app-icon art.
@@ -45,8 +45,10 @@ It's listed in `manifest.xml`:
 The list is generated, not hand-typed: `tools/list-products.sh` prints every
 watch-app device whose max firmware meets `minApiLevel` (currently `3.1.0`),
 excluding Edge cycling computers and handheld GPS units. It currently yields
-**120 devices**. (In VS Code the Monkey C extension's **"Edit Products"** editor
-does the same interactively.) To regenerate after an SDK update:
+**120 devices** — of which **94 are actually submitted**; the newest 26 are held
+back by Store-catalogue lag (see below). (In VS Code the Monkey C extension's
+**"Edit Products"** editor does the same interactively.) To regenerate after an
+SDK update:
 
 ```sh
 tools/list-products.sh > /tmp/products.txt   # paste into <iq:products>
@@ -60,6 +62,38 @@ Two things to keep in mind as you widen the list:
 - **Every listed device is a support commitment.** The Store only offers the app
   to devices you list, and users will expect it to work. Test at least one
   representative of each screen class (`./build.sh fleet` builds one per family).
+
+### Store catalogue lags the SDK (26 devices deferred)
+
+The SDK builds for 120 devices, but the manifest **submitted** to the Store
+lists **94**. Uploading the full 120 was rejected with:
+
+```
+"ERROR_WHILE_PROCESSING_MANIFEST": "There was an error processing the manifest file."
+```
+
+The cause is **not** the app: the newest hardware generation (Connect IQ API
+6.x, plus the 2025 Instinct/Descent lines) is buildable and appears on Garmin's
+[compatible-devices page](https://developer.garmin.com/connect-iq/compatible-devices/),
+but the **Store's product catalogue hasn't registered those products yet**, so
+its manifest processor errors on them. A minimal 4-device upload and the trimmed
+94-device upload both succeeded, isolating it to that newest cohort.
+
+The 26 deferred devices:
+
+```
+fenix 8 (43/47mm, Solar 47/51mm), fenix 8 Pro 47mm, fenix E
+Forerunner 970, Forerunner 570 (42/47mm), Forerunner 170/170m, Forerunner 70
+vivoactive 6, Venu X1, Venu 4 (41/45mm)
+Instinct 3 (AMOLED 45/50mm, Solar 45mm), Instinct E (40/45mm), Instinct Crossover AMOLED
+Enduro 3, Descent Mk3 (43/51mm), D2 Mach 2 Pro
+```
+
+**To re-add them** (once the Store starts accepting them — updates use the same
+key, so widening later is free): move each id back into `<iq:products>`, rebuild
+the `.iq` (§5), and re-upload. If it still errors, that device isn't registered
+yet; drop it again and try the rest. The cut was made by "newest generation", so
+some 2024 devices (e.g. fenix 8) may already be acceptable — worth probing first.
 
 ## 2. Per-screen-family drawable folders
 
