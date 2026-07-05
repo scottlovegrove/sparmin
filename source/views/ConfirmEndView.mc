@@ -49,9 +49,20 @@ class ConfirmEndView extends WatchUi.View {
                     Fmt.duration(_session.elapsedSeconds(now)),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
+        // Water-safe: the tick needs a double-tap, so say so (the button still
+        // ends in one press). Without this the ignored first tap looks broken.
+        // The hint takes the mid-band, so drop the marks a little to clear it.
+        var hintShown = _isTouch && TouchConfig.isWaterSafe();
+        if (hintShown) {
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(_w / 2, _h * 0.53, Graphics.FONT_XTINY, "Double-tap tick to end",
+                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+
         var r = (_h * 0.13).toNumber();
-        _drawTick(dc, (_w * 0.32).toNumber(), (_h * 0.72).toNumber(), r, focus == 0);
-        _drawCross(dc, (_w * 0.68).toNumber(), (_h * 0.72).toNumber(), r, focus == 1);
+        var markCy = (hintShown ? _h * 0.78 : _h * 0.72).toNumber();
+        _drawTick(dc, (_w * 0.32).toNumber(), markCy, r, focus == 0);
+        _drawCross(dc, (_w * 0.68).toNumber(), markCy, r, focus == 1);
     }
 
     private function _drawTick(dc as Graphics.Dc, cx, cy, r, focused) as Void {

@@ -22,6 +22,7 @@ class StripView extends WatchUi.View {
     private var _h as Lang.Number = 0;
     private var _iconSyms as Lang.Dictionary;         // stationId -> Rez.Drawables symbol
     private var _iconCache as Lang.Dictionary = {};   // stationId -> BitmapResource (or null)
+    private var _touchLocked as Lang.Boolean = false; // water-safe touch-lock (§ StripDelegate)
 
     function initialize(session as SessionManager) {
         View.initialize();
@@ -58,9 +59,19 @@ class StripView extends WatchUi.View {
     function isTouch() as Lang.Boolean { return _isTouch; }
     function getSession() as SessionManager { return _session; }
 
+    //! Water-safe touch-lock: while set, StripDelegate ignores all touch. Stop is
+    //! still a physical button, so the session can always be ended.
+    function isTouchLocked() as Lang.Boolean { return _touchLocked; }
+    function toggleTouchLock() as Void { _touchLocked = !_touchLocked; }
+
     function onShow() as Void {
         // Pick up any station-config changes made on the config screen.
         _ctrl.reload(StationConfig.load());
+        // A touch-lock only guards a live session; a finished one (back at IDLE)
+        // must leave the strip unlocked, else the lock lingers with no way off it.
+        if (_session.getState() == STATE_IDLE) {
+            _touchLocked = false;
+        }
         _visualStart = _ctrl.windowStart.toFloat();
         _timer = new Timer.Timer();
         _timer.start(method(:onTick), 1000, true);
@@ -182,6 +193,23 @@ class StripView extends WatchUi.View {
         if (state == STATE_IDLE) {
             _drawHint(dc);
         }
+        if (_touchLocked) {
+            _drawLock(dc);
+        }
+    }
+
+    //! Small padlock at the top edge while the water-safe touch-lock is on.
+    private function _drawLock(dc as Graphics.Dc) as Void {
+        var cx = _w / 2;
+        var cy = (_h * 0.08).toNumber();
+        var bw = (_w * 0.10).toNumber();     // body width
+        var bh = (_h * 0.05).toNumber();     // body height
+        var r = (bw * 0.32).toNumber();      // shackle radius
+        dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(3);
+        dc.drawArc(cx, cy, r, Graphics.ARC_COUNTER_CLOCKWISE, 0, 180);   // shackle
+        dc.setPenWidth(1);
+        dc.fillRoundedRectangle(cx - bw / 2, cy, bw, bh, 3);            // body
     }
 
     //! True when a tap lands on the idle footer (the "Edit stations" target).
@@ -339,12 +367,12 @@ class StripView extends WatchUi.View {
         dc.drawText(_w / 2, _h * 0.68, Graphics.FONT_XTINY, msg,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Footer: edit-stations affordance (tap target on touch; Menu on buttons).
+        // Footer: settings affordance (tap target on touch; Menu on buttons).
         var fy = (_h * 0.82).toNumber();
         dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(_w * 0.24, fy - _h * 0.055, _w * 0.52, _h * 0.11, 6);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(_w / 2, fy, Graphics.FONT_XTINY, "Edit stations",
+        dc.drawText(_w / 2, fy, Graphics.FONT_XTINY, "Settings",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 }

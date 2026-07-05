@@ -60,6 +60,8 @@ source/
 │                         # short labels). Canonical ids — never remap.
 ├─ StationConfig.mc       # module: hide/reorder visible ids in Storage; pure
 │                         # toggle()/move() helpers (unit-tested).
+├─ TouchConfig.mc         # module: "water-safe touch" flag in Storage + pure
+│                         # confirmsTap() double-tap rule (unit-tested).
 ├─ StripController.mc     # pure strip nav: focus cursor + visible window +
 │                         # edge-slide rule. idAtIndex() for animated render.
 ├─ Segment.mc             # one lap: stationId(null=transition), times, HR stats,
@@ -68,7 +70,7 @@ source/
 ├─ BackendClient.mc       # PARKED: POST + offline queue. Unwired (backend deferred).
 ├─ Fmt.mc                 # module: duration ("m:ss") + hr formatting.
 ├─ Uuid.mc / Iso.mc       # module: session id (v4) + ISO-8601 UTC.
-├─ Tests.mc               # 16 (:test) cases + FakeRecorder. Run in the simulator.
+├─ Tests.mc               # 20 (:test) cases + FakeRecorder. Run in the simulator.
 └─ views/
    ├─ StripView.mc        # home screen (IDLE/TRANSITION/STATION_ACTIVE): strip,
    │  StripDelegate.mc    # timers, HR, icons, drag-scroll animation, focus label
@@ -118,9 +120,16 @@ bug; don't switch back.
 
 Key map (from on-device testing): **VA5** touch — tap tile = select; drag =
 scroll; top-right button `KEY_ENTER`(4) = Stop; bottom-right `KEY_ESC`(5) = Back;
-idle footer tap = Edit stations. **FR745** buttons — Up(13)/Down(8) = focus;
+idle footer tap = Settings. **FR745** buttons — Up(13)/Down(8) = focus;
 Start `KEY_ENTER`(4) = select; Back/Lap `KEY_ESC`(5) = Stop/Back; **hold-Up →
-`KEY_MENU`(7)** = Edit stations.
+`KEY_MENU`(7)** = Settings.
+
+**Water-safe touch** (`TouchConfig`, opt-in Settings toggle, touch devices only):
+guards a wet screen from stray droplet taps. When on, a tile/tick actuates only
+on a *second* tap of the same target within `DOUBLE_TAP_MS`, and mid-session
+`KEY_ESC` (bottom-right) toggles a **touch-lock** — while locked `StripDelegate`
+swallows all touch and `StripView` shows a padlock; the physical Stop button
+still works. Off = single-tap, `KEY_ESC` a mid-session no-op (unchanged).
 
 ## Icons / resources
 

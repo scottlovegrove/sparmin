@@ -24,6 +24,9 @@ class ConfigDelegate extends WatchUi.Menu2InputDelegate {
         } else if (id.equals("reorder")) {
             var view = new MoveModeView();
             WatchUi.pushView(view, new MoveModeDelegate(view), WatchUi.SLIDE_LEFT);
+        } else if (id.equals("waterSafe")) {
+            // Menu2 has already flipped the toggle; persist its new state.
+            TouchConfig.setWaterSafe((item as WatchUi.ToggleMenuItem).isEnabled());
         }
     }
 }

@@ -1,6 +1,7 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
 import Toybox.Time;
+import Toybox.System;
 
 //! Input for the strip view (§7). Uses raw InputDelegate events, not
 //! BehaviorDelegate — on a touch device BehaviorDelegate translates a tap into
@@ -12,6 +13,11 @@ import Toybox.Time;
 //!                (KEY_ESC) = Back/exit.
 //! Buttons (FR745): Up/Down move focus; Start selects the focused tile; Back/Lap
 //!                is the context Stop; Menu edits stations.
+//!
+//! With water-safe touch on (TouchConfig): a tile actuates only on a *second*
+//! tap of the same tile within DOUBLE_TAP_MS, and the bottom-right button
+//! (KEY_ESC, otherwise a mid-session no-op on touch) toggles a touch-lock that
+//! makes the strip ignore all touch until pressed again.
 class StripDelegate extends WatchUi.InputDelegate {
     private var _view as StripView;
     private var _session as SessionManager;
@@ -19,6 +25,8 @@ class StripDelegate extends WatchUi.InputDelegate {
     private var _isTouch as Lang.Boolean;
     private var _dragStartX as Lang.Number = 0;
     private var _dragStartVisual as Lang.Float = 0.0;
+    private var _lastTapId = null;                  // armed tile for the double-tap gate
+    private var _lastTapMs as Lang.Number = 0;
 
     function initialize(view as StripView) {
         InputDelegate.initialize();
@@ -52,13 +60,33 @@ class StripDelegate extends WatchUi.InputDelegate {
         if (!_isTouch) {
             return false;
         }
+        if (_view.isTouchLocked()) {
+            return true;   // water-safe lock: swallow all touch
+        }
         var coords = evt.getCoordinates();
         if (_session.getState() == STATE_IDLE && _view.isFooterTap(coords)) {
             _openConfig();
             return true;
         }
-        _selectStation(_view.stationIdAtPoint(coords));
+        var id = _view.stationIdAtPoint(coords);
+        if (id == null) {
+            return true;
+        }
+        if (TouchConfig.isWaterSafe() && !_confirmsSecondTap(id)) {
+            return true;   // first tap arms; a droplet won't produce the second
+        }
+        _selectStation(id);
         return true;
+    }
+
+    //! Advance the double-tap gate for `id`. Returns true when this tap confirms a
+    //! double-tap of the same tile; otherwise arms `id` for the next tap.
+    private function _confirmsSecondTap(id) as Lang.Boolean {
+        var nowMs = System.getTimer();
+        var confirmed = TouchConfig.confirmsTap(_lastTapId, _lastTapMs, id, nowMs, TouchConfig.DOUBLE_TAP_MS);
+        _lastTapId = confirmed ? null : id;   // consume on confirm, else re-arm
+        _lastTapMs = nowMs;
+        return confirmed;
     }
 
     //! Drag-to-scroll: the strip tracks the finger while dragging, then snaps to
@@ -66,6 +94,9 @@ class StripDelegate extends WatchUi.InputDelegate {
     function onDrag(evt as WatchUi.DragEvent) as Lang.Boolean {
         if (!_isTouch) {
             return false;
+        }
+        if (_view.isTouchLocked()) {
+            return true;   // water-safe lock: no drag scrolling either
         }
         var coords = evt.getCoordinates();
         var type = evt.getType();
@@ -103,13 +134,18 @@ class StripDelegate extends WatchUi.InputDelegate {
     }
 
     // Back: exit from IDLE (both devices). Mid-session it's the context Stop on
-    // button devices, and a no-op on touch (where Stop is the top-right button)
-    // to avoid an accidental exit.
+    // button devices. On touch it's a no-op (Stop is the top-right button) — or,
+    // with water-safe touch on, it toggles the touch-lock so the strip can be
+    // sealed against stray water taps.
     private function _back() as Lang.Boolean {
         if (_session.getState() == STATE_IDLE) {
             return false;   // let the OS exit the app
         }
         if (_isTouch) {
+            if (TouchConfig.isWaterSafe()) {
+                _view.toggleTouchLock();
+                WatchUi.requestUpdate();
+            }
             return true;
         }
         _stop();
@@ -120,9 +156,15 @@ class StripDelegate extends WatchUi.InputDelegate {
         if (_session.getState() != STATE_IDLE) {
             return;
         }
-        var menu = new WatchUi.Menu2({ :title => "Edit stations" });
+        var menu = new WatchUi.Menu2({ :title => "Settings" });
         menu.addItem(new WatchUi.MenuItem("Show / hide", null, "hide", null));
         menu.addItem(new WatchUi.MenuItem("Reorder", null, "reorder", null));
+        // Water-safe touch only means anything on a touchscreen (VA5); button
+        // devices (FR745) have no touch to guard, so don't offer it there.
+        if (_isTouch) {
+            menu.addItem(new WatchUi.ToggleMenuItem(
+                "Water-safe touch", null, "waterSafe", TouchConfig.isWaterSafe(), null));
+        }
         WatchUi.pushView(menu, new ConfigDelegate(), WatchUi.SLIDE_UP);
     }
 }

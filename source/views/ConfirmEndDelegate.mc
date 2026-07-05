@@ -1,16 +1,23 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
 import Toybox.Time;
+import Toybox.System;
 
 //! Input for the confirm-end dialog (§7), via raw InputDelegate events.
 //! Buttons: Up/Down move focus between tick/cross, Start commits the focused
 //! choice, Back/Lap cancels. Touch: tap the tick (left) to confirm, the cross
 //! (right) to cancel; top-right button confirms, bottom-right cancels.
+//!
+//! With water-safe touch on, confirming by touch needs a *double* tap of the
+//! tick (a stray water tap won't end the session); the physical top-right button
+//! still confirms in one press. Cancel stays single-tap (harmless — it resumes).
 class ConfirmEndDelegate extends WatchUi.InputDelegate {
     private var _view as ConfirmEndView;
     private var _session as SessionManager;
     private var _stripView as StripView;
     private var _isTouch as Lang.Boolean;
+    private var _armed = null;                 // "end" once the tick is armed
+    private var _lastTapMs as Lang.Number = 0;
 
     function initialize(view as ConfirmEndView) {
         InputDelegate.initialize();
@@ -50,8 +57,24 @@ class ConfirmEndDelegate extends WatchUi.InputDelegate {
         if (!_isTouch) {
             return false;
         }
-        if (_view.choiceAtPoint(evt.getCoordinates()) == 0) { _confirm(); } else { _cancel(); }
+        if (_view.choiceAtPoint(evt.getCoordinates()) == 0) {
+            if (TouchConfig.isWaterSafe() && !_confirmsSecondTap()) {
+                return true;   // first tap arms; wait for the confirming second
+            }
+            _confirm();
+        } else {
+            _cancel();
+        }
         return true;
+    }
+
+    //! Advance the double-tap gate on the tick. True when this tap confirms.
+    private function _confirmsSecondTap() as Lang.Boolean {
+        var nowMs = System.getTimer();
+        var confirmed = TouchConfig.confirmsTap(_armed, _lastTapMs, "end", nowMs, TouchConfig.DOUBLE_TAP_MS);
+        _armed = confirmed ? null : "end";
+        _lastTapMs = nowMs;
+        return confirmed;
     }
 
     private function _confirm() as Void {

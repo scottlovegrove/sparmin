@@ -77,6 +77,37 @@ function testReorderMovesOnlyOrder(logger) {
     return true;
 }
 
+// ---- Water-safe touch (double-tap gate) ----
+
+(:test)
+function testWaterSafeDefaultOff(logger) {
+    Application.Storage.deleteValue(TouchConfig.STORAGE_KEY);
+    Test.assertEqual(TouchConfig.isWaterSafe(), false);
+    return true;
+}
+
+(:test)
+function testDoubleTapConfirmsSameTileInWindow(logger) {
+    var w = TouchConfig.DOUBLE_TAP_MS;
+    // Second tap of the same tile, inside the window -> confirmed.
+    Test.assert(TouchConfig.confirmsTap("hydro_pool", 1000, "hydro_pool", 1000 + w, w));
+    // Exactly at the boundary still counts.
+    Test.assert(TouchConfig.confirmsTap("hydro_pool", 1000, "hydro_pool", 1000 + w, w));
+    return true;
+}
+
+(:test)
+function testDoubleTapRejectsUnarmedDifferentAndLate(logger) {
+    var w = TouchConfig.DOUBLE_TAP_MS;
+    // Nothing armed yet (first tap).
+    Test.assertEqual(TouchConfig.confirmsTap(null, 0, "hydro_pool", 500, w), false);
+    // A different tile doesn't complete the double-tap.
+    Test.assertEqual(TouchConfig.confirmsTap("ice_cave", 1000, "hydro_pool", 1100, w), false);
+    // Same tile but too slow.
+    Test.assertEqual(TouchConfig.confirmsTap("hydro_pool", 1000, "hydro_pool", 1000 + w + 1, w), false);
+    return true;
+}
+
 // ---- State machine + laps ----
 
 (:test)
