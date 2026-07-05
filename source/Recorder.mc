@@ -12,13 +12,22 @@ import Toybox.FitContributor;
 //! markLap()/finish() (§6.4).
 class Recorder {
 
-    // The sport/sub-sport is load-bearing: it must not read as a distance/GPS
-    // activity (SPORT_GENERIC showed "0 miles" in Garmin Connect), and whether
-    // the activity lap field renders depends on it too. Breathwork is an HR- and
-    // time-based recovery activity with no distance — a good fit for a thermal
-    // spa. Validate on-device and adjust here (§6.2, README).
+    // The sport/sub-sport is load-bearing and can only be validated in Garmin
+    // Connect on a real device. Failure modes seen:
+    //   - SPORT_GENERIC read as a distance/GPS activity ("0 miles" in Connect).
+    //   - SUB_SPORT_BREATHING dropped the whole thing into Connect's wellness
+    //     view: HR/stress only, no laps table at all.
+    // Cardio training is HR- and time-based with no distance, and Connect renders
+    // it as a normal activity: a proper laps table (per-lap time/HR/calories),
+    // HR chart and zones. Confirmed on-device.
+    //
+    // NOTE: Connect's app does NOT display Connect IQ developer fields, so the
+    // per-lap `activity` label and the session `summary` written below are in the
+    // FIT file but invisible in Connect's UI (laps show only as "1, 2, 3…").
+    // Surfacing the activity names is the job of the (deferred) Strava-labelling
+    // backend, not something a FitContributor field can achieve in Connect.
     const SPORT = Activity.SPORT_TRAINING;
-    const SUB_SPORT = Activity.SUB_SPORT_BREATHING;
+    const SUB_SPORT = Activity.SUB_SPORT_CARDIO_TRAINING;
     const FIELD_NAME = "activity";
     const FIELD_ID = 0;
     // Session-scope field carrying the end-of-session summary line, so the whole
