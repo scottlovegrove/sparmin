@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generate the Connect IQ Store listing images from the app art:
 #   submission/hero.png            1440x720  (hero banner, <2 MB)
-#   submission/cover.png           1440x720  (cover image, <300 KB — same design)
+#   submission/cover.png            500x500  (cover image = the app icon, <300 KB)
 #   submission/icon-24bit.png       128x128  (store app icon, AMOLED / 24-bit)
 #   submission/icon-64color.png     128x128  (store app icon, MIP / 64-colour)
 #
@@ -64,10 +64,9 @@ PY
 
 mkdir -p submission
 rsvg-convert -w 1440 -h 720 "$tmp/hero.svg" -o submission/hero.png
-cp submission/hero.png submission/cover.png
 
-# Store app icons (128x128): the split-drop brand mark on a dark tile. The Store
-# takes one 24-bit variant (AMOLED) and one 64-colour variant (MIP).
+# App-icon art: the split-drop brand mark on a dark tile. Used for the store
+# cover (500x500) and the two on-device store icons (128x128, 24-bit + 64-colour).
 cat > "$tmp/appicon.svg" <<'SVG'
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
@@ -83,6 +82,7 @@ cat > "$tmp/appicon.svg" <<'SVG'
   </g>
 </svg>
 SVG
+rsvg-convert -w 500 -h 500 "$tmp/appicon.svg" -o submission/cover.png
 rsvg-convert -w 128 -h 128 "$tmp/appicon.svg" -o submission/icon-24bit.png
 magick submission/icon-24bit.png -colors 64 -strip submission/icon-64color.png
 
