@@ -1,0 +1,12 @@
+{
+  "name": "@sparmin/watch",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sparmin Garmin Connect IQ watch app (Monkey C). Not a Node package — this manifest only exposes the build/test scripts to the monorepo.",
+  "scripts": {
+    "build": "./build.sh",
+    "build:fleet": "./build.sh fleet",
+    "build:all": "./build.sh all",
+    "test": "./build.sh test"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "sparmin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sparmin monorepo — Garmin Connect IQ watch app + marketing website.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build:watch": "npm run build -w @sparmin/watch"
+  }
+}
