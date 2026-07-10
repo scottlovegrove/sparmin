@@ -86,7 +86,7 @@ class SessionManager {
         if (_state != STATE_IDLE) {
             return;
         }
-        _beginSession(now);
+        _beginSession(now, null, LABEL_TRANSITION, STATE_TRANSITION);
         _persist();
     }
 
@@ -136,8 +136,9 @@ class SessionManager {
     //!  - IN_ACTIVITY, different activity: auto-switch, zero gap.
     function selectActivity(activityId, now) {
         if (_state == STATE_IDLE) {
-            _beginSession(now);
-            _openActivity(activityId, now);
+            // Start straight into the station: the first FIT lap *is* the
+            // activity, so there is no zero-length leading transition lap.
+            _beginSession(now, activityId, SpaActivity.nameFor(activityId), STATE_IN_ACTIVITY);
         } else if (_state == STATE_TRANSITION) {
             _openActivity(activityId, now);
         } else if (_state == STATE_IN_ACTIVITY) {
@@ -210,16 +211,19 @@ class SessionManager {
 
     // ---- Internals ----
 
-    private function _beginSession(now) {
+    //! Open a fresh session with its first lap. `firstActivityId` is null for a
+    //! transition-first start (via startSession) or a station id to open directly
+    //! into that activity; `firstLabel`/`firstState` match.
+    private function _beginSession(now, firstActivityId, firstLabel, firstState) {
         _sessionId = Uuid.generate();
         _sessionStart = now;
         _sessionEnd = null;
         _segments = [];
         _recorder.startSession();
-        _open = new Segment(null, now);
-        _openLabel = LABEL_TRANSITION;
-        _activeActivityId = null;
-        _state = STATE_TRANSITION;
+        _open = new Segment(firstActivityId, now);
+        _openLabel = firstLabel;
+        _activeActivityId = firstActivityId;
+        _state = firstState;
     }
 
     private function _openActivity(activityId, now) {

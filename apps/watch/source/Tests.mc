@@ -160,6 +160,33 @@ function testFullSessionFlowAndLabels(logger) {
 }
 
 (:test)
+function testDoubleTapStartOpensStationAsFirstLap(logger) {
+    // The real production entry: selectActivity straight from IDLE (double-tap a
+    // station). The first FIT lap must BE the station, not a zero-length
+    // leading "transition" ghost lap.
+    var rec = new FakeRecorder();
+    var sm = new SessionManager(rec);
+
+    sm.selectActivity("finnish_sauna", 1000);       // start straight into station
+    Test.assertEqual(sm.getState(), STATE_IN_ACTIVITY);
+
+    sm.selectActivity("ice_cave", 1120);            // finnish[1000,1120]=120 (auto-switch)
+    sm.stopPress(1150);                             // ice_cave[1120,1150]=30 -> transition
+    sm.stopPress(1150);                             // -> confirm
+    sm.confirmEnd(1160);                            // trans[1150,1160]=10
+
+    // No leading transition: only the trailing gap before confirm counts.
+    Test.assertEqual(sm.transitionSeconds(), 10);
+
+    // First closing lap is the station itself — no leading "transition".
+    Test.assertEqual(rec.lapLabels.size(), 2);
+    Test.assertEqual(rec.lapLabels[0], "Finnish sauna");
+    Test.assertEqual(rec.lapLabels[1], "Ice cave");
+    Test.assertEqual(rec.finishLabel, "transition");
+    return true;
+}
+
+(:test)
 function testSummaryText(logger) {
     var rec = new FakeRecorder();
     var sm = new SessionManager(rec);
