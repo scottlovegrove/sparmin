@@ -1,23 +1,19 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
 import Toybox.Time;
-import Toybox.System;
 
-//! Input for the confirm-end dialog (§7), via raw InputDelegate events.
-//! Buttons: Up/Down move focus between tick/cross, Start commits the focused
-//! choice, Back/Lap cancels. Touch: tap the tick (left) to confirm, the cross
-//! (right) to cancel; top-right button confirms, bottom-right cancels.
+//! Input for the confirm-end screen (raw InputDelegate).
 //!
-//! With water-safe touch on, confirming by touch needs a *double* tap of the
-//! tick (a stray water tap won't end the session); the physical top-right button
-//! still confirms in one press. Cancel stays single-tap (harmless — it resumes).
+//! Touch (VA5): top-right button (KEY_ENTER) = Resume; bottom-right (KEY_ESC) =
+//! Save. Taps map by arc: top = Discard (-> its own confirm), the right arc =
+//! Resume, the bottom arc = Save.
+//! Buttons (FR745): Up/Down move focus between save/resume, Start commits the
+//! focused one, Back/Lap resumes.
 class ConfirmEndDelegate extends WatchUi.InputDelegate {
     private var _view as ConfirmEndView;
     private var _session as SessionManager;
     private var _stripView as StripView;
     private var _isTouch as Lang.Boolean;
-    private var _armed = null;                 // "end" once the tick is armed
-    private var _lastTapMs as Lang.Number = 0;
 
     function initialize(view as ConfirmEndView) {
         InputDelegate.initialize();
@@ -39,17 +35,17 @@ class ConfirmEndDelegate extends WatchUi.InputDelegate {
                 return true;
             }
             if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
-                if (_view.focus == 0) { _confirm(); } else { _cancel(); }
+                if (_view.focus == 0) { _save(); } else { _resume(); }
                 return true;
             }
             if (key == WatchUi.KEY_ESC || key == WatchUi.KEY_LAP) {
-                _cancel();
+                _resume();
                 return true;
             }
             return false;
         }
-        if (key == WatchUi.KEY_ENTER) { _confirm(); return true; }
-        if (key == WatchUi.KEY_ESC) { _cancel(); return true; }
+        if (key == WatchUi.KEY_ENTER) { _resume(); return true; }   // top-right
+        if (key == WatchUi.KEY_ESC) { _save(); return true; }       // bottom-right
         return false;
     }
 
@@ -57,35 +53,33 @@ class ConfirmEndDelegate extends WatchUi.InputDelegate {
         if (!_isTouch) {
             return false;
         }
-        if (_view.choiceAtPoint(evt.getCoordinates()) == 0) {
-            if (TouchConfig.isWaterSafe() && !_confirmsSecondTap()) {
-                return true;   // first tap arms; wait for the confirming second
-            }
-            _confirm();
-        } else {
-            _cancel();
+        var region = _view.regionAtPoint(evt.getCoordinates());
+        if (region == CONFIRM_REGION_DISCARD) {
+            _discard();
+        } else if (region == CONFIRM_REGION_RESUME) {
+            _resume();
+        } else if (region == CONFIRM_REGION_SAVE) {
+            _save();
         }
         return true;
     }
 
-    //! Advance the double-tap gate on the tick. True when this tap confirms.
-    private function _confirmsSecondTap() as Lang.Boolean {
-        var nowMs = System.getTimer();
-        var confirmed = TouchConfig.confirmsTap(_armed, _lastTapMs, "end", nowMs, TouchConfig.DOUBLE_TAP_MS);
-        _armed = confirmed ? null : "end";
-        _lastTapMs = nowMs;
-        return confirmed;
-    }
-
-    private function _confirm() as Void {
+    //! Save the FIT and show the summary.
+    private function _save() as Void {
         _session.confirmEnd(now());   // stops + saves the FIT activity
-        // Backend POST would fire here once the backend exists (deferred).
         var sv = new SummaryView(_stripView);
         WatchUi.switchToView(sv, new SummaryDelegate(sv), WatchUi.SLIDE_UP);
     }
 
-    private function _cancel() as Void {
+    //! Back to the running session (still TRANSITION).
+    private function _resume() as Void {
         _session.cancelEnd();
-        WatchUi.popView(WatchUi.SLIDE_DOWN);  // back to the strip (TRANSITION)
+        WatchUi.popView(WatchUi.SLIDE_DOWN);
+    }
+
+    //! Hand off to the discard confirmation.
+    private function _discard() as Void {
+        var dv = new DiscardConfirmView(_stripView);
+        WatchUi.switchToView(dv, new DiscardConfirmDelegate(dv), WatchUi.SLIDE_UP);
     }
 }

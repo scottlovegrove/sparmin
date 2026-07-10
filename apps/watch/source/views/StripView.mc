@@ -66,6 +66,11 @@ class StripView extends WatchUi.View {
     function onShow() as Void {
         // Pick up any activity-config changes made on the config screen.
         _ctrl.reload(ActivityConfig.load());
+        // A finished/discarded session lands back at IDLE — drop the button cursor
+        // so no stray focus ring lingers on the start screen.
+        if (_session.getState() == STATE_IDLE) {
+            _cursorShown = false;
+        }
         _visualStart = _ctrl.windowStart.toFloat();
         _timer = new Timer.Timer();
         _timer.start(method(:onTick), 1000, true);
@@ -187,17 +192,6 @@ class StripView extends WatchUi.View {
         if (state == STATE_IDLE) {
             _drawHint(dc);
         }
-        if (_isTouch) {
-            _drawButtonHints(dc, state);
-        }
-    }
-
-    //! Physical-button hints (touch devices): Next (top-right) advances the
-    //! highlight, Select (bottom-right) commits it — the wet fallback for when the
-    //! screen won't take taps. Select flips to a red stop mark on the End tile.
-    private function _drawButtonHints(dc as Graphics.Dc, state) as Void {
-        ButtonHints.drawNext(dc, _w, _h);
-        ButtonHints.drawSelect(dc, _w, _h, _ctrl.isOnEndSlot());
     }
 
     //! True when a tap lands on the idle footer (the "Edit activities" target).

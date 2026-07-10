@@ -95,8 +95,12 @@ source/
 └─ views/
    ├─ StripView.mc        # home screen (IDLE/TRANSITION/IN_ACTIVITY): strip,
    │  StripDelegate.mc    # timers, HR, icons, drag-scroll animation, focus label
-   ├─ ConfirmEndView.mc   # guarded end: tick/cross drawn as line shapes (MIP-safe)
-   │  ConfirmEndDelegate.mc
+   ├─ ConfirmEndView.mc   # guarded end. Touch: 3 bezel arcs — resume/save (the two
+   │  ConfirmEndDelegate.mc # buttons) + discard (touch top). FR745: tick/cross marks.
+   ├─ DiscardConfirmView.mc # "discard without saving?" (touch-only): top-right bin
+   │  DiscardConfirmDelegate.mc # discards, bottom-right back-arrow returns to end.
+   ├─ DiscardedView.mc    # brief "Discarded" ack, auto-returns to the idle strip
+   │  DiscardedDelegate.mc
    ├─ SummaryView.mc      # scrollable per-activity breakdown
    │  SummaryDelegate.mc
    └─ ConfigView.mc       # MoveModeView (reorder). ConfigDelegate.mc holds the
@@ -114,7 +118,15 @@ IDLE ──start/select──▶ TRANSITION ──select activity──▶ IN_AC
                           │  │ stop
                   cancel  │  ▼
                        CONFIRM_END ──confirm(save FIT)──▶ SUMMARY ──dismiss──▶ IDLE
+                            │
+                            └── discard (discardSession: recorder.discard, no
+                                save, snapshot cleared) ──▶ IDLE  [+ "Discarded" ack]
 ```
+
+The confirm-end screen offers three outcomes (touch): **resume** (top-right
+button), **save** (bottom-right button → SUMMARY) and **discard** (tap top →
+`DiscardConfirmView` → `discardSession()` → the "Discarded" ack → IDLE). FR745
+keeps the two-way save/resume (no discard).
 
 - **Lap contract:** the `activity` FitContributor field is set to the *closing*
   lap's label immediately before each `addLap()`/`finish()`, so every lap
@@ -149,9 +161,11 @@ controls menu, so app gestures are short-press only. **FR745** buttons —
 Up(13)/Down(8) = focus; Start `KEY_ENTER`(4) = select; Back/Lap `KEY_ESC`(5) =
 Stop/Back; **hold-Up → `KEY_MENU`(7)** = Settings.
 
-Button hints are drawn as native-style **bezel arcs** at the two right-side
-buttons (`ButtonHints`, touch devices only): green ▸ Next / ● Select on the strip
-(Select turns red ⏹ on the End tile), green ✓ / red ✕ on CONFIRM_END.
+The **live strip shows no button overlay** — like native activity screens, the
+buttons just drive the focus highlight. Hints appear only at the decision point:
+CONFIRM_END draws its confirm/cancel marks as native-style **bezel arcs** at the
+two right-side buttons (`ButtonHints`, touch devices only) — green ✓ top-right,
+red ✕ bottom-right.
 
 **Water-safe touch** (`TouchConfig`, opt-in Settings toggle, touch devices only):
 guards a wet screen from stray droplet taps on the *touch* path — a tile/tick

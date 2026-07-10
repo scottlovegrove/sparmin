@@ -250,6 +250,23 @@ function testAggregateRepeatVisits(logger) {
     return true;
 }
 
+(:test)
+function testDiscardSessionWipesAndReturnsToIdle(logger) {
+    Application.Storage.deleteValue(SESSION_SNAP_KEY);
+    var rec = new FakeRecorder();
+    var sm = new SessionManager(rec);
+    sm.selectActivity("finnish_sauna", 1000);
+    sm.requestEnd(1100);
+    Test.assertEqual(sm.getState(), STATE_CONFIRM_END);
+
+    sm.discardSession();
+    Test.assertEqual(sm.getState(), STATE_IDLE);
+    Test.assert(rec.discarded);
+    Test.assertEqual(rec.stopped, false);        // discarded, not saved
+    Test.assertEqual(hasSessionSnapshot(), false);
+    return true;
+}
+
 // ---- HR folding ----
 
 (:test)

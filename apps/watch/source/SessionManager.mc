@@ -194,6 +194,17 @@ class SessionManager {
         _persist();
     }
 
+    //! Discard the whole recording and return to IDLE (the discard-confirm path).
+    //! No FIT is saved; the snapshot is cleared so nothing offers to resume it.
+    function discardSession() {
+        if (_state != STATE_IN_ACTIVITY && _state != STATE_TRANSITION && _state != STATE_CONFIRM_END) {
+            return;
+        }
+        _recorder.discard();
+        _clearPersist();
+        reset();   // -> IDLE, model wiped
+    }
+
     //! CONFIRM_END -> SUMMARY: close the final lap, stop and save the activity.
     //! The final segment is closed first so summaryText() reflects the whole
     //! session; _openLabel is unchanged, so the FIT closing-lap label still holds.

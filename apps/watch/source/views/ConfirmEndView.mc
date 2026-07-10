@@ -2,15 +2,30 @@ import Toybox.Lang;
 import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.Time;
+import Toybox.Math;
 
-//! Guarded end (§5 CONFIRM_END): shows total-so-far with a tick (confirm) and a
-//! cross (cancel), mirroring the native activity stop. Marks are drawn as line
-//! shapes rather than glyph fonts so they stay legible on the FR745's MIP panel.
+//! Guarded end (§5 CONFIRM_END), styled like the native activity stop screen.
+//!
+//! Touch (VA5): three bezel arcs — resume (green ▶, top-right button), save
+//! (green ✓, bottom-right button) and discard (red bin, top, touch-only). Discard
+//! routes through its own confirm screen; the two common actions sit on the two
+//! physical buttons so they work with a wet finger.
+//! Buttons (FR745): a two-way tick (save) / cross (resume) laid out for the
+//! Up/Down focus cursor and drawn as line shapes, legible on its MIP panel.
+
+//! Touch tap regions on the confirm-end screen (the return of regionAtPoint).
+enum {
+    CONFIRM_REGION_NONE = -1,
+    CONFIRM_REGION_DISCARD,
+    CONFIRM_REGION_RESUME,
+    CONFIRM_REGION_SAVE
+}
+
 class ConfirmEndView extends WatchUi.View {
     private var _stripView as StripView;
     private var _session as SessionManager;
     private var _isTouch as Lang.Boolean;
-    public var focus as Lang.Number;      // 0 = confirm, 1 = cancel
+    public var focus as Lang.Number;      // FR745 only: 0 = save, 1 = resume
     private var _w as Lang.Number = 0;
     private var _h as Lang.Number = 0;
 
@@ -31,10 +46,16 @@ class ConfirmEndView extends WatchUi.View {
         WatchUi.requestUpdate();
     }
 
-    //! 0 = confirm (top), 1 = cancel (bottom) — matches the top-right / bottom-right
-    //! arc hints on touch.
-    function choiceAtPoint(coords as Lang.Array) as Lang.Number {
-        return (coords[1] < _h / 2) ? 0 : 1;
+    //! Which arc a tap fell on, by its angle from centre (touch only).
+    function regionAtPoint(coords as Lang.Array) as Lang.Number {
+        var dx = coords[0] - _w / 2.0;
+        var dy = _h / 2.0 - coords[1];     // screen y is down; make up positive
+        var ang = Math.atan2(dy, dx) * 180.0 / Math.PI;
+        if (ang < 0) { ang += 360; }
+        if (ang >= 20 && ang < 78) { return CONFIRM_REGION_RESUME; }
+        if (ang >= 78 && ang < 150) { return CONFIRM_REGION_DISCARD; }
+        if (ang >= 270 && ang < 340) { return CONFIRM_REGION_SAVE; }
+        return CONFIRM_REGION_NONE;
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
@@ -43,32 +64,25 @@ class ConfirmEndView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         dc.clear();
 
-        dc.drawText(_w / 2, _h * 0.20, Graphics.FONT_SMALL, "End session?",
+        // Touch keeps the text in the central band, clear of the three edge arcs;
+        // the button device uses its original higher layout.
+        var titleY = _isTouch ? 0.40 : 0.20;
+        var timeY = _isTouch ? 0.56 : 0.38;
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(_w / 2, _h * titleY, Graphics.FONT_SMALL, "End session?",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         var now = Time.now().value();
-        dc.drawText(_w / 2, _h * 0.38, Graphics.FONT_NUMBER_MEDIUM,
+        dc.drawText(_w / 2, _h * timeY, Graphics.FONT_NUMBER_MEDIUM,
                     Fmt.duration(_session.elapsedSeconds(now)),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Water-safe: the tick needs a double-tap, so say so (the button still
-        // ends in one press). Without this the ignored first tap looks broken.
-        // The hint takes the mid-band, so drop the marks a little to clear it.
-        var hintShown = _isTouch && TouchConfig.isWaterSafe();
-        if (hintShown) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, _h * 0.53, Graphics.FONT_XTINY, "Double-tap top to end",
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
-
-        // Touch: green tick (top-right button) / red cross (bottom-right), matching
-        // the strip's arc hints. Button device (FR745): marks as line shapes, laid
-        // out for the Up/Down focus cursor and legible on its MIP panel.
         if (_isTouch) {
-            ButtonHints.drawConfirm(dc, _w, _h);
-            ButtonHints.drawCancel(dc, _w, _h);
+            ButtonHints.draw(dc, _w, _h, ButtonHints.DEG_TOP, ButtonHints.HINT_RED, ButtonHints.GLYPH_TRASH);
+            ButtonHints.draw(dc, _w, _h, ButtonHints.DEG_TOP_RIGHT, ButtonHints.HINT_GREEN, ButtonHints.GLYPH_PLAY);
+            ButtonHints.draw(dc, _w, _h, ButtonHints.DEG_BOTTOM_RIGHT, ButtonHints.HINT_GREEN, ButtonHints.GLYPH_TICK);
         } else {
             var r = (_h * 0.13).toNumber();
-            var markCy = (hintShown ? _h * 0.78 : _h * 0.72).toNumber();
+            var markCy = (_h * 0.72).toNumber();
             _drawTick(dc, (_w * 0.32).toNumber(), markCy, r, focus == 0);
             _drawCross(dc, (_w * 0.68).toNumber(), markCy, r, focus == 1);
         }

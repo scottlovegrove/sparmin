@@ -12,9 +12,9 @@ import Toybox.System;
 //!              swipe to pan. The two physical buttons are the wet fallback (a wet
 //!              finger can't tap): top-right (KEY_ENTER) = Next, cycling the focus
 //!              highlight; bottom-right (KEY_ESC) = Select, committing it. The
-//!              highlight cycle includes a trailing End/Exit tile, so ending needs
-//!              no dedicated gesture (the vívoactive 5 reserves the top-button
-//!              hold for its own controls menu, so holds are out).
+//!              highlight cycle includes a trailing End/Exit tile, so ending is
+//!              just Select on that tile — no dedicated gesture (the vívoactive 5
+//!              reserves the top-button hold for its own controls menu).
 //! Buttons (FR745): Up/Down move focus; Start selects the focused tile; Back/Lap
 //!              is the context Stop; Menu edits activities.
 //!
@@ -30,6 +30,7 @@ class StripDelegate extends WatchUi.InputDelegate {
     private var _dragStartVisual as Lang.Float = 0.0;
     private var _lastTapId = null;                  // armed tile for the double-tap gate
     private var _lastTapMs as Lang.Number = 0;
+    private var _escDownMs as Lang.Number = 0;      // bottom-right press time, for hold detection
 
     function initialize(view as StripView) {
         InputDelegate.initialize();
@@ -43,11 +44,21 @@ class StripDelegate extends WatchUi.InputDelegate {
         return Time.now().value();
     }
 
+    // Hold threshold (ms) for the bottom-right end/exit shortcut.
+    const HOLD_MS = 600;
+    // Sentinel id for the End/Exit tile's double-tap gate (never a real activityId).
+    const END_TAP_ID = "__end__";
+
     function onKey(evt as WatchUi.KeyEvent) as Lang.Boolean {
         var key = evt.getKey();
         if (_isTouch) {
             if (key == WatchUi.KEY_ENTER) { _next(); return true; }      // top-right: cycle
-            if (key == WatchUi.KEY_ESC) { _commit(); return true; }      // bottom-right: select
+            if (key == WatchUi.KEY_ESC) {                                // bottom-right
+                var held = (_escDownMs > 0) ? System.getTimer() - _escDownMs : 0;
+                _escDownMs = 0;
+                if (held >= HOLD_MS) { _endOrExit(); } else { _commit(); }   // hold = end, tap = select
+                return true;
+            }
             return false;
         }
         // Button device (FR745)
@@ -56,6 +67,16 @@ class StripDelegate extends WatchUi.InputDelegate {
         if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) { _selectActivity(_ctrl.focusedId()); return true; }
         if (key == WatchUi.KEY_ESC || key == WatchUi.KEY_LAP) { return _back(); }
         if (key == WatchUi.KEY_MENU) { _openConfig(); return true; }
+        return false;
+    }
+
+    //! Timestamp a bottom-right press so onKey can tell a tap (Select) from a hold
+    //! (end/exit). Returns false — it must NOT suppress the onKey click that does
+    //! the actual work.
+    function onKeyPressed(evt as WatchUi.KeyEvent) as Lang.Boolean {
+        if (_isTouch && evt.getKey() == WatchUi.KEY_ESC) {
+            _escDownMs = System.getTimer();
+        }
         return false;
     }
 
@@ -69,6 +90,10 @@ class StripDelegate extends WatchUi.InputDelegate {
             return true;
         }
         if (_view.isEndTileAtPoint(coords)) {
+            // Same droplet guard as the tiles: needs a confirming second tap.
+            if (TouchConfig.isWaterSafe() && !_confirmsSecondTap(END_TAP_ID)) {
+                return true;
+            }
             _endOrExit();
             return true;
         }
