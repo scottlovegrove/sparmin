@@ -22,7 +22,7 @@ class StripView extends WatchUi.View {
     private var _h as Lang.Number = 0;
     private var _iconSyms as Lang.Dictionary;         // activityId -> Rez.Drawables symbol
     private var _iconCache as Lang.Dictionary = {};   // activityId -> BitmapResource (or null)
-    private var _touchLocked as Lang.Boolean = false; // water-safe touch-lock (§ StripDelegate)
+    private var _cursorShown as Lang.Boolean = false; // reveal the focus ring on touch after a button press
 
     function initialize(session as SessionManager) {
         View.initialize();
@@ -30,7 +30,7 @@ class StripView extends WatchUi.View {
         _hrDisplay = null;
         _isTouch = System.getDeviceSettings().isTouchScreen;
         var tiles = _isTouch ? 4 : 3;      // roomy tiles: VA5 4, FR745 3 (§2)
-        _ctrl = new StripController(ActivityConfig.load(), tiles);
+        _ctrl = new StripController(ActivityConfig.load(), tiles, _isTouch);
         _iconSyms = {
             "outdoor_cold_plunge" => Rez.Drawables.st_outdoor_cold_plunge,
             "indoor_cold_plunge" => Rez.Drawables.st_indoor_cold_plunge,
@@ -59,19 +59,13 @@ class StripView extends WatchUi.View {
     function isTouch() as Lang.Boolean { return _isTouch; }
     function getSession() as SessionManager { return _session; }
 
-    //! Water-safe touch-lock: while set, StripDelegate ignores all touch. Stop is
-    //! still a physical button, so the session can always be ended.
-    function isTouchLocked() as Lang.Boolean { return _touchLocked; }
-    function toggleTouchLock() as Void { _touchLocked = !_touchLocked; }
+    //! Reveal the focus ring on touch devices (after the first Next button press),
+    //! so the button cursor is visible without cluttering pure-touch use.
+    function revealCursor() as Void { _cursorShown = true; }
 
     function onShow() as Void {
         // Pick up any activity-config changes made on the config screen.
         _ctrl.reload(ActivityConfig.load());
-        // A touch-lock only guards a live session; a finished one (back at IDLE)
-        // must leave the strip unlocked, else the lock lingers with no way off it.
-        if (_session.getState() == STATE_IDLE) {
-            _touchLocked = false;
-        }
         _visualStart = _ctrl.windowStart.toFloat();
         _timer = new Timer.Timer();
         _timer.start(method(:onTick), 1000, true);
@@ -165,7 +159,7 @@ class StripView extends WatchUi.View {
     }
 
     private function _maxStart() as Lang.Number {
-        var m = _ctrl.count() - _ctrl.visibleCount;
+        var m = _ctrl.slotCount() - _ctrl.visibleCount;
         return (m < 0) ? 0 : m;
     }
 
@@ -193,23 +187,17 @@ class StripView extends WatchUi.View {
         if (state == STATE_IDLE) {
             _drawHint(dc);
         }
-        if (_touchLocked) {
-            _drawLock(dc);
+        if (_isTouch) {
+            _drawButtonHints(dc, state);
         }
     }
 
-    //! Small padlock at the top edge while the water-safe touch-lock is on.
-    private function _drawLock(dc as Graphics.Dc) as Void {
-        var cx = _w / 2;
-        var cy = (_h * 0.08).toNumber();
-        var bw = (_w * 0.10).toNumber();     // body width
-        var bh = (_h * 0.05).toNumber();     // body height
-        var r = (bw * 0.32).toNumber();      // shackle radius
-        dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(3);
-        dc.drawArc(cx, cy, r, Graphics.ARC_COUNTER_CLOCKWISE, 0, 180);   // shackle
-        dc.setPenWidth(1);
-        dc.fillRoundedRectangle(cx - bw / 2, cy, bw, bh, 3);            // body
+    //! Physical-button hints (touch devices): Next (top-right) advances the
+    //! highlight, Select (bottom-right) commits it — the wet fallback for when the
+    //! screen won't take taps. Select flips to a red stop mark on the End tile.
+    private function _drawButtonHints(dc as Graphics.Dc, state) as Void {
+        ButtonHints.drawNext(dc, _w, _h);
+        ButtonHints.drawSelect(dc, _w, _h, _ctrl.isOnEndSlot());
     }
 
     //! True when a tap lands on the idle footer (the "Edit activities" target).
@@ -231,26 +219,37 @@ class StripView extends WatchUi.View {
     //! Map a tapped point to the activityId under it, or null if outside the
     //! strip. Uses the same eased geometry as drawing so taps match what's shown.
     function activityIdAtPoint(coords as Lang.Array) {
-        if (_w == 0) { return null; }
+        return _ctrl.idAtIndex(_slotIndexAtPoint(coords));
+    }
+
+    //! True when a tap lands on the trailing End/Exit tile.
+    function isEndTileAtPoint(coords as Lang.Array) as Lang.Boolean {
+        return _ctrl.isEndIndex(_slotIndexAtPoint(coords));
+    }
+
+    //! Absolute slot index under a tapped point, or -1. Uses the same eased
+    //! geometry as drawing so taps match what's shown.
+    private function _slotIndexAtPoint(coords as Lang.Array) as Lang.Number {
+        if (_w == 0) { return -1; }
         var n = _ctrl.visibleCount;
-        if (n <= 0) { return null; }
+        if (n <= 0) { return -1; }
         var top = _stripTop();
         var tileH = _stripTileH();
         var tileW = _stripTileW(n);
         var step = tileW + _stripGap();
         var x = coords[0];
         var y = coords[1];
-        if (y < top || y > top + tileH) { return null; }
+        if (y < top || y > top + tileH) { return -1; }
         var first = _visualStart.toNumber() - 1;
         var last = _visualStart.toNumber() + n + 1;
         for (var i = first; i <= last; i += 1) {
-            if (i < 0 || i >= _ctrl.count()) { continue; }
+            if (i < 0 || i >= _ctrl.slotCount()) { continue; }
             var tx = _stripMargin() + (i - _visualStart) * step;
             if (x >= tx && x <= tx + tileW) {
-                return _ctrl.idAtIndex(i);
+                return i;
             }
         }
-        return null;
+        return -1;
     }
 
     private function _drawStrip(dc as Graphics.Dc, state) as Void {
@@ -261,17 +260,24 @@ class StripView extends WatchUi.View {
         var tileW = _stripTileW(n);
         var step = tileW + _stripGap();
         var activeId = _session.getActiveActivityId();
+        var showCursor = (!_isTouch || _cursorShown);
         // Render one extra tile each side so partials slide in during animation.
         var first = _visualStart.toNumber() - 1;
         var last = _visualStart.toNumber() + n + 1;
         for (var i = first; i <= last; i += 1) {
-            if (i < 0 || i >= _ctrl.count()) { continue; }
-            var id = _ctrl.idAtIndex(i);
-            if (id == null) { continue; }
+            if (i < 0 || i >= _ctrl.slotCount()) { continue; }
             var x = _stripMargin() + (i - _visualStart) * step;
             if (x + tileW < 0 || x > _w) { continue; }   // fully off-screen
+            var isFocused = (showCursor && i == _ctrl.focusedIndex);
+
+            if (_ctrl.isEndIndex(i)) {
+                _drawEndTile(dc, x, top, tileW, tileH, isFocused, state);
+                continue;
+            }
+
+            var id = _ctrl.idAtIndex(i);
+            if (id == null) { continue; }
             var isActive = (activeId != null && activeId.equals(id));
-            var isFocused = (!_isTouch && i == _ctrl.focusedIndex);
 
             // Dark tiles so the icons (designed on near-black) stay legible; the
             // active activity gets a lighter blue-grey fill.
@@ -302,9 +308,26 @@ class StripView extends WatchUi.View {
         if (_ctrl.windowStart > 0) {
             dc.drawText(2, midY, Graphics.FONT_XTINY, "<", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
-        if (_ctrl.windowStart + n < _ctrl.count()) {
+        if (_ctrl.windowStart + n < _ctrl.slotCount()) {
             dc.drawText(_w - 2, midY, Graphics.FONT_XTINY, ">", Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
+    }
+
+    //! The trailing End/Exit tile (touch wet-fallback cursor target): red so it
+    //! reads as the terminating action. "End" mid-session, "Exit" at idle.
+    private function _drawEndTile(dc as Graphics.Dc, x, top, tileW, tileH, isFocused as Lang.Boolean, state) as Void {
+        dc.setColor(0x5A2222, Graphics.COLOR_TRANSPARENT);
+        dc.fillRoundedRectangle(x, top, tileW, tileH, 8);
+        if (isFocused) {
+            dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(3);
+            dc.drawRoundedRectangle(x, top, tileW, tileH, 8);
+            dc.setPenWidth(1);
+        }
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(x + tileW / 2, top + tileH / 2, Graphics.FONT_XTINY,
+                    (state == STATE_IDLE) ? "Exit" : "End",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     // The big timer and the name/label fonts are fixed-pixel Garmin fonts, so on

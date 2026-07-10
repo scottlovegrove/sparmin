@@ -177,6 +177,23 @@ class SessionManager {
         }
     }
 
+    //! One-press end from any live state (the touch End tile / bottom-right):
+    //! close an open activity lap into a transition lap first — preserving the
+    //! lap contract — then arm CONFIRM_END. Equivalent to the two-step stopPress
+    //! path (IN_ACTIVITY -> TRANSITION -> CONFIRM_END), collapsed into one call.
+    function requestEnd(now) {
+        if (_state != STATE_IN_ACTIVITY && _state != STATE_TRANSITION) {
+            return;
+        }
+        if (_state == STATE_IN_ACTIVITY) {
+            _boundary(null, LABEL_TRANSITION, now);
+            _activeActivityId = null;
+            _state = STATE_TRANSITION;
+        }
+        _state = STATE_CONFIRM_END;
+        _persist();
+    }
+
     //! CONFIRM_END -> SUMMARY: close the final lap, stop and save the activity.
     //! The final segment is closed first so summaryText() reflects the whole
     //! session; _openLabel is unchanged, so the FIT closing-lap label still holds.

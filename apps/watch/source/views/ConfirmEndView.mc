@@ -31,9 +31,10 @@ class ConfirmEndView extends WatchUi.View {
         WatchUi.requestUpdate();
     }
 
-    //! 0 = confirm (left), 1 = cancel (right).
+    //! 0 = confirm (top), 1 = cancel (bottom) — matches the top-right / bottom-right
+    //! arc hints on touch.
     function choiceAtPoint(coords as Lang.Array) as Lang.Number {
-        return (coords[0] < _w / 2) ? 0 : 1;
+        return (coords[1] < _h / 2) ? 0 : 1;
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
@@ -55,14 +56,22 @@ class ConfirmEndView extends WatchUi.View {
         var hintShown = _isTouch && TouchConfig.isWaterSafe();
         if (hintShown) {
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_w / 2, _h * 0.53, Graphics.FONT_XTINY, "Double-tap tick to end",
+            dc.drawText(_w / 2, _h * 0.53, Graphics.FONT_XTINY, "Double-tap top to end",
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        var r = (_h * 0.13).toNumber();
-        var markCy = (hintShown ? _h * 0.78 : _h * 0.72).toNumber();
-        _drawTick(dc, (_w * 0.32).toNumber(), markCy, r, focus == 0);
-        _drawCross(dc, (_w * 0.68).toNumber(), markCy, r, focus == 1);
+        // Touch: green tick (top-right button) / red cross (bottom-right), matching
+        // the strip's arc hints. Button device (FR745): marks as line shapes, laid
+        // out for the Up/Down focus cursor and legible on its MIP panel.
+        if (_isTouch) {
+            ButtonHints.drawConfirm(dc, _w, _h);
+            ButtonHints.drawCancel(dc, _w, _h);
+        } else {
+            var r = (_h * 0.13).toNumber();
+            var markCy = (hintShown ? _h * 0.78 : _h * 0.72).toNumber();
+            _drawTick(dc, (_w * 0.32).toNumber(), markCy, r, focus == 0);
+            _drawCross(dc, (_w * 0.68).toNumber(), markCy, r, focus == 1);
+        }
     }
 
     private function _drawTick(dc as Graphics.Dc, cx, cy, r, focused) as Void {

@@ -81,7 +81,10 @@ source/
 ├─ TouchConfig.mc         # module: "water-safe touch" flag in Storage + pure
 │                         # confirmsTap() double-tap rule (unit-tested).
 ├─ StripController.mc     # pure strip nav: focus cursor + visible window +
-│                         # edge-slide rule. idAtIndex() for animated render.
+│                         # edge-slide rule + trailing End/Exit slot (touch
+│                         # button fallback). idAtIndex() for animated render.
+├─ ButtonHints.mc         # module: native-style bezel arc + glyph physical-button
+│                         # hints (touch wet-fallback); StripView + ConfirmEndView.
 ├─ Segment.mc             # one lap: activityId(null=transition), times, HR stats,
 │                         # foldHr(), toDict()/segmentFromDict() (crash-resume).
 ├─ HrSampler.mc           # module: live-vs-display HR, invalid-sample rejection.
@@ -137,17 +140,24 @@ the coordinates, so coordinate-based tile selection can't work. This was a real
 bug; don't switch back.
 
 Key map (from on-device testing): **VA5** touch — tap tile = select; drag =
-scroll; top-right button `KEY_ENTER`(4) = Stop; bottom-right `KEY_ESC`(5) = Back;
-idle footer tap = Settings. **FR745** buttons — Up(13)/Down(8) = focus;
-Start `KEY_ENTER`(4) = select; Back/Lap `KEY_ESC`(5) = Stop/Back; **hold-Up →
-`KEY_MENU`(7)** = Settings.
+scroll; idle footer tap = Settings. The two buttons are the **wet fallback** (a
+wet finger can't tap): top-right `KEY_ENTER`(4) = **Next** (cycle the focus
+highlight, loops); bottom-right `KEY_ESC`(5) = **Select** (commit it). The
+highlight cycle ends on a trailing **End/Exit tile**, so ending needs no
+dedicated gesture — the vívoactive 5 reserves the top-button *hold* for its own
+controls menu, so app gestures are short-press only. **FR745** buttons —
+Up(13)/Down(8) = focus; Start `KEY_ENTER`(4) = select; Back/Lap `KEY_ESC`(5) =
+Stop/Back; **hold-Up → `KEY_MENU`(7)** = Settings.
+
+Button hints are drawn as native-style **bezel arcs** at the two right-side
+buttons (`ButtonHints`, touch devices only): green ▸ Next / ● Select on the strip
+(Select turns red ⏹ on the End tile), green ✓ / red ✕ on CONFIRM_END.
 
 **Water-safe touch** (`TouchConfig`, opt-in Settings toggle, touch devices only):
-guards a wet screen from stray droplet taps. When on, a tile/tick actuates only
-on a *second* tap of the same target within `DOUBLE_TAP_MS`, and mid-session
-`KEY_ESC` (bottom-right) toggles a **touch-lock** — while locked `StripDelegate`
-swallows all touch and `StripView` shows a padlock; the physical Stop button
-still works. Off = single-tap, `KEY_ESC` a mid-session no-op (unchanged).
+guards a wet screen from stray droplet taps on the *touch* path — a tile/tick
+actuates only on a *second* tap of the same target within `DOUBLE_TAP_MS`. The
+buttons commit in one press regardless (the real wet answer), so there is no
+touch-lock. Off = single-tap.
 
 ## Icons / resources
 

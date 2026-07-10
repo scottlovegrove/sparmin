@@ -277,7 +277,7 @@ function testHrFoldingRejectsInvalidAndTransition(logger) {
 
 (:test)
 function testStripWindowSlidesAtEdges(logger) {
-    var c = new StripController(SpaActivity.allIds(), 3); // 10 activities, window 3
+    var c = new StripController(SpaActivity.allIds(), 3, false); // 10 activities, window 3
     Test.assertEqual(c.windowStart, 0);
     c.moveFocus(1);
     c.moveFocus(1);              // focus 2, still fully visible
@@ -290,7 +290,7 @@ function testStripWindowSlidesAtEdges(logger) {
 
 (:test)
 function testStripWrapsAtStart(logger) {
-    var c = new StripController(SpaActivity.allIds(), 3);
+    var c = new StripController(SpaActivity.allIds(), 3, false);
     c.moveFocus(-1);             // wrap 0 -> 9
     Test.assertEqual(c.focusedIndex, 9);
     Test.assertEqual(c.windowStart, 7); // last three visible
@@ -299,13 +299,88 @@ function testStripWrapsAtStart(logger) {
 
 (:test)
 function testStripReloadClampsFocus(logger) {
-    var c = new StripController(SpaActivity.allIds(), 3);
+    var c = new StripController(SpaActivity.allIds(), 3, false);
     c.moveFocus(1);
     c.moveFocus(1);
     c.moveFocus(1);             // focus 3
     c.reload(["finnish_sauna", "ice_cave"]);
     Test.assertEqual(c.visibleCount, 2);
     Test.assert(c.focusedIndex <= 1);
+    return true;
+}
+
+(:test)
+function testEndSlotIsTrailingAndWraps(logger) {
+    // 3 stations + the End slot = 4 cursor targets, window 3.
+    var c = new StripController(["finnish_sauna", "ice_cave", "hydro_pool"], 3, true);
+    Test.assertEqual(c.slotCount(), 4);
+    Test.assertEqual(c.count(), 3);
+    Test.assertEqual(c.isOnEndSlot(), false);
+
+    c.moveFocus(1);
+    c.moveFocus(1);              // focus 2 (last station)
+    Test.assertEqual(c.isOnEndSlot(), false);
+    c.moveFocus(1);              // focus 3 = End slot
+    Test.assertEqual(c.focusedIndex, 3);
+    Test.assertEqual(c.isOnEndSlot(), true);
+    Test.assert(c.focusedId() == null);         // End carries no activityId
+    Test.assert(c.isEndIndex(3));
+    Test.assertEqual(c.windowStart, 1);         // window slid to reveal the End tile
+
+    c.moveFocus(1);              // wrap End -> first station
+    Test.assertEqual(c.focusedIndex, 0);
+    Test.assertEqual(c.isOnEndSlot(), false);
+    Test.assertEqual(c.focusedId(), "finnish_sauna");
+    return true;
+}
+
+(:test)
+function testNoEndSlotWhenDisabled(logger) {
+    var c = new StripController(["finnish_sauna", "ice_cave"], 2, false);
+    Test.assertEqual(c.slotCount(), 2);
+    c.moveFocus(1);              // focus 1 (last)
+    c.moveFocus(1);              // wraps straight back to 0, no End slot
+    Test.assertEqual(c.focusedIndex, 0);
+    Test.assertEqual(c.isOnEndSlot(), false);
+    return true;
+}
+
+(:test)
+function testRequestEndFromActivityMatchesTwoStepStop(logger) {
+    // requestEnd (one press on the End tile) must produce the same laps as the
+    // two-step stopPress path: close the activity into a transition lap, then end.
+    var rec = new FakeRecorder();
+    var sm = new SessionManager(rec);
+    sm.selectActivity("finnish_sauna", 1000);   // start straight into station
+    sm.requestEnd(1120);                         // finnish[1000,1120]=120 -> CONFIRM_END
+    Test.assertEqual(sm.getState(), STATE_CONFIRM_END);
+    sm.confirmEnd(1130);                          // trans[1120,1130]=10
+
+    Test.assertEqual(sm.transitionSeconds(), 10);
+    Test.assertEqual(rec.lapLabels.size(), 1);
+    Test.assertEqual(rec.lapLabels[0], "Finnish sauna");
+    Test.assertEqual(rec.finishLabel, "transition");
+    return true;
+}
+
+(:test)
+function testRequestEndFromTransitionAndNoOpStates(logger) {
+    var sm = new SessionManager(new FakeRecorder());
+    sm.startSession(1000);                        // -> TRANSITION
+    sm.requestEnd(1010);                          // TRANSITION -> CONFIRM_END directly
+    Test.assertEqual(sm.getState(), STATE_CONFIRM_END);
+
+    // No-op from a non-live state.
+    sm.confirmEnd(1020);                          // -> SUMMARY
+    sm.requestEnd(1030);
+    Test.assertEqual(sm.getState(), STATE_SUMMARY);
+
+    // No-op from IDLE (and leaves no snapshot behind).
+    Application.Storage.deleteValue(SESSION_SNAP_KEY);
+    var sm2 = new SessionManager(new FakeRecorder());
+    sm2.requestEnd(0);
+    Test.assertEqual(sm2.getState(), STATE_IDLE);
+    Test.assertEqual(hasSessionSnapshot(), false);
     return true;
 }
 

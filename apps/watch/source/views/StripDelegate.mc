@@ -8,16 +8,19 @@ import Toybox.System;
 //! the SELECT behaviour (losing the coordinates), so tile selection could never
 //! see where you tapped.
 //!
-//! Touch (VA5):   tap a tile to select; tap the footer (idle) to edit activities;
-//!                swipe to pan; top-right button (KEY_ENTER) = Stop; bottom-right
-//!                (KEY_ESC) = Back/exit.
+//! Touch (VA5): tap a tile to select; tap the footer (idle) to edit activities;
+//!              swipe to pan. The two physical buttons are the wet fallback (a wet
+//!              finger can't tap): top-right (KEY_ENTER) = Next, cycling the focus
+//!              highlight; bottom-right (KEY_ESC) = Select, committing it. The
+//!              highlight cycle includes a trailing End/Exit tile, so ending needs
+//!              no dedicated gesture (the vívoactive 5 reserves the top-button
+//!              hold for its own controls menu, so holds are out).
 //! Buttons (FR745): Up/Down move focus; Start selects the focused tile; Back/Lap
-//!                is the context Stop; Menu edits activities.
+//!              is the context Stop; Menu edits activities.
 //!
-//! With water-safe touch on (TouchConfig): a tile actuates only on a *second*
-//! tap of the same tile within DOUBLE_TAP_MS, and the bottom-right button
-//! (KEY_ESC, otherwise a mid-session no-op on touch) toggles a touch-lock that
-//! makes the strip ignore all touch until pressed again.
+//! With water-safe touch on (TouchConfig) a tile actuates only on a *second* tap
+//! of the same tile within DOUBLE_TAP_MS — a droplet guard on the touch path; the
+//! buttons commit in one press regardless.
 class StripDelegate extends WatchUi.InputDelegate {
     private var _view as StripView;
     private var _session as SessionManager;
@@ -43,8 +46,8 @@ class StripDelegate extends WatchUi.InputDelegate {
     function onKey(evt as WatchUi.KeyEvent) as Lang.Boolean {
         var key = evt.getKey();
         if (_isTouch) {
-            if (key == WatchUi.KEY_ENTER) { _stop(); return true; }      // top-right
-            if (key == WatchUi.KEY_ESC) { return _back(); }              // bottom-right
+            if (key == WatchUi.KEY_ENTER) { _next(); return true; }      // top-right: cycle
+            if (key == WatchUi.KEY_ESC) { _commit(); return true; }      // bottom-right: select
             return false;
         }
         // Button device (FR745)
@@ -60,12 +63,13 @@ class StripDelegate extends WatchUi.InputDelegate {
         if (!_isTouch) {
             return false;
         }
-        if (_view.isTouchLocked()) {
-            return true;   // water-safe lock: swallow all touch
-        }
         var coords = evt.getCoordinates();
         if (_session.getState() == STATE_IDLE && _view.isFooterTap(coords)) {
             _openConfig();
+            return true;
+        }
+        if (_view.isEndTileAtPoint(coords)) {
+            _endOrExit();
             return true;
         }
         var id = _view.activityIdAtPoint(coords);
@@ -75,6 +79,7 @@ class StripDelegate extends WatchUi.InputDelegate {
         if (TouchConfig.isWaterSafe() && !_confirmsSecondTap(id)) {
             return true;   // first tap arms; a droplet won't produce the second
         }
+        _ctrl.focusId(id);   // keep the button cursor in sync with taps
         _selectActivity(id);
         return true;
     }
@@ -94,9 +99,6 @@ class StripDelegate extends WatchUi.InputDelegate {
     function onDrag(evt as WatchUi.DragEvent) as Lang.Boolean {
         if (!_isTouch) {
             return false;
-        }
-        if (_view.isTouchLocked()) {
-            return true;   // water-safe lock: no drag scrolling either
         }
         var coords = evt.getCoordinates();
         var type = evt.getType();
@@ -123,6 +125,38 @@ class StripDelegate extends WatchUi.InputDelegate {
         WatchUi.requestUpdate();
     }
 
+    // ---- Touch button fallback (cycle + commit) ----
+
+    //! Top-right: advance the highlight one slot (loops, includes the End tile).
+    private function _next() as Void {
+        _ctrl.moveFocus(1);
+        _view.revealCursor();
+        _view.animateToWindow();
+    }
+
+    //! Bottom-right: commit the highlighted target — start/switch a station, or
+    //! end/exit on the trailing tile.
+    private function _commit() as Void {
+        _view.revealCursor();
+        if (_ctrl.isOnEndSlot()) {
+            _endOrExit();
+            return;
+        }
+        _selectActivity(_ctrl.focusedId());
+    }
+
+    //! End tile: end the session (any live state -> confirm), or exit the app when
+    //! idle (nothing to end).
+    private function _endOrExit() as Void {
+        if (_session.getState() == STATE_IDLE) {
+            System.exit();   // never returns
+        } else {
+            _session.requestEnd(now());
+            var cev = new ConfirmEndView(_view);
+            WatchUi.pushView(cev, new ConfirmEndDelegate(cev), WatchUi.SLIDE_UP);
+        }
+    }
+
     private function _stop() as Void {
         _session.stopPress(now());
         if (_session.getState() == STATE_CONFIRM_END) {
@@ -133,20 +167,10 @@ class StripDelegate extends WatchUi.InputDelegate {
         }
     }
 
-    // Back: exit from IDLE (both devices). Mid-session it's the context Stop on
-    // button devices. On touch it's a no-op (Stop is the top-right button) — or,
-    // with water-safe touch on, it toggles the touch-lock so the strip can be
-    // sealed against stray water taps.
+    // Back (button devices, FR745): exit from IDLE, otherwise the context Stop.
     private function _back() as Lang.Boolean {
         if (_session.getState() == STATE_IDLE) {
             return false;   // let the OS exit the app
-        }
-        if (_isTouch) {
-            if (TouchConfig.isWaterSafe()) {
-                _view.toggleTouchLock();
-                WatchUi.requestUpdate();
-            }
-            return true;
         }
         _stop();
         return true;
