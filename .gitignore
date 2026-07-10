@@ -2,6 +2,10 @@
 node_modules/
 *.log
 
+# --- VS Code: ignore local machine settings, keep shared recommendations ---
+.vscode/*
+!.vscode/extensions.json
+
 # --- OS cruft ---
 .DS_Store
 Thumbs.db
