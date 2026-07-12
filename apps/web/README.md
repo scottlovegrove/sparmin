@@ -10,7 +10,7 @@ From the repo root (npm workspaces — no need to `cd` in):
 
 ```sh
 npm install          # once
-npm run dev:web      # dev server at http://localhost:4321/sparmin
+npm run dev:web      # dev server at http://localhost:4321
 npm run build:web    # type-check (astro check) + static build → apps/web/dist
 npm run preview:web  # serve the built output
 ```
@@ -69,8 +69,14 @@ summary: One line on what this release is about.
 push to `main` that touches `apps/web`. In the repo's **Settings → Pages**, the
 source must be set to **GitHub Actions**.
 
-The site is served from a project page, so `astro.config.mjs` sets
-`base: '/sparmin'` and every internal link is built from
-`import.meta.env.BASE_URL`. To move to a custom domain: set `base: '/'` and
-`site` to the domain, add `public/CNAME` containing the domain, and point a DNS
-CNAME at `scottlovegrove.github.io`.
+The site lives at **https://sparmin.scottlovegrove.co.uk**, so it sits at the
+root of its own domain: `astro.config.mjs` sets `base: '/'`, and every internal
+link is built from `import.meta.env.BASE_URL` rather than hardcoded, so it
+follows `base` wherever that points.
+
+`public/CNAME` carries the domain into the built output. It has to ship in the
+build, not sit on a branch, because Pages deploys here come from an Actions
+artefact — deleting it would hand the site back to
+`scottlovegrove.github.io/sparmin` on the next deploy.
+
+DNS is a CNAME on the `sparmin` subdomain pointing at `scottlovegrove.github.io`.
