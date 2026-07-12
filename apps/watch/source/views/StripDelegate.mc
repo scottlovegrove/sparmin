@@ -12,9 +12,15 @@ import Toybox.System;
 //!              swipe to pan. The two physical buttons are the wet fallback (a wet
 //!              finger can't tap): top-right (KEY_ENTER) = Next, cycling the focus
 //!              highlight; bottom-right (KEY_ESC) = Select, committing it. The
-//!              highlight cycle includes a trailing End/Exit tile, so ending is
-//!              just Select on that tile — no dedicated gesture (the vívoactive 5
-//!              reserves the top-button hold for its own controls menu).
+//!              cycle ends on a trailing tile — "End" mid-session, "Exit" at idle —
+//!              so both leaving the app and ending a session are reachable without
+//!              a dedicated gesture (the vívoactive 5 reserves the top-button hold
+//!              for its own controls menu). A hold of the bottom-right button is a
+//!              shortcut straight to that tile's action.
+//!              While idle and *not* button-navigating (no cursor yet), the
+//!              bottom-right button keeps its conventional Back/exit meaning, like
+//!              every other Garmin app. The first Next press reveals the cursor and
+//!              claims the button as Select — the Exit tile is then the way out.
 //! Buttons (FR745): Up/Down move focus; Start selects the focused tile; Back/Lap
 //!              is the context Stop; Menu edits activities.
 //!
@@ -56,6 +62,13 @@ class StripDelegate extends WatchUi.InputDelegate {
             if (key == WatchUi.KEY_ESC) {                                // bottom-right
                 var held = (_escDownMs > 0) ? System.getTimer() - _escDownMs : 0;
                 _escDownMs = 0;
+                // Idle and not button-navigating: keep the conventional Back (exit
+                // the app), like every other Garmin app. Once the cursor is live the
+                // button becomes Select — the Exit tile in the cycle is then the way
+                // out, so nobody is stranded.
+                if (_session.getState() == STATE_IDLE && !_view.isCursorShown()) {
+                    return false;   // let the OS take it — exits the app
+                }
                 if (held >= HOLD_MS) { _endOrExit(); } else { _commit(); }   // hold = end, tap = select
                 return true;
             }
@@ -71,8 +84,8 @@ class StripDelegate extends WatchUi.InputDelegate {
     }
 
     //! Timestamp a bottom-right press so onKey can tell a tap (Select) from a hold
-    //! (end/exit). Returns false — it must NOT suppress the onKey click that does
-    //! the actual work.
+    //! (end session). Returns false — it must NOT suppress the onKey click that
+    //! does the actual work.
     function onKeyPressed(evt as WatchUi.KeyEvent) as Lang.Boolean {
         if (_isTouch && evt.getKey() == WatchUi.KEY_ESC) {
             _escDownMs = System.getTimer();
@@ -152,7 +165,7 @@ class StripDelegate extends WatchUi.InputDelegate {
 
     // ---- Touch button fallback (cycle + commit) ----
 
-    //! Top-right: advance the highlight one slot (loops, includes the End tile).
+    //! Top-right: advance the highlight one slot (loops, includes the End/Exit tile).
     private function _next() as Void {
         _ctrl.moveFocus(1);
         _view.revealCursor();
@@ -170,8 +183,8 @@ class StripDelegate extends WatchUi.InputDelegate {
         _selectActivity(_ctrl.focusedId());
     }
 
-    //! End tile: end the session (any live state -> confirm), or exit the app when
-    //! idle (nothing to end).
+    //! The trailing tile (and the bottom-right hold): end the session, or exit the
+    //! app at idle — where it's the way out once the cursor has claimed Back.
     private function _endOrExit() as Void {
         if (_session.getState() == STATE_IDLE) {
             System.exit();   // never returns

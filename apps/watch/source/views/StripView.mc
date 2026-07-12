@@ -63,6 +63,11 @@ class StripView extends WatchUi.View {
     //! so the button cursor is visible without cluttering pure-touch use.
     function revealCursor() as Void { _cursorShown = true; }
 
+    //! Whether the button cursor is live (the user has started cycling with Next).
+    //! Until it is, the bottom-right button keeps its conventional Back meaning.
+    function isCursorShown() as Lang.Boolean { return _cursorShown; }
+
+
     function onShow() as Void {
         // Pick up any activity-config changes made on the config screen.
         _ctrl.reload(ActivityConfig.load());
@@ -308,7 +313,8 @@ class StripView extends WatchUi.View {
     }
 
     //! The trailing End/Exit tile (touch wet-fallback cursor target): red so it
-    //! reads as the terminating action. "End" mid-session, "Exit" at idle.
+    //! reads as the terminating action. "End" mid-session, "Exit" at idle — where
+    //! it's how you leave the app once the button cursor has claimed Back.
     private function _drawEndTile(dc as Graphics.Dc, x, top, tileW, tileH, isFocused as Lang.Boolean, state) as Void {
         dc.setColor(0x5A2222, Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(x, top, tileW, tileH, 8);

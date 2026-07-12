@@ -8,7 +8,8 @@ import Toybox.Lang;
 //! with the other), the cursor also reaches one virtual trailing slot past the
 //! last station — the "End / Exit" target. It carries no activityId; the view
 //! draws it and the delegate interprets it by session state (End mid-session,
-//! Exit at idle).
+//! Exit at idle, which is how you leave the app once the cursor has claimed the
+//! Back button).
 class StripController {
     public var visibleIds as Lang.Array;  // configured, ordered visible activityIds
     public var focusedIndex as Lang.Number;

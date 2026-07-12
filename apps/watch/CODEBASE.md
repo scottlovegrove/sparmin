@@ -158,11 +158,20 @@ Key map (from on-device testing): **VA5** touch — tap tile = select; drag =
 scroll; idle footer tap = Settings. The two buttons are the **wet fallback** (a
 wet finger can't tap): top-right `KEY_ENTER`(4) = **Next** (cycle the focus
 highlight, loops); bottom-right `KEY_ESC`(5) = **Select** (commit it). The
-highlight cycle ends on a trailing **End/Exit tile**, so ending needs no
+highlight cycle ends on a trailing **End/Exit tile** ("End" mid-session, "Exit"
+at idle), so both ending a session and leaving the app are reachable without a
 dedicated gesture — the vívoactive 5 reserves the top-button *hold* for its own
-controls menu, so app gestures are short-press only. **FR745** buttons —
-Up(13)/Down(8) = focus; Start `KEY_ENTER`(4) = select; Back/Lap `KEY_ESC`(5) =
-Stop/Back; **hold-Up → `KEY_MENU`(7)** = Settings.
+controls menu. A **hold of the bottom-right button** is a shortcut straight to
+that tile's action (the bottom-button hold is free in-app; verified on-device).
+
+**Back stays Back until the cursor exists.** While idle and not yet
+button-navigating, bottom-right keeps its conventional Back/exit meaning, like
+every other Garmin app — claiming it as Select from the start left users with no
+familiar way out. The first Next press reveals the cursor and takes the button
+over; from then on the Exit tile is the way out, so nobody is stranded.
+
+**FR745** buttons — Up(13)/Down(8) = focus; Start `KEY_ENTER`(4) = select;
+Back/Lap `KEY_ESC`(5) = Stop/Back; **hold-Up → `KEY_MENU`(7)** = Settings.
 
 The **live strip shows no button overlay** — like native activity screens, the
 buttons just drive the focus highlight. Hints appear only at the decision point:
