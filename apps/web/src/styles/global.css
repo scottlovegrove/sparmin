@@ -1,0 +1,189 @@
+/* Palette taken from the app icon: hot (sauna) orange, cold (plunge) blue. */
+:root {
+    --hot: #f5822a;
+    --cold: #37a6e0;
+
+    --bg: #0d0f12;
+    --bg-raised: #15181d;
+    --border: #262b33;
+    --text: #e8eaed;
+    --text-dim: #9aa3ad;
+
+    --measure: 62ch;
+    --page: 1080px;
+    --radius: 14px;
+
+    color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family:
+        system-ui,
+        -apple-system,
+        'Segoe UI',
+        Roboto,
+        sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+}
+
+h1 {
+    font-size: clamp(2.25rem, 6vw, 3.5rem);
+    margin: 0;
+}
+
+h2 {
+    font-size: clamp(1.5rem, 3.5vw, 2rem);
+    margin: 0 0 1.5rem;
+}
+
+p {
+    text-wrap: pretty;
+}
+
+a {
+    color: var(--cold);
+    text-underline-offset: 3px;
+}
+
+a:hover {
+    color: var(--text);
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+.page {
+    max-width: var(--page);
+    margin-inline: auto;
+    padding-inline: 1.5rem;
+}
+
+section {
+    padding-block: clamp(3rem, 8vw, 5rem);
+    border-top: 1px solid var(--border);
+}
+
+.lede {
+    max-width: var(--measure);
+    color: var(--text-dim);
+    font-size: 1.1875rem;
+}
+
+/* Site chrome ------------------------------------------------------------ */
+
+.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1.25rem;
+}
+
+.wordmark {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 650;
+    font-size: 1.125rem;
+    color: var(--text);
+    text-decoration: none;
+    letter-spacing: -0.01em;
+}
+
+.wordmark img {
+    width: 28px;
+    height: 28px;
+}
+
+.site-nav {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.9375rem;
+}
+
+/* On a narrow phone the wordmark and the nav collide, so let the nav drop onto
+   its own line. */
+@media (max-width: 460px) {
+    .site-header {
+        flex-wrap: wrap;
+        row-gap: 0.75rem;
+    }
+
+    .site-nav {
+        flex-basis: 100%;
+        gap: 1.25rem;
+    }
+}
+
+.site-nav a {
+    color: var(--text-dim);
+    text-decoration: none;
+}
+
+.site-nav a:hover,
+.site-nav a[aria-current='page'] {
+    color: var(--text);
+}
+
+.site-footer {
+    border-top: 1px solid var(--border);
+    padding-block: 2rem 3rem;
+    color: var(--text-dim);
+    font-size: 0.9375rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    justify-content: space-between;
+}
+
+/* Buttons ---------------------------------------------------------------- */
+
+.button {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid transparent;
+}
+
+.button--primary {
+    background: var(--hot);
+    color: #17130f;
+}
+
+.button--primary:hover {
+    background: #ff9a4a;
+    color: #17130f;
+}
+
+.button--ghost {
+    border-color: var(--border);
+    color: var(--text);
+}
+
+.button--ghost:hover {
+    border-color: var(--text-dim);
+    color: var(--text);
+}

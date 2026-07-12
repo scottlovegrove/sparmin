@@ -2,6 +2,10 @@
 node_modules/
 *.log
 
+# --- Astro (apps/web) ---
+dist/
+.astro/
+
 # --- VS Code: ignore local machine settings, keep shared recommendations ---
 .vscode/*
 !.vscode/extensions.json

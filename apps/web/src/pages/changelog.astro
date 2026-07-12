@@ -1,0 +1,109 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../layouts/Base.astro';
+
+const releases = await getCollection('changelog');
+
+// Newest version first, comparing each numeric part rather than the string, so
+// 0.10.0 sorts above 0.9.0.
+const parts = (version: string) => version.split('.').map(Number);
+releases.sort((a, b) => {
+    const [av, bv] = [parts(a.data.version), parts(b.data.version)];
+    for (let i = 0; i < Math.max(av.length, bv.length); i++) {
+        const diff = (bv[i] ?? 0) - (av[i] ?? 0);
+        if (diff !== 0) return diff;
+    }
+    return 0;
+});
+
+const entries = await Promise.all(
+    releases.map(async (release) => ({
+        ...release.data,
+        Content: (await render(release)).Content,
+    })),
+);
+
+const formatDate = (date: Date) =>
+    date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+---
+
+<Base
+    title="Sparmin — changelog"
+    description="What changed in each release of Sparmin, the Garmin Connect IQ spa session logger."
+>
+    <section class="intro">
+        <h1>Changelog</h1>
+        <p class="lede">Every release of Sparmin, newest first.</p>
+    </section>
+
+    {
+        entries.map(({ version, date, summary, Content }) => (
+            <section class="release">
+                <div class="release__meta">
+                    <h2>{version}</h2>
+                    {date && <p class="release__date">{formatDate(date)}</p>}
+                </div>
+                <div class="release__body">
+                    <p class="release__summary">{summary}</p>
+                    <Content />
+                </div>
+            </section>
+        ))
+    }
+</Base>
+
+<style>
+    .intro {
+        border-top: 0;
+        padding-block: clamp(2.5rem, 7vw, 4rem) 0;
+    }
+
+    .intro .lede {
+        margin-top: 1rem;
+    }
+
+    .release {
+        display: grid;
+        gap: 0.5rem 3rem;
+        grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 720px) {
+        .release {
+            grid-template-columns: 10rem 1fr;
+        }
+    }
+
+    .release__meta h2 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+
+    .release__date {
+        margin: 0.25rem 0 0;
+        color: var(--text-dim);
+        font-size: 0.9375rem;
+    }
+
+    .release__body {
+        max-width: var(--measure);
+    }
+
+    .release__summary {
+        margin-top: 0;
+        font-weight: 600;
+    }
+
+    .release__body :global(ul) {
+        padding-left: 1.25rem;
+        color: var(--text-dim);
+    }
+
+    .release__body :global(li) {
+        margin-bottom: 0.5rem;
+    }
+
+    .release__body :global(strong) {
+        color: var(--text);
+    }
+</style>

@@ -1,0 +1,282 @@
+---
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import idle from '../assets/screenshots/vivo-idle.png';
+import active from '../assets/screenshots/vivo-active-session.png';
+import summary from '../assets/screenshots/vivo-summary.png';
+
+const STORE_URL = 'https://apps.garmin.com/apps/b594caa9-3332-4de3-9cf2-3fdd848852e8';
+
+const REPO_URL = 'https://github.com/scottlovegrove/sparmin';
+const ISSUES_URL = `${REPO_URL}/issues`;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const shots = [
+    {
+        image: idle,
+        title: 'Arrive and start',
+        caption: 'The activity strip is the home screen. Tap where you are — the timer starts.',
+    },
+    {
+        image: active,
+        title: 'Move between spots',
+        caption: 'Tap the next activity and it switches with no gap. Live heart rate throughout.',
+    },
+    {
+        image: summary,
+        title: 'Finish with a breakdown',
+        caption: 'Time, visit count and heart rate for every activity, plus your transition time.',
+    },
+];
+
+const features = [
+    {
+        title: 'A real Garmin activity',
+        body: 'Your visit is recorded as a FIT activity and syncs to Garmin Connect like any other workout — not a note, not a third-party log.',
+    },
+    {
+        title: 'Timed spot by spot',
+        body: 'Each sauna, steam room, cold plunge, hydro pool and lounger is a separate lap, so you see where the time actually went.',
+    },
+    {
+        title: 'Zero-gap switching',
+        body: "Tap the next activity and the last one closes at the same instant. Step out and the app times that as transition time, so nothing goes unaccounted for.",
+    },
+    {
+        title: 'Heart rate that means something',
+        body: 'Live heart rate during the session, then average and maximum per activity — the number that tells a sauna from a plunge.',
+    },
+    {
+        title: 'Your list, your order',
+        body: 'Show, hide and reorder activities so the places you actually visit are the ones you can reach first.',
+    },
+    {
+        title: 'Fits your watch',
+        body: 'Round or rectangular, touchscreen or buttons — the layout adapts. Runs on 94 Connect IQ watches.',
+    },
+];
+
+const faqs = [
+    {
+        q: 'Which watches does it work on?',
+        a: 'Any Connect IQ watch running API level 3.1.0 or newer — 94 models, from the vívoactive and Venu lines to Forerunner, fēnix, epix and Instinct. It is built and tested on the vívoactive 5 (touchscreen) and Forerunner 745 (buttons).',
+    },
+    {
+        q: 'What does it record the session as?',
+        a: 'A Cardio training activity, with one lap per activity you visited. Each lap is tagged with its activity name, so the breakdown survives the trip into Garmin Connect rather than living only on the watch.',
+    },
+    {
+        q: 'Does it track distance or steps?',
+        a: 'No. A spa visit is time and heart rate, not distance — recording it as a distance activity just produced an activity claiming "0 miles". Sparmin records time, per-activity laps and heart rate.',
+    },
+    {
+        q: 'My touchscreen goes haywire when it is wet. Is that a problem?',
+        a: 'That is what Water-safe touch mode is for. Turn it on in Settings and selecting an activity takes a deliberate double tap, so a stray droplet cannot start or switch anything. There is also a touch-lock that disables the screen entirely for a full soak — the physical Stop button still works, so you can always end the session.',
+    },
+    {
+        q: 'Can I take my watch into a sauna or a cold plunge?',
+        a: "That is between you and your watch's manufacturer — check the temperature and water-resistance ratings for your model. Sparmin only records what happens; it makes no promises about what your hardware survives.",
+    },
+    {
+        q: 'Does it send my data anywhere?',
+        a: 'No. Everything stays on the watch and goes to Garmin Connect through Garmin’s own sync, exactly like a run or a ride. Sparmin has no server and no account.',
+    },
+    {
+        q: 'Something is broken, or an activity I use is missing.',
+        a: 'Open an issue on GitHub and I’ll take a look. The app is open source, so you can read the code — and the bug you report is the one I fix next.',
+    },
+];
+---
+
+<Base
+    title="Sparmin — log your sauna, plunge and pool time as a Garmin activity"
+    description="A Garmin Connect IQ watch app that records a spa visit as a real activity — timed spot by spot, with live heart rate and an end-of-session breakdown."
+>
+    <section class="hero">
+        <h1>Your spa visit, recorded like a workout.</h1>
+        <p class="lede">
+            Sparmin turns a sauna, bathhouse or thermal spa visit into a proper Garmin activity.
+            It times every spot separately — each sauna, steam room, cold plunge, hydro pool and
+            lounger — so you finish with a breakdown instead of one shapeless block of time.
+        </p>
+        <div class="hero__actions">
+            <a class="button button--primary" href={STORE_URL}>
+                Get it on the Connect IQ Store
+            </a>
+            <a class="button button--ghost" href="https://github.com/scottlovegrove/sparmin">
+                View the source
+            </a>
+        </div>
+    </section>
+
+    <section>
+        <h2>How a session goes</h2>
+        <ol class="shots">
+            {
+                shots.map((shot) => (
+                    <li class="shot">
+                        <Image
+                            src={shot.image}
+                            alt={shot.title}
+                            widths={[390, 780]}
+                            sizes="(max-width: 720px) 80vw, 320px"
+                        />
+                        <h3>{shot.title}</h3>
+                        <p>{shot.caption}</p>
+                    </li>
+                ))
+            }
+        </ol>
+    </section>
+
+    <section>
+        <h2>What you get</h2>
+        <ul class="features">
+            {
+                features.map((feature) => (
+                    <li>
+                        <h3>{feature.title}</h3>
+                        <p>{feature.body}</p>
+                    </li>
+                ))
+            }
+        </ul>
+    </section>
+
+    <section>
+        <h2>Questions</h2>
+        <div class="faq">
+            {
+                faqs.map((faq) => (
+                    <details>
+                        <summary>{faq.q}</summary>
+                        <p>{faq.a}</p>
+                    </details>
+                ))
+            }
+        </div>
+    </section>
+
+    <section class="support">
+        <h2>Support</h2>
+        <p class="lede">
+            Bug, missing activity, or a watch it misbehaves on? Raise it on GitHub. Issues are
+            public, so you can see what is already known and what is being worked on.
+        </p>
+        <p>
+            <a class="button button--primary" href={ISSUES_URL}>Report an issue on GitHub</a>
+        </p>
+        <p>
+            Recent changes are listed in the <a href={`${base}/changelog`}>changelog</a>.
+        </p>
+    </section>
+</Base>
+
+<style>
+    .hero {
+        border-top: 0;
+        padding-block: clamp(3rem, 10vw, 6rem);
+    }
+
+    .hero .lede {
+        margin-block: 1.5rem 2rem;
+    }
+
+    .hero__actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .shots {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 2.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .shot {
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+    }
+
+    /* The screenshots are full-watch renders on a white background, so they get
+       a light card rather than sitting directly on the dark page. They differ by
+       a few pixels each, so a fixed box keeps the three captions on one line. */
+    .shot img {
+        border-radius: var(--radius);
+        background: #fff;
+        border: 1px solid var(--border);
+        width: min(100%, 300px);
+        height: 420px;
+        object-fit: contain;
+    }
+
+    .shot h3 {
+        margin: 1.25rem 0 0.35rem;
+        font-size: 1.125rem;
+    }
+
+    .shot p {
+        margin: 0;
+        color: var(--text-dim);
+        max-width: 34ch;
+    }
+
+    .features {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 1.25rem;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .features li {
+        background: var(--bg-raised);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+    }
+
+    .features h3 {
+        margin: 0 0 0.5rem;
+        font-size: 1.0625rem;
+    }
+
+    .features p {
+        margin: 0;
+        color: var(--text-dim);
+    }
+
+    .faq {
+        max-width: var(--measure);
+    }
+
+    .faq details {
+        border-bottom: 1px solid var(--border);
+    }
+
+    .faq summary {
+        cursor: pointer;
+        padding: 1rem 0;
+        font-weight: 600;
+        list-style-position: outside;
+    }
+
+    .faq summary:hover {
+        color: var(--cold);
+    }
+
+    .faq p {
+        margin: 0 0 1.25rem;
+        color: var(--text-dim);
+    }
+
+    .support .lede {
+        margin-bottom: 2rem;
+    }
+</style>
