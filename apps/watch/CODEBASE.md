@@ -95,10 +95,10 @@ source/
 └─ views/
    ├─ StripView.mc        # home screen (IDLE/TRANSITION/IN_ACTIVITY): strip,
    │  StripDelegate.mc    # timers, HR, icons, drag-scroll animation, focus label
-   ├─ ConfirmEndView.mc   # guarded end. Touch: 3 bezel arcs — resume/save (the two
-   │  ConfirmEndDelegate.mc # buttons) + discard (touch top). FR745: tick/cross marks.
-   ├─ DiscardConfirmView.mc # "discard without saving?" (touch-only): top-right bin
-   │  DiscardConfirmDelegate.mc # discards, bottom-right back-arrow returns to end.
+   ├─ ConfirmEndView.mc   # guarded end: resume / save / discard. Touch: 3 bezel arcs.
+   │  ConfirmEndDelegate.mc # Buttons: 3 marks cycled with Up/Down, Start commits.
+   ├─ DiscardConfirmView.mc # "discard without saving?" — touch: top-right bin discards,
+   │  DiscardConfirmDelegate.mc # bottom-right returns. Buttons: cancel/discard pair.
    ├─ DiscardedView.mc    # brief "Discarded" ack, auto-returns to the idle strip
    │  DiscardedDelegate.mc
    ├─ SummaryView.mc      # scrollable per-activity breakdown
@@ -123,10 +123,13 @@ IDLE ──start/select──▶ TRANSITION ──select activity──▶ IN_AC
                                 save, snapshot cleared) ──▶ IDLE  [+ "Discarded" ack]
 ```
 
-The confirm-end screen offers three outcomes (touch): **resume** (top-right
-button), **save** (bottom-right button → SUMMARY) and **discard** (tap top →
-`DiscardConfirmView` → `discardSession()` → the "Discarded" ack → IDLE). FR745
-keeps the two-way save/resume (no discard).
+The confirm-end screen offers three outcomes on **both** input styles: **resume**,
+**save** (→ SUMMARY) and **discard** (→ `DiscardConfirmView` → `discardSession()`
+→ the "Discarded" ack → IDLE). Touch drives them from the arcs (resume =
+top-right button, save = bottom-right button, discard = tap top); button devices
+cycle the three marks with Up/Down and commit with Start. The discard
+confirmation itself defaults its focus to **cancel** on button devices, so a
+stray Start can't throw a session away.
 
 - **Lap contract:** the `activity` FitContributor field is set to the *closing*
   lap's label immediately before each `addLap()`/`finish()`, so every lap

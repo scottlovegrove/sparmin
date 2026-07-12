@@ -7,8 +7,8 @@ import Toybox.Time;
 //! Touch (VA5): top-right button (KEY_ENTER) = Resume; bottom-right (KEY_ESC) =
 //! Save. Taps map by arc: top = Discard (-> its own confirm), the right arc =
 //! Resume, the bottom arc = Save.
-//! Buttons (FR745): Up/Down move focus between save/resume, Start commits the
-//! focused one, Back/Lap resumes.
+//! Buttons (FR745): Up/Down move focus across save / resume / discard, Start
+//! commits the focused one (discard goes to its own confirm), Back/Lap resumes.
 class ConfirmEndDelegate extends WatchUi.InputDelegate {
     private var _view as ConfirmEndView;
     private var _session as SessionManager;
@@ -30,12 +30,16 @@ class ConfirmEndDelegate extends WatchUi.InputDelegate {
     function onKey(evt as WatchUi.KeyEvent) as Lang.Boolean {
         var key = evt.getKey();
         if (!_isTouch) {
-            if (key == WatchUi.KEY_UP || key == WatchUi.KEY_DOWN) {
-                _view.toggleFocus();
-                return true;
-            }
+            if (key == WatchUi.KEY_UP) { _view.moveFocus(-1); return true; }
+            if (key == WatchUi.KEY_DOWN) { _view.moveFocus(1); return true; }
             if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
-                if (_view.focus == 0) { _save(); } else { _resume(); }
+                if (_view.focus == 0) {
+                    _save();
+                } else if (_view.focus == 1) {
+                    _resume();
+                } else {
+                    _discard();
+                }
                 return true;
             }
             if (key == WatchUi.KEY_ESC || key == WatchUi.KEY_LAP) {

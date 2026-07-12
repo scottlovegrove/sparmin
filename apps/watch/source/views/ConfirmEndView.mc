@@ -25,7 +25,7 @@ class ConfirmEndView extends WatchUi.View {
     private var _stripView as StripView;
     private var _session as SessionManager;
     private var _isTouch as Lang.Boolean;
-    public var focus as Lang.Number;      // FR745 only: 0 = save, 1 = resume
+    public var focus as Lang.Number;      // buttons only: 0 = save, 1 = resume, 2 = discard
     private var _w as Lang.Number = 0;
     private var _h as Lang.Number = 0;
 
@@ -41,8 +41,12 @@ class ConfirmEndView extends WatchUi.View {
     function getStripView() as StripView { return _stripView; }
     function isTouch() as Lang.Boolean { return _isTouch; }
 
-    function toggleFocus() as Void {
-        focus = (focus == 0) ? 1 : 0;
+    //! Move the button-device focus cursor across save / resume / discard, wrapping.
+    function moveFocus(delta as Lang.Number) as Void {
+        focus = (focus + delta) % 3;
+        if (focus < 0) {
+            focus += 3;
+        }
         WatchUi.requestUpdate();
     }
 
@@ -81,11 +85,38 @@ class ConfirmEndView extends WatchUi.View {
             ButtonHints.draw(dc, _w, _h, ButtonHints.DEG_TOP_RIGHT, ButtonHints.HINT_GREEN, ButtonHints.GLYPH_PLAY);
             ButtonHints.draw(dc, _w, _h, ButtonHints.DEG_BOTTOM_RIGHT, ButtonHints.HINT_GREEN, ButtonHints.GLYPH_TICK);
         } else {
-            var r = (_h * 0.13).toNumber();
-            var markCy = (_h * 0.72).toNumber();
-            _drawTick(dc, (_w * 0.32).toNumber(), markCy, r, focus == 0);
-            _drawCross(dc, (_w * 0.68).toNumber(), markCy, r, focus == 1);
+            // Three marks across the foot: save / resume / discard, moved through
+            // with Up/Down. Smaller radius than the old two-up layout so they fit.
+            var r = (_h * 0.115).toNumber();
+            var markCy = (_h * 0.73).toNumber();
+            _drawTick(dc, (_w * 0.24).toNumber(), markCy, r, focus == 0);
+            _drawCross(dc, (_w * 0.50).toNumber(), markCy, r, focus == 1);
+            _drawBin(dc, (_w * 0.76).toNumber(), markCy, r, focus == 2);
+            // Name the focused action — the marks alone are ambiguous (the cross
+            // means "resume", not "discard").
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(_w / 2, _h * 0.55, Graphics.FONT_XTINY, _focusLabel(),
+                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
+    }
+
+    private function _focusLabel() as Lang.String {
+        if (focus == 0) { return "Save"; }
+        if (focus == 1) { return "Resume"; }
+        return "Discard";
+    }
+
+    //! Waste bin (discard), drawn as filled rectangles so it stays legible on MIP.
+    private function _drawBin(dc as Graphics.Dc, cx, cy, r, focused) as Void {
+        dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(cx, cy, r);
+        _ring(dc, cx, cy, r, focused);
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        var s = (r * 0.5).toNumber();
+        dc.fillRectangle(cx - s, (cy - s * 0.55).toNumber(), 2 * s, (s * 0.3).toNumber() + 1);
+        dc.fillRectangle((cx - s * 0.4).toNumber(), cy - s, (s * 0.8).toNumber(), (s * 0.4).toNumber() + 1);
+        dc.fillRectangle((cx - s * 0.75).toNumber(), (cy - s * 0.2).toNumber(),
+                         (s * 1.5).toNumber(), (s * 1.35).toNumber());
     }
 
     private function _drawTick(dc as Graphics.Dc, cx, cy, r, focused) as Void {
