@@ -2,6 +2,20 @@
   "name": "@sparmin/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Sparmin marketing website (single page) — placeholder until the site is built.",
-  "scripts": {}
+  "description": "Sparmin marketing website — Astro, statically built, deployed to GitHub Pages.",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "type-check": "astro check",
+    "check": "oxlint src && oxfmt --check",
+    "fix": "oxlint src --fix && oxfmt",
+    "clean": "rimraf dist .astro",
+    "integrity-check": "npm-run-all clean check build"
+  },
+  "dependencies": {
+    "astro": "7.0.7",
+    "zod": "4.4.3"
+  }
 }

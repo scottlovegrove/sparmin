@@ -1,0 +1,37 @@
+name: Web CI
+on:
+    pull_request:
+        paths:
+            - 'apps/web/**'
+            # shared lint/format config the integrity-check depends on
+            - '.oxlintrc.json'
+            - '.oxfmtrc.json'
+            - 'package.json'
+            # NB: deliberately not `package-lock.json`. It's a single root lockfile for
+            # the whole npm-workspaces monorepo, so any dep bump anywhere rewrites it and
+            # would fire this CI unrelated to the site. A real dep change to the site
+            # always touches one of the package.json files globbed above.
+            - '.github/workflows/web-ci.yml'
+
+# Only a single workflow will run at a time. Cancel any in-progress run.
+concurrency:
+    group: web-ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    web-ci:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run CI check
+              working-directory: apps/web
+              run: npm run integrity-check

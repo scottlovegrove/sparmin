@@ -7,6 +7,19 @@
     "apps/*"
   ],
   "scripts": {
-    "build:watch": "npm run build -w @sparmin/watch"
+    "build:watch": "npm run build -w @sparmin/watch",
+    "dev:web": "npm run dev -w @sparmin/web",
+    "build:web": "npm run build -w @sparmin/web",
+    "preview:web": "npm run preview -w @sparmin/web",
+    "check": "oxlint apps/web/src && oxfmt --check",
+    "fix": "oxlint apps/web/src --fix && oxfmt"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.9",
+    "npm-run-all2": "9.0.2",
+    "oxfmt": "0.57.0",
+    "oxlint": "1.72.0",
+    "rimraf": "6.1.3",
+    "typescript": "6.0.3"
   }
 }

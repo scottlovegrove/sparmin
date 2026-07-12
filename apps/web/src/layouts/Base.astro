@@ -1,0 +1,63 @@
+---
+import '../styles/global.css';
+
+interface Props {
+    title: string;
+    description: string;
+}
+
+const { title, description } = Astro.props;
+
+// Every internal URL hangs off BASE_URL, so the whole site moves with `base`.
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const home = base || '/';
+const path = Astro.url.pathname.replace(/\/$/, '');
+const REPO_URL = 'https://github.com/scottlovegrove/sparmin';
+const ISSUES_URL = `${REPO_URL}/issues`;
+---
+
+<html lang="en-GB">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href={`${base}/favicon.svg`} type="image/svg+xml" />
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:type" content="website" />
+        <meta name="generator" content={Astro.generator} />
+    </head>
+    <body>
+        <div class="page">
+            <header class="site-header">
+                <a class="wordmark" href={home}>
+                    <img src={`${base}/favicon.svg`} alt="" width="28" height="28" />
+                    Sparmin
+                </a>
+                <nav class="site-nav">
+                    <a href={home} aria-current={path === base ? 'page' : undefined}>Overview</a>
+                    <a
+                        href={`${base}/changelog`}
+                        aria-current={path === `${base}/changelog` ? 'page' : undefined}
+                    >
+                        Changelog
+                    </a>
+                    <a href={ISSUES_URL}>Support</a>
+                </nav>
+            </header>
+
+            <main>
+                <slot />
+            </main>
+
+            <footer class="site-footer">
+                <span>Sparmin — a Garmin Connect IQ app by Scott Lovegrove.</span>
+                <span>
+                    <a href={ISSUES_URL}>Report an issue</a> ·
+                    <a href={REPO_URL}>Source on GitHub</a>
+                </span>
+            </footer>
+        </div>
+    </body>
+</html>
