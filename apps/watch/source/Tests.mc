@@ -267,6 +267,40 @@ function testDiscardSessionWipesAndReturnsToIdle(logger) {
     return true;
 }
 
+(:test)
+function testAggregateKeepsVisitsInOrderForSummary(logger) {
+    // The summary lists one row per activity in first-visit order, with each visit's
+    // duration underneath. A repeat must fold into the FIRST row, not open a new one.
+    var sm = new SessionManager(new FakeRecorder());
+    sm.selectActivity("salt_sauna", 0);          // salt #1: 0->100 = 100
+    sm.selectActivity("outdoor_cold_plunge", 100);   // cold: 100->130 = 30
+    sm.selectActivity("steam_room", 130);        // steam: 130->200 = 70
+    sm.selectActivity("salt_sauna", 200);        // salt #2: 200->260 = 60 (repeat)
+    sm.requestEnd(260);
+    sm.confirmEnd(260);
+
+    var aggs = sm.activityAggregates();
+    Test.assertEqual(aggs.size(), 3);            // salt folded, not duplicated
+
+    // Row order = order of FIRST visit.
+    Test.assertEqual(aggs[0].activityId, "salt_sauna");
+    Test.assertEqual(aggs[1].activityId, "outdoor_cold_plunge");
+    Test.assertEqual(aggs[2].activityId, "steam_room");
+
+    // Salt keeps both visits, chronologically — these are the times the row lists.
+    Test.assertEqual(aggs[0].visits, 2);
+    var saltVisits = aggs[0].segments as Lang.Array;
+    Test.assertEqual(saltVisits.size(), 2);
+    Test.assertEqual(saltVisits[0].durationSeconds(), 100);
+    Test.assertEqual(saltVisits[1].durationSeconds(), 60);
+    Test.assertEqual(aggs[0].totalSeconds, 160);
+
+    var coldVisits = aggs[1].segments as Lang.Array;
+    Test.assertEqual(coldVisits.size(), 1);
+    Test.assertEqual(coldVisits[0].durationSeconds(), 30);
+    return true;
+}
+
 // ---- HR folding ----
 
 (:test)

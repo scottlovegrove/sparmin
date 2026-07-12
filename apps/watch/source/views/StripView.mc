@@ -20,8 +20,6 @@ class StripView extends WatchUi.View {
     private var _isTouch as Lang.Boolean;
     private var _w as Lang.Number = 0;
     private var _h as Lang.Number = 0;
-    private var _iconSyms as Lang.Dictionary;         // activityId -> Rez.Drawables symbol
-    private var _iconCache as Lang.Dictionary = {};   // activityId -> BitmapResource (or null)
     private var _cursorShown as Lang.Boolean = false; // reveal the focus ring on touch after a button press
 
     function initialize(session as SessionManager) {
@@ -31,28 +29,6 @@ class StripView extends WatchUi.View {
         _isTouch = System.getDeviceSettings().isTouchScreen;
         var tiles = _isTouch ? 4 : 3;      // roomy tiles: VA5 4, FR745 3 (§2)
         _ctrl = new StripController(ActivityConfig.load(), tiles, _isTouch);
-        _iconSyms = {
-            "outdoor_cold_plunge" => Rez.Drawables.st_outdoor_cold_plunge,
-            "indoor_cold_plunge" => Rez.Drawables.st_indoor_cold_plunge,
-            "hydro_pool" => Rez.Drawables.st_hydro_pool,
-            "heated_loungers" => Rez.Drawables.st_heated_loungers,
-            "salt_sauna" => Rez.Drawables.st_salt_sauna,
-            "steam_room" => Rez.Drawables.st_steam_room,
-            "fire_ice_room" => Rez.Drawables.st_fire_ice_room,
-            "finnish_sauna" => Rez.Drawables.st_finnish_sauna,
-            "ice_cave" => Rez.Drawables.st_ice_cave,
-            "outdoor_lounger" => Rez.Drawables.st_outdoor_lounger
-        };
-    }
-
-    //! Lazily load + cache the activity icon bitmap for an id (null if none).
-    private function _iconFor(id) {
-        if (_iconCache.hasKey(id)) {
-            return _iconCache[id];
-        }
-        var bmp = _iconSyms.hasKey(id) ? WatchUi.loadResource(_iconSyms[id]) : null;
-        _iconCache.put(id, bmp);
-        return bmp;
     }
 
     function getController() as StripController { return _ctrl; }
@@ -290,7 +266,7 @@ class StripView extends WatchUi.View {
                 dc.setPenWidth(1);
             }
 
-            var bmp = _iconFor(id);
+            var bmp = ActivityIcons.bitmapFor(id);
             if (bmp != null) {
                 dc.drawBitmap(x + (tileW - bmp.getWidth()) / 2,
                               top + (tileH - bmp.getHeight()) / 2, bmp);

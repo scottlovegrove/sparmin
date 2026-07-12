@@ -88,6 +88,8 @@ source/
 ├─ Segment.mc             # one lap: activityId(null=transition), times, HR stats,
 │                         # foldHr(), toDict()/segmentFromDict() (crash-resume).
 ├─ HrSampler.mc           # module: live-vs-display HR, invalid-sample rejection.
+├─ ActivityIcons.mc       # module: activityId -> drawable + lazy bitmap cache,
+│                         # shared by the strip and the summary.
 ├─ BackendClient.mc       # PARKED: POST + offline queue. Unwired (backend deferred).
 ├─ Fmt.mc                 # module: duration ("m:ss") + hr formatting.
 ├─ Uuid.mc / Iso.mc       # module: session id (v4) + ISO-8601 UTC.
@@ -101,7 +103,8 @@ source/
    │  DiscardConfirmDelegate.mc # bottom-right returns. Buttons: cancel/discard pair.
    ├─ DiscardedView.mc    # brief "Discarded" ack, auto-returns to the idle strip
    │  DiscardedDelegate.mc
-   ├─ SummaryView.mc      # scrollable per-activity breakdown
+   ├─ SummaryView.mc      # per-activity rows (icon + name + each visit's time),
+   │                      # in first-visit order; eased/drag scrolling
    │  SummaryDelegate.mc
    └─ ConfigView.mc       # MoveModeView (reorder). ConfigDelegate.mc holds the
       ConfigDelegate.mc    # Menu2 hub + HideMenuDelegate (checkbox) + MoveModeDelegate

@@ -401,6 +401,9 @@ class ActivityAggregate {
     public var displayName;
     public var totalSeconds;
     public var visits;
+    //! The individual visits, in the order they happened — the summary lists each
+    //! one under the activity's name (a repeat visit doesn't get its own row).
+    public var segments as Lang.Array = [];
     public var hrSum;
     public var hrCount;
     public var hrMin;
@@ -411,6 +414,7 @@ class ActivityAggregate {
         me.displayName = SpaActivity.nameFor(activityId);
         me.totalSeconds = 0;
         me.visits = 0;
+        me.segments = [];
         me.hrSum = 0;
         me.hrCount = 0;
         me.hrMin = null;
@@ -420,6 +424,7 @@ class ActivityAggregate {
     function addSegment(seg) {
         totalSeconds += seg.durationSeconds();
         visits += 1;
+        segments.add(seg);
         hrSum += seg.hrSum;
         hrCount += seg.hrCount;
         if (seg.hrMin != null && (hrMin == null || seg.hrMin < hrMin)) {

@@ -1,11 +1,14 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-//! Input for the summary screen (raw InputDelegate). Scroll with Up/Down or a
-//! vertical swipe; dismiss with Start/Back or a tap, returning to the idle strip.
+//! Input for the summary screen (raw InputDelegate). Scroll with Up/Down (eased,
+//! one row a press) or by dragging the list with a finger (1:1); dismiss with
+//! Start/Back or a tap, returning to the idle strip.
 class SummaryDelegate extends WatchUi.InputDelegate {
     private var _view as SummaryView;
     private var _session as SessionManager;
+    private var _dragStartY as Lang.Number = 0;
+    private var _dragging as Lang.Boolean = false;
 
     function initialize(view as SummaryView) {
         InputDelegate.initialize();
@@ -25,12 +28,18 @@ class SummaryDelegate extends WatchUi.InputDelegate {
         return false;
     }
 
-    function onSwipe(evt as WatchUi.SwipeEvent) as Lang.Boolean {
-        var dir = evt.getDirection();
-        if (dir == WatchUi.SWIPE_UP) {
-            _view.scroll(1);
-        } else if (dir == WatchUi.SWIPE_DOWN) {
-            _view.scroll(-1);
+    //! Track the finger 1:1 while dragging — a swipe-per-notch list feels sticky.
+    function onDrag(evt as WatchUi.DragEvent) as Lang.Boolean {
+        var coords = evt.getCoordinates();
+        var type = evt.getType();
+        if (type == WatchUi.DRAG_TYPE_START) {
+            _dragStartY = coords[1];
+            _dragging = true;
+        } else if (type == WatchUi.DRAG_TYPE_CONTINUE && _dragging) {
+            _view.dragBy(coords[1] - _dragStartY);
+            _dragStartY = coords[1];
+        } else if (type == WatchUi.DRAG_TYPE_STOP) {
+            _dragging = false;
         }
         return true;
     }
