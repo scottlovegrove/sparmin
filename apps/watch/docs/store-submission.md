@@ -185,7 +185,12 @@ From the spec's acceptance criteria (§13, §15), at minimum:
 
 ## 8. Updates & versioning
 
-- Bump the app version, rebuild the `.iq` (same key), and upload it as an update.
+- Bump `Version.APP` in `source/Version.mc` — a v3 manifest has no version
+  field, so that constant is the app's own record of what it is, and it's what
+  the in-app **Settings → About** page shows. Keep it equal to the version you
+  type into the store dashboard, or About will lie about which build is on the
+  watch.
+- Then rebuild the `.iq` (same key) and upload it as an update.
 - The app **`id`** (the UUID in `manifest.xml`) never changes — it's the app's
   permanent identity across all updates.
 

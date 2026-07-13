@@ -227,6 +227,7 @@ class StripDelegate extends WatchUi.InputDelegate {
             menu.addItem(new WatchUi.ToggleMenuItem(
                 "Water-safe touch", null, "waterSafe", TouchConfig.isWaterSafe(), null));
         }
+        menu.addItem(new WatchUi.MenuItem("About", null, "about", null));
         WatchUi.pushView(menu, new ConfigDelegate(), WatchUi.SLIDE_UP);
     }
 }

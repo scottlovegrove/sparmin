@@ -93,6 +93,8 @@ source/
 ├─ BackendClient.mc       # PARKED: POST + offline queue. Unwired (backend deferred).
 ├─ Fmt.mc                 # module: duration ("m:ss") + hr formatting.
 ├─ Uuid.mc / Iso.mc       # module: session id (v4) + ISO-8601 UTC.
+├─ Version.mc             # module: the app version string, shown on the About
+│                         # page. Hand-bumped at each release.
 ├─ Tests.mc               # 20 (:test) cases + FakeRecorder. Run in the simulator.
 └─ views/
    ├─ StripView.mc        # home screen (IDLE/TRANSITION/IN_ACTIVITY): strip,
@@ -106,8 +108,10 @@ source/
    ├─ SummaryView.mc      # per-activity rows (icon + name + each visit's time),
    │                      # in first-visit order; eased/drag scrolling
    │  SummaryDelegate.mc
-   └─ ConfigView.mc       # MoveModeView (reorder). ConfigDelegate.mc holds the
-      ConfigDelegate.mc    # Menu2 hub + HideMenuDelegate (checkbox) + MoveModeDelegate
+   ├─ ConfigView.mc       # MoveModeView (reorder). ConfigDelegate.mc holds the
+   │  ConfigDelegate.mc    # Menu2 hub + HideMenuDelegate (checkbox) + MoveModeDelegate
+   └─ AboutView.mc        # static About page: name, version, part number + CIQ
+      AboutDelegate.mc     # level. Any tap/press returns to the Settings menu.
 ```
 
 ## The state machine (SessionManager — the heart of it)
