@@ -44,6 +44,22 @@ to the watch's `GARMIN/APPS/`.
   dynamic dictionaries/arrays to `Lang.Dictionary` / `Lang.Array` and annotate
   return types to avoid "container access" warnings. `hidden`/`class`/etc. are
   reserved words — don't name locals after them.
+- **A release = version bump + changelog entry, together.** Anything a user would
+  notice — a feature, a fix, a behaviour change — ships as a release, and a
+  release is always both halves:
+  1. Bump `Version.APP` in `source/Version.mc` (semver: patch for a fix, minor for
+     a feature). It's the only record of the app's version — a v3 manifest has no
+     version field — and it's what the Settings → About page shows and what you
+     type into the store dashboard.
+  2. Add the matching note in the `apps/web` workspace: a new
+     `apps/web/src/content/changelog/<version>.md` (frontmatter `version` +
+     `summary`, then user-facing bullets — copy the newest file).
+
+  Either half without the other is a bug: an un-bumped version means nobody can
+  tell what's on the watch, and a missing changelog entry means nobody knows what
+  changed. This is the one change that deliberately spans both workspaces.
+  Internal-only work (refactors, tests, docs, tooling) is not a release — leave
+  the version alone.
 - **Canonical activity ids.** `activityId`s in `SpaActivity.mc` are permanent.
   Hiding/reordering (`ActivityConfig`) is a pure display layer — it must never
   remap or drop an id. The id written to the FIT lap field and the backend
