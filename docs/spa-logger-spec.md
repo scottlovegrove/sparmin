@@ -12,7 +12,7 @@ Lives in this monorepo as a new workspace: **`apps/companion`**.
 ## 1. Architecture
 
 **One deployable app, not two.** A single Cloudflare Worker serves the built
-frontend assets (via the wrangler `assets` binding) *and* the Hono `/api/*`
+frontend assets (via the wrangler `assets` binding) _and_ the Hono `/api/*`
 routes. Same-origin by construction — no CORS, and better-auth's magic-link
 session cookie works without the cross-origin cookie dance. "Cloudflare Pages"
 as a separate product is not used; there is no existing Pages/PWA pattern in this
@@ -22,16 +22,16 @@ tooling).
 Deployment topology (one Worker) is independent of frontend richness: the SPA can
 grow charts, date pickers and the deferred Stats screens without changing this.
 
-| Layer | Choice | Why |
-|---|---|---|
-| Watch | Connect IQ app (vívoactive 5, Forerunner 745 / `fr745`) | Records FIT with one lap per activity |
-| Ingest | Manual FIT export → drag into the SPA | Avoids watch auth + pairing entirely for v1 |
-| Parsing | Client-side, Garmin FIT SDK (JS) | Keeps FIT binary out of the Worker; no Worker CPU burn. A code boundary, not a deployment one — the same Worker serves the page whose JS parses |
-| Frontend | React + Vite SPA, served by the Worker as static assets | Room for charts / date pickers / Stats without a later migration |
-| API | Hono on the same Cloudflare Worker | Native D1 binding — `env.DB`, no connection string |
-| DB | Cloudflare D1 (SQLite) | Free tier, no pooler, no pause, Time Travel backups |
-| Auth | better-auth, magic link | Runs on Workers, D1 store via Drizzle; same-origin cookie |
-| Email | Cloudflare Email Service or Resend | Check CF Email Service GA status first |
+| Layer    | Choice                                                  | Why                                                                                                                                             |
+| -------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Watch    | Connect IQ app (vívoactive 5, Forerunner 745 / `fr745`) | Records FIT with one lap per activity                                                                                                           |
+| Ingest   | Manual FIT export → drag into the SPA                   | Avoids watch auth + pairing entirely for v1                                                                                                     |
+| Parsing  | Client-side, Garmin FIT SDK (JS)                        | Keeps FIT binary out of the Worker; no Worker CPU burn. A code boundary, not a deployment one — the same Worker serves the page whose JS parses |
+| Frontend | React + Vite SPA, served by the Worker as static assets | Room for charts / date pickers / Stats without a later migration                                                                                |
+| API      | Hono on the same Cloudflare Worker                      | Native D1 binding — `env.DB`, no connection string                                                                                              |
+| DB       | Cloudflare D1 (SQLite)                                  | Free tier, no pooler, no pause, Time Travel backups                                                                                             |
+| Auth     | better-auth, magic link                                 | Runs on Workers, D1 store via Drizzle; same-origin cookie                                                                                       |
+| Email    | Cloudflare Email Service or Resend                      | Check CF Email Service GA status first                                                                                                          |
 
 **Cost:** free at hobby scale. Only email has a meaningful ceiling.
 
@@ -45,15 +45,15 @@ client parser and the server ingest — one source of truth for the §5.1 payloa
 Delivered as seven small, independently reviewable PRs rather than a few mammoth
 ones. Each is mergeable on its own and (from PR1 on) testable.
 
-| PR | Scope | Testable by | Depends on |
-|---|---|---|---|
-| **0** | **Workspace scaffold.** New `apps/companion`: `package.json`, `wrangler.jsonc` (Worker + `assets` binding), React+Vite SPA skeleton, Hono skeleton with a health route, Vitest + `@cloudflare/vitest-pool-workers`, Drizzle config, oxlint/oxfmt wired into the root | `wrangler dev` | — |
-| **1** | **FIT parser** — pure `ArrayBuffer → SessionPayload`, Garmin FIT SDK, Vitest against real FIT fixtures. **Starts by dumping a real exported FIT** to confirm §4.3 quirks and which fields (§3 note) are actually present | Vitest | 0 |
-| **2** | **Schema + migrations + stations seed** — D1 schema (Drizzle), migrations, seed `stations` from the CIQ enum (§3 note), `GET /api/stations` | `wrangler d1` + `EXPLAIN QUERY PLAN` | 0 |
-| **3** | **Ingest** `POST /api/sessions` — Zod validation, dedupe (409), 422/400, `db.batch` write, unclassified auto-insert. Auth stubbed | curl + Vitest | 1, 2 |
-| **4** | **Read/delete** `GET /api/sessions` (paginated), `GET /:id` (+intervals), `DELETE /:id` | Vitest | 2, 3 |
-| **5** | **Auth** — better-auth magic link, Drizzle/D1 store, email provider, guard `/api/*`. Real `user_id` replaces the stub | manual login | 3, 4 |
-| **6** | **Upload UI** (React SPA) — dropzone → client parse (PR1) → POST → duplicate/error/success states | manual | 1, 3, 5 |
+| PR    | Scope                                                                                                                                                                                                                                                                | Testable by                          | Depends on |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ---------- |
+| **0** | **Workspace scaffold.** New `apps/companion`: `package.json`, `wrangler.jsonc` (Worker + `assets` binding), React+Vite SPA skeleton, Hono skeleton with a health route, Vitest + `@cloudflare/vitest-pool-workers`, Drizzle config, oxlint/oxfmt wired into the root | `wrangler dev`                       | —          |
+| **1** | **FIT parser** — pure `ArrayBuffer → SessionPayload`, Garmin FIT SDK, Vitest against real FIT fixtures. **Starts by dumping a real exported FIT** to confirm §4.3 quirks and which fields (§3 note) are actually present                                             | Vitest                               | 0          |
+| **2** | **Schema + migrations + stations seed** — D1 schema (Drizzle), migrations, seed `stations` from the CIQ enum (§3 note), `GET /api/stations`                                                                                                                          | `wrangler d1` + `EXPLAIN QUERY PLAN` | 0          |
+| **3** | **Ingest** `POST /api/sessions` — Zod validation, dedupe (409), 422/400, `db.batch` write, unclassified auto-insert. Auth stubbed                                                                                                                                    | curl + Vitest                        | 1, 2       |
+| **4** | **Read/delete** `GET /api/sessions` (paginated), `GET /:id` (+intervals), `DELETE /:id`                                                                                                                                                                              | Vitest                               | 2, 3       |
+| **5** | **Auth** — better-auth magic link, Drizzle/D1 store, email provider, guard `/api/*`. Real `user_id` replaces the stub                                                                                                                                                | manual login                         | 3, 4       |
+| **6** | **Upload UI** (React SPA) — dropzone → client parse (PR1) → POST → duplicate/error/success states                                                                                                                                                                    | manual                               | 1, 3, 5    |
 
 - PRs 2–4 are testable with `wrangler dev` and curl. Auth is not a blocker for
   either — it lands in PR5 and is retrofitted onto the endpoints.
@@ -142,13 +142,13 @@ CREATE INDEX idx_intervals_user_station ON station_intervals (user_id, station_i
 
 ### 4.1 Messages read
 
-| Message | Fields | → |
-|---|---|---|
-| `file_id` | `type` (must be `activity`), `serial_number`, `product`, `time_created` | device identity + dedupe key |
-| `activity` | `timestamp`, `local_timestamp` | `utc_offset_s = local_timestamp - timestamp` |
-| `session` | `start_time`, `total_elapsed_time`, `total_timer_time`, `total_calories`, `avg_heart_rate`, `max_heart_rate`, sweat loss | session row, verbatim |
-| `lap` × N | `message_index`, `start_time`, `total_elapsed_time`, `total_timer_time`, `avg_heart_rate`, `max_heart_rate`, `total_calories`, `total_cycles`, est sweat loss, resting calories | one `station_intervals` row each |
-| `field_description` | developer field defs | locate the station label field |
+| Message             | Fields                                                                                                                                                                          | →                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `file_id`           | `type` (must be `activity`), `serial_number`, `product`, `time_created`                                                                                                         | device identity + dedupe key                 |
+| `activity`          | `timestamp`, `local_timestamp`                                                                                                                                                  | `utc_offset_s = local_timestamp - timestamp` |
+| `session`           | `start_time`, `total_elapsed_time`, `total_timer_time`, `total_calories`, `avg_heart_rate`, `max_heart_rate`, sweat loss                                                        | session row, verbatim                        |
+| `lap` × N           | `message_index`, `start_time`, `total_elapsed_time`, `total_timer_time`, `avg_heart_rate`, `max_heart_rate`, `total_calories`, `total_cycles`, est sweat loss, resting calories | one `station_intervals` row each             |
+| `field_description` | developer field defs                                                                                                                                                            | locate the station label field               |
 
 The watch (`Recorder.mc`) also writes a **second** developer field the parser can
 ignore for v1: `summary` (developer field id `1`, scoped to `MESG_TYPE_SESSION`,
@@ -171,15 +171,17 @@ salt sauna`), or the literal `transition` for transition laps.
 
 - Match on `field_name` from the `field_description` message.
 - **Accept a set of known field names**, not one literal — renaming the field in the CIQ app must not orphan previously-recorded files.
-- Resolve the field *value* to `stations.id` by exact name match against `stations.name` (which was seeded from the same `SpaActivity.NAMES` strings, plus `transition`).
+- Resolve the field _value_ to `stations.id` by exact name match against `stations.name` (which was seeded from the same `SpaActivity.NAMES` strings, plus `transition`).
 
 ### 4.3 Known quirks — must handle
 
-1. **`lap.timestamp` is unusable.** Every lap in observed files carries the *session start* (`08:46:02`) rather than the lap end. Derive:
-   ```
-   ended_at = lap.start_time + lap.total_elapsed_time
-   ```
-   Never read `lap.timestamp`. (Worth fixing in the CIQ app separately; the parser must not depend on it either way.)
+1. **`lap.timestamp` is unusable.** Every lap in observed files carries the _session start_ (`08:46:02`) rather than the lap end. Derive:
+
+    ```
+    ended_at = lap.start_time + lap.total_elapsed_time
+    ```
+
+    Never read `lap.timestamp`. (Worth fixing in the CIQ app separately; the parser must not depend on it either way.)
 
 2. **Trailing artefact lap.** Files end with a ~3s `transition` lap with `lap_trigger = session_end`. Stored as-is per decision — it's a real interval, just a tiny one. Any future stats should be aware.
 
@@ -199,48 +201,48 @@ salt sauna`), or the literal `transition` for transition laps.
 
 Hono on Workers. All routes authenticated except `/api/auth/*`.
 
-| Method | Route | Notes |
-|---|---|---|
-| `POST` | `/api/sessions` | Ingest. Body = parsed payload (§5.1) |
-| `GET` | `/api/sessions` | List, paginated, `started_at DESC` |
-| `GET` | `/api/sessions/:id` | Session + intervals |
-| `DELETE` | `/api/sessions/:id` | |
-| `GET` | `/api/stations` | The enum + thermal classes |
-| `*` | `/api/auth/*` | better-auth handler |
+| Method   | Route               | Notes                                |
+| -------- | ------------------- | ------------------------------------ |
+| `POST`   | `/api/sessions`     | Ingest. Body = parsed payload (§5.1) |
+| `GET`    | `/api/sessions`     | List, paginated, `started_at DESC`   |
+| `GET`    | `/api/sessions/:id` | Session + intervals                  |
+| `DELETE` | `/api/sessions/:id` |                                      |
+| `GET`    | `/api/stations`     | The enum + thermal classes           |
+| `*`      | `/api/auth/*`       | better-auth handler                  |
 
 ### 5.1 Ingest payload
 
 ```jsonc
 {
-  "id": "uuid-v4",                     // client-generated, idempotency
-  "device": { "serial": "3412345678", "product": "vivoactive5" },
-  "session": {
-    "startedAt": 1752652    ,          // unix seconds UTC
-    "endedAt":   1752655    ,
-    "utcOffsetS": 3600,
-    "totalElapsedS": 2415.2,
-    "totalTimerS": 2415.2,
-    "totalCalories": 262,
-    "totalSweatLossMl": 277,
-    "avgHr": 96,
-    "maxHr": 136
-  },
-  "laps": [
-    {
-      "lapIndex": 0,
-      "station": "Himalayan salt sauna",
-      "startedAt": 1752652    ,
-      "elapsedS": 899.856,
-      "timerS": 899.856,
-      "avgHr": 100,
-      "maxHr": 120,
-      "calories": 115,
-      "restingCalories": 29,
-      "sweatLossMl": 106,
-      "cycles": null
-    }
-    // …
-  ]
+    "id": "uuid-v4", // client-generated, idempotency
+    "device": { "serial": "3412345678", "product": "vivoactive5" },
+    "session": {
+        "startedAt": 1752652, // unix seconds UTC
+        "endedAt": 1752655,
+        "utcOffsetS": 3600,
+        "totalElapsedS": 2415.2,
+        "totalTimerS": 2415.2,
+        "totalCalories": 262,
+        "totalSweatLossMl": 277,
+        "avgHr": 96,
+        "maxHr": 136,
+    },
+    "laps": [
+        {
+            "lapIndex": 0,
+            "station": "Himalayan salt sauna",
+            "startedAt": 1752652,
+            "elapsedS": 899.856,
+            "timerS": 899.856,
+            "avgHr": 100,
+            "maxHr": 120,
+            "calories": 115,
+            "restingCalories": 29,
+            "sweatLossMl": 106,
+            "cycles": null,
+        },
+        // …
+    ],
 }
 ```
 
@@ -258,12 +260,12 @@ Validate with Zod. The client is untrusted in principle; in practice the blast r
 
 ### 5.2 Responses
 
-| Code | Meaning |
-|---|---|
-| `201` | Created |
+| Code  | Meaning                                                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------ |
+| `201` | Created                                                                                                |
 | `409` | Duplicate — `(user_id, device_serial, started_at)` exists. Surface as "already imported", not an error |
-| `422` | Not a spa session / no station dev field |
-| `400` | Payload failed validation |
+| `422` | Not a spa session / no station dev field                                                               |
+| `400` | Payload failed validation                                                                              |
 
 Write session + intervals in a single D1 batch (`db.batch()`) so a partial import can't land.
 
