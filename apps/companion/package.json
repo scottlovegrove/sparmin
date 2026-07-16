@@ -19,8 +19,10 @@
         "integrity-check": "npm-run-all clean check build test"
     },
     "dependencies": {
+        "@garmin/fitsdk": "21.208.0",
         "drizzle-orm": "0.45.2",
-        "hono": "4.12.30"
+        "hono": "4.12.30",
+        "zod": "4.4.3"
     },
     "devDependencies": {
         "@cloudflare/vite-plugin": "1.45.0",

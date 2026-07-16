@@ -59,9 +59,10 @@ ones. Each is mergeable on its own and (from PR1 on) testable.
   either — it lands in PR5 and is retrofitted onto the endpoints.
 - Auth precedes the UI so PR6 targets the real guarded endpoint (same-origin
   cookie, no CORS).
-- **PR1's fixture capture doubles as the fact-check** for the "present?" fields
-  in §3/§4 (calories, sweat loss, cycles, device product string). Resolve those
-  into this spec before PR2 freezes the schema.
+- **PR1's fixture capture doubled as the fact-check** for the "present?" fields
+  in §3/§4 — done, against 6 real vívoactive 5 exports. Findings folded into §3
+  (dropped sweat loss + resting calories) and §4.2 (station label read by field
+  number, not name, because older watch builds omit the `field_description`).
 - **Stats** — deferred (§8). Schema supports it; nothing built yet.
 
 ---
@@ -96,7 +97,6 @@ CREATE TABLE sessions (
   total_elapsed_s     REAL NOT NULL,
   total_timer_s       REAL,
   total_calories      INTEGER,
-  total_sweat_loss_ml INTEGER,
   avg_hr              INTEGER,
   max_hr              INTEGER,
   created_at          INTEGER NOT NULL,
@@ -116,9 +116,7 @@ CREATE TABLE station_intervals (
   avg_hr           INTEGER,
   max_hr           INTEGER,
   calories         INTEGER,
-  resting_calories INTEGER,
-  sweat_loss_ml    INTEGER,
-  cycles           INTEGER,                 -- step count, only present on transitions
+  cycles           INTEGER,                 -- step count, sparse (see §4.3)
   UNIQUE (session_id, lap_index)
 );
 
@@ -131,7 +129,8 @@ CREATE INDEX idx_intervals_user_station ON station_intervals (user_id, station_i
 
 - **`is_transition` lives on `stations`.** "transition" is one member of the enum; the property belongs to the station, set once, not repeated per lap.
 - **Seed source is `SpaActivity.mc`.** The watch writes the station's **display name** (not its id) into the FIT lap field — e.g. `Himalayan salt sauna`. Seed `stations.name` from `SpaActivity.NAMES` (10 entries) **plus the literal `transition`** (`is_transition = 1`; it's what `SessionManager.LABEL_TRANSITION` writes for transition laps). The app's canonical ids (`salt_sauna`, …) never appear in the FIT and are not the join key here; if a stable slug is ever wanted, add a `slug` column later — for v1 the name is the key.
-- **Calories / sweat loss / cycles are Garmin-native and UNVERIFIED.** The watch app writes only sport/sub-sport, laps, HR, and the `activity`/`summary` dev fields — it does **not** compute `total_calories`, `total_sweat_loss_ml`, `resting_calories`, or `total_cycles` (step count). Whether Garmin natively populates these on a `SPORT_TRAINING`/`SUB_SPORT_CARDIO_TRAINING` indoor activity is device-dependent and must be confirmed against a real exported FIT (PR1) before relying on them. All are nullable here on purpose; treat absent = `NULL`, never 0.
+- **Which Garmin-native fields exist — verified against 6 real vívoactive 5 exports (PR1).** The watch app writes only sport/sub-sport, laps, HR, and the `activity`/`summary` dev fields; everything else is whatever Garmin populates natively. Confirmed **present**: session + per-lap `total_calories`, `avg`/`max` heart rate, and `total_cycles` (sparse). Confirmed **absent** — removed from the schema above: sweat loss (no sweat field anywhere) and per-lap resting calories (laps carry `total_calories` only; the session has a `metabolic_calories` field if ever wanted). Everything nullable stays nullable; treat absent = `NULL`, never 0.
+- **Station label is read by developer-field _number_, not name (§4.2).** The app owns the field number (`Recorder.FIELD_ID = 0`); older watch builds didn't emit the `field_description`/`developer_data_id` scaffolding (the two oldest of 6 real files lack it), so name-based lookup fails on a user's back-catalogue. Keying off the app-assigned number survives every recording.
 - **`user_id` denormalised onto `station_intervals`.** Deliberate. Every cross-session stat filters by user, and D1 is single-threaded — index directly rather than join through `sessions` on every read.
 - **Session totals stored verbatim AND derivable from laps.** Garmin's own totals are the source of truth for the session; per-station rollups are computed.
 - **Indexes matter more than usual.** D1 is single-threaded: an unindexed scan blocks every queued query. Verify with `EXPLAIN QUERY PLAN` — want `SEARCH TABLE USING INDEX`, never `SCAN TABLE`.
@@ -142,57 +141,72 @@ CREATE INDEX idx_intervals_user_station ON station_intervals (user_id, station_i
 
 ### 4.1 Messages read
 
-| Message             | Fields                                                                                                                                                                          | →                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `file_id`           | `type` (must be `activity`), `serial_number`, `product`, `time_created`                                                                                                         | device identity + dedupe key                 |
-| `activity`          | `timestamp`, `local_timestamp`                                                                                                                                                  | `utc_offset_s = local_timestamp - timestamp` |
-| `session`           | `start_time`, `total_elapsed_time`, `total_timer_time`, `total_calories`, `avg_heart_rate`, `max_heart_rate`, sweat loss                                                        | session row, verbatim                        |
-| `lap` × N           | `message_index`, `start_time`, `total_elapsed_time`, `total_timer_time`, `avg_heart_rate`, `max_heart_rate`, `total_calories`, `total_cycles`, est sweat loss, resting calories | one `station_intervals` row each             |
-| `field_description` | developer field defs                                                                                                                                                            | locate the station label field               |
+| Message       | Fields                                                                                                                                        | →                                            |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `file_id`     | `type` (must be `activity`), `serial_number`, `product`/`garmin_product`, `time_created`                                                      | device identity + dedupe key                 |
+| `activity`    | `timestamp`, `local_timestamp`                                                                                                                | `utc_offset_s = local_timestamp - timestamp` |
+| `session`     | `start_time`, `total_elapsed_time`, `total_timer_time`, `total_calories`, `avg_heart_rate`, `max_heart_rate`                                  | session row, verbatim                        |
+| `lap` × N     | `message_index`, `start_time`, `total_elapsed_time`, `total_timer_time`, `avg_heart_rate`, `max_heart_rate`, `total_calories`, `total_cycles` | one `station_intervals` row each             |
+| lap dev field | developer field `(developerDataIndex 0, fieldDefNum 0)`, string                                                                               | the station label (§4.2)                     |
 
-The watch (`Recorder.mc`) also writes a **second** developer field the parser can
-ignore for v1: `summary` (developer field id `1`, scoped to `MESG_TYPE_SESSION`,
-a string ≤240 chars) — a human-readable summary line. Noted so it isn't mistaken
-for the station label; only the lap-scoped `activity` field (§4.2) matters for
-ingest. Reminder from §3: calories / sweat loss / cycles in the `session`/`lap`
-rows are Garmin-native, not app-written, and unverified until PR1.
+The watch (`Recorder.mc`) also writes a **second** developer field the parser
+ignores: `summary` (field number `1`, scoped to `MESG_TYPE_SESSION`, a string
+≤240 chars) — a human-readable summary line. Only the lap-scoped station field
+(field number `0`) matters for ingest.
 
-`device_product` — do **not** hardcode `forerunner745`. The FIT `garmin_product`
-name for the Forerunner 745 is `fr745` (the watch build target); read whatever
-the SDK actually decodes from `file_id.product` and confirm both product strings
-against a real FIT.
+`device_product`: read the SDK-decoded `garmin_product` name — the 6 real exports
+decode as `vivoactive5`; the Forerunner 745 decodes as `fr745`. Do **not**
+hardcode `forerunner745`. Fall back to the raw numeric `product` when the SDK
+can't name it.
 
 ### 4.2 The station label
 
 Written by the CIQ app (`Recorder.mc`) as a **FitContributor developer field
-scoped to `MESG_TYPE_LAP`**, developer field id `0`, currently named `activity`,
-carrying a string. The value is the station's **display name** (e.g. `Himalayan
-salt sauna`), or the literal `transition` for transition laps.
+scoped to `MESG_TYPE_LAP`**, **field number `0`** (`Recorder.FIELD_ID`), a
+string. The value is the station's **display name** (e.g. `Himalayan salt sauna`),
+or the literal `transition` for transition laps.
 
-- Match on `field_name` from the `field_description` message.
-- **Accept a set of known field names**, not one literal — renaming the field in the CIQ app must not orphan previously-recorded files.
-- Resolve the field _value_ to `stations.id` by exact name match against `stations.name` (which was seeded from the same `SpaActivity.NAMES` strings, plus `transition`).
+**Read it by field number, not by name.** Older watch builds didn't emit the
+`developer_data_id` + `activity` `field_description` scaffolding — of 6 real
+files, the two oldest recordings (8 + 10 July 2026) lack it, the four from 12 July
+on have it (the fix landed app-side between those dates; it correlates with the
+recording date, not with Garmin Connect). On the files missing the scaffolding the
+official FIT SDK's name-based developer-field decoding silently drops the label,
+so matching on `field_name` is unreliable across a user's back-catalogue. The raw
+value, tagged with its app-assigned field number `0`, is present on every lap in
+every file regardless. So:
+
+- Extract the lap developer field at `(developerDataIndex 0, fieldDefNum 0)`
+  directly from the lap's developer-field bytes — this survives Connect's
+  stripping. Use the FIT SDK for the native lap fields (HR, calories, times) and
+  join the raw label on by `message_index`.
+- Resolve the value to `stations.id` server-side by exact name match against
+  `stations.name` (seeded from `SpaActivity.NAMES` + `transition`).
+- The field number is the app's contract (`Recorder.FIELD_ID`). If the watch ever
+  renumbers it, the parser needs a matching bump — call that out in the watch app.
 
 ### 4.3 Known quirks — must handle
 
-1. **`lap.timestamp` is unusable.** Every lap in observed files carries the _session start_ (`08:46:02`) rather than the lap end. Derive:
+1. **`lap.timestamp` is unusable.** Confirmed on all 6 files — every lap carries the _session start_ rather than the lap end. Derive:
 
     ```
     ended_at = lap.start_time + lap.total_elapsed_time
     ```
 
-    Never read `lap.timestamp`. (Worth fixing in the CIQ app separately; the parser must not depend on it either way.)
+    Never read `lap.timestamp`. (Garmin owns `lap.timestamp`; the app only calls `addLap()`, so this likely can't be fixed watch-side — the derivation is self-sufficient regardless.)
 
-2. **Trailing artefact lap.** Files end with a ~3s `transition` lap with `lap_trigger = session_end`. Stored as-is per decision — it's a real interval, just a tiny one. Any future stats should be aware.
+2. **Trailing artefact lap.** Confirmed — files end with a ~3s `transition` lap with `lap_trigger = sessionEnd`. Stored as-is; it's a real interval, just a tiny one. Any future stats should be aware.
 
-3. **`total_cycles` is sparse.** Only populated on transitions (step count while walking). Nullable.
+3. **`total_cycles` is sparse.** Present on some laps, absent on others. Nullable.
 
-4. **FIT epoch.** FIT timestamps are seconds since `1989-12-31T00:00:00Z`. The JS SDK normally converts to `Date`; store unix seconds.
+4. **FIT epoch.** FIT timestamps are seconds since `1989-12-31T00:00:00Z`; unix = FIT + `631065600`. Decode with `convertDateTimesToDates: false` (keeps raw FIT seconds) and add the offset; store unix seconds.
+
+5. **Older recordings lack the developer-field definitions.** See §4.2 — pre-~11 July 2026 builds didn't emit `developer_data_id` + the `activity` `field_description`. The SDK's name-based developer-field lookup can't be trusted across a back-catalogue; read the station label by field number.
 
 ### 4.4 Validation — reject the file if
 
 - `file_id.type !== 'activity'`
-- No laps carry the station developer field → **reject** ("this doesn't look like a spa session")
+- No lap carries a station label at developer field number `0` → **reject** ("this doesn't look like a spa session"). Check the raw field value, not the SDK's name-resolved field (which Connect can strip — §4.2).
 - Any lap's station name is absent from `stations` → auto-insert as `unclassified` rather than reject. Safety net for CIQ/DB version skew; never lose a real session over it. Surface unclassified stations for later tagging.
 
 ---
@@ -217,34 +231,35 @@ Hono on Workers. All routes authenticated except `/api/auth/*`.
     "id": "uuid-v4", // client-generated, idempotency
     "device": { "serial": "3412345678", "product": "vivoactive5" },
     "session": {
-        "startedAt": 1752652, // unix seconds UTC
-        "endedAt": 1752655,
+        "startedAt": 1783496460, // unix seconds UTC
+        "endedAt": 1783498774,
         "utcOffsetS": 3600,
-        "totalElapsedS": 2415.2,
-        "totalTimerS": 2415.2,
-        "totalCalories": 262,
-        "totalSweatLossMl": 277,
-        "avgHr": 96,
-        "maxHr": 136,
+        "totalElapsedS": 2313.637,
+        "totalTimerS": 2313.637,
+        "totalCalories": 267,
+        "avgHr": 99,
+        "maxHr": 133,
     },
     "laps": [
         {
-            "lapIndex": 0,
+            "lapIndex": 1,
             "station": "Himalayan salt sauna",
-            "startedAt": 1752652,
-            "elapsedS": 899.856,
-            "timerS": 899.856,
-            "avgHr": 100,
-            "maxHr": 120,
-            "calories": 115,
-            "restingCalories": 29,
-            "sweatLossMl": 106,
-            "cycles": null,
+            "startedAt": 1783496461,
+            "elapsedS": 899.945,
+            "timerS": 899.945,
+            "avgHr": 98,
+            "maxHr": 119,
+            "calories": 109,
+            "cycles": 3,
         },
         // …
     ],
 }
 ```
+
+`id` is added by the upload layer, not the parser (the parser is a pure,
+deterministic `ArrayBuffer → parsed session`; the client uuid is minted at POST
+time). Values above are real, from a scrubbed fixture.
 
 Validate with Zod. The client is untrusted in principle; in practice the blast radius is a user's own data.
 
