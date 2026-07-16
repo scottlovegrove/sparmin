@@ -137,23 +137,147 @@ describe('GET /api/sessions', () => {
     })
 })
 
+// 2026-07-08T07:41:02Z, 2026-07-10T07:41:27Z, 2026-08-01T00:00:00Z
+const JULY_8 = 1783496462
+const JULY_10 = 1783669287
+const AUGUST_1 = 1785542400
+
+describe('GET /api/sessions — date range', () => {
+    beforeEach(async () => {
+        await env.DB.prepare('DELETE FROM sessions').run()
+        await seed(payload(uuid(1), JULY_8))
+        await seed(payload(uuid(2), JULY_10))
+        await seed(payload(uuid(3), AUGUST_1))
+    })
+
+    const list = async (query: string) => {
+        const res = await app.request(`/api/sessions${query}`, {}, env)
+        const body = await res.json<{ sessions: { id: string }[] }>()
+        return { status: res.status, ids: body.sessions?.map((s) => s.id) }
+    }
+
+    it('bounds the range inclusively at both ends', async () => {
+        // A bare date means that whole day, so the 8th's session is in range even
+        // though it started at 07:41.
+        const { ids } = await list('?from=2026-07-08&to=2026-07-10')
+
+        expect(ids).toEqual([uuid(2), uuid(1)])
+    })
+
+    it('excludes days outside the range', async () => {
+        const { ids } = await list('?from=2026-07-09&to=2026-07-31')
+
+        expect(ids).toEqual([uuid(2)])
+    })
+
+    it('takes `from` on its own', async () => {
+        const { ids } = await list('?from=2026-07-09')
+
+        expect(ids).toEqual([uuid(3), uuid(2)])
+    })
+
+    it('takes `to` on its own', async () => {
+        const { ids } = await list('?to=2026-07-09')
+
+        expect(ids).toEqual([uuid(1)])
+    })
+
+    it('accepts a full ISO date-time', async () => {
+        const { ids } = await list('?from=2026-07-08T08:00:00Z')
+
+        // Past the 8th's 07:41 start, so that one drops out.
+        expect(ids).toEqual([uuid(3), uuid(2)])
+    })
+
+    it('rejects a range that runs backwards', async () => {
+        const { status } = await list('?from=2026-07-10&to=2026-07-08')
+
+        expect(status).toBe(400)
+    })
+
+    it('rejects a date it cannot parse', async () => {
+        const { status } = await list('?from=last%20tuesday')
+
+        expect(status).toBe(400)
+    })
+})
+
+describe('GET /api/sessions?include=intervals', () => {
+    beforeEach(async () => {
+        await env.DB.prepare('DELETE FROM sessions').run()
+    })
+
+    it('returns each session’s stays, so a period needs no call per session', async () => {
+        await seed(payload(uuid(1), JULY_8))
+        await seed(payload(uuid(2), JULY_10))
+
+        const res = await app.request('/api/sessions?include=intervals', {}, env)
+        const { sessions } = await res.json<{
+            sessions: { id: string; intervals: { order: number; station: string }[] }[]
+        }>()
+
+        expect(res.status).toBe(200)
+        // Grouped against the right session, in order, not pooled together.
+        for (const session of sessions) {
+            expect(session.intervals.map((i) => i.order)).toEqual([0, 1])
+            expect(session.intervals.map((i) => i.station)).toEqual([
+                'transition',
+                'Himalayan salt sauna',
+            ])
+        }
+    })
+
+    it('combines with the date range', async () => {
+        await seed(payload(uuid(1), JULY_8))
+        await seed(payload(uuid(2), AUGUST_1))
+
+        const { sessions } = await (
+            await app.request(
+                '/api/sessions?from=2026-07-01&to=2026-07-31&include=intervals',
+                {},
+                env,
+            )
+        ).json<{ sessions: { id: string; intervals: unknown[] }[] }>()
+
+        expect(sessions).toHaveLength(1)
+        expect(sessions[0].id).toBe(uuid(1))
+        expect(sessions[0].intervals).toHaveLength(2)
+    })
+
+    it('omits the stays unless asked', async () => {
+        await seed(payload(uuid(1), JULY_8))
+
+        const { sessions } = await (
+            await app.request('/api/sessions', {}, env)
+        ).json<{ sessions: Record<string, unknown>[] }>()
+
+        expect(sessions[0]).not.toHaveProperty('intervals')
+    })
+
+    it('rejects an include it does not know', async () => {
+        const res = await app.request('/api/sessions?include=everything', {}, env)
+
+        expect(res.status).toBe(400)
+    })
+})
+
 describe('GET /api/sessions/:id', () => {
     beforeEach(async () => {
         await env.DB.prepare('DELETE FROM sessions').run()
     })
 
-    it('returns the session with its intervals in lap order', async () => {
+    it('returns the session with its intervals in order', async () => {
         await seed(payload(uuid(1), 1783000000))
 
         const res = await app.request(`/api/sessions/${uuid(1)}`, {}, env)
         const body = await res.json<{
             session: { id: string }
-            intervals: { lapIndex: number; station: string; thermalClass: string }[]
+            intervals: { order: number; station: string; thermalClass: string }[]
         }>()
 
         expect(res.status).toBe(200)
         expect(body.session.id).toBe(uuid(1))
-        expect(body.intervals.map((i) => i.lapIndex)).toEqual([0, 1])
+        expect(body.intervals.map((i) => i.order)).toEqual([0, 1])
         // Station names and classes are resolved, not raw ids.
         expect(body.intervals[1]).toMatchObject({
             station: 'Himalayan salt sauna',
@@ -161,6 +285,17 @@ describe('GET /api/sessions/:id', () => {
             isTransition: false,
             avgHr: 98,
         })
+    })
+
+    it('describes the visit, not the FIT recording that produced it', async () => {
+        await seed(payload(uuid(1), 1783000000))
+
+        const { intervals } = await (
+            await app.request(`/api/sessions/${uuid(1)}`, {}, env)
+        ).json<{ intervals: Record<string, unknown>[] }>()
+
+        expect(intervals[0]).toHaveProperty('order')
+        expect(intervals[0]).not.toHaveProperty('lapIndex')
     })
 
     it('404s an unknown id', async () => {

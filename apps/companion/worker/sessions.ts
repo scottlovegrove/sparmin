@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm'
 import { sessions, stationIntervals, stations } from '../src/db/schema'
 import type { IngestPayload } from '../src/lib/session-payload'
 import type { Db } from './db'
@@ -126,15 +126,37 @@ export async function ingestSession(
     return { status: 'created' }
 }
 
-//! One page of the user's sessions, newest first. Summary rows only — the laps
-//! are a separate read (getSession), so the list stays cheap however long the
-//! history gets.
-export async function listSessions(
-    db: Db,
-    userId: string,
-    { limit, offset }: { limit: number; offset: number },
-) {
-    return db
+// One stay at one station, or the walk between two. `lap_index` is the FIT
+// message_index and the row's order key; it is exposed as `order` because the
+// read API describes the visit, not the recording that produced it.
+const intervalColumns = {
+    order: stationIntervals.lapIndex,
+    station: stations.name,
+    thermalClass: stations.thermalClass,
+    isTransition: stations.isTransition,
+    startedAt: stationIntervals.startedAt,
+    endedAt: stationIntervals.endedAt,
+    elapsedS: stationIntervals.elapsedS,
+    timerS: stationIntervals.timerS,
+    avgHr: stationIntervals.avgHr,
+    maxHr: stationIntervals.maxHr,
+    calories: stationIntervals.calories,
+    cycles: stationIntervals.cycles,
+}
+
+export type SessionFilter = {
+    limit: number
+    offset: number
+    from?: number
+    to?: number
+    includeIntervals: boolean
+}
+
+//! One page of the user's sessions, newest first, optionally bounded by a date
+//! range. Summary rows by default — pass includeIntervals for the stays too,
+//! which costs one extra query for the whole page rather than one per session.
+export async function listSessions(db: Db, userId: string, filter: SessionFilter) {
+    const rows = await db
         .select({
             id: sessions.id,
             startedAt: sessions.startedAt,
@@ -147,14 +169,51 @@ export async function listSessions(
             deviceProduct: sessions.deviceProduct,
         })
         .from(sessions)
-        .where(eq(sessions.userId, userId))
+        .where(
+            and(
+                eq(sessions.userId, userId),
+                filter.from == null ? undefined : gte(sessions.startedAt, filter.from),
+                filter.to == null ? undefined : lte(sessions.startedAt, filter.to),
+            ),
+        )
         .orderBy(desc(sessions.startedAt))
-        .limit(limit)
-        .offset(offset)
+        .limit(filter.limit)
+        .offset(filter.offset)
+
+    if (!filter.includeIntervals || rows.length === 0) {
+        return rows
+    }
+
+    // One query for the page's stays, then group in memory — the alternative is
+    // a round trip per session, and D1 is single-threaded.
+    const intervals = await db
+        .select({ sessionId: stationIntervals.sessionId, ...intervalColumns })
+        .from(stationIntervals)
+        .innerJoin(stations, eq(stations.id, stationIntervals.stationId))
+        .where(
+            inArray(
+                stationIntervals.sessionId,
+                rows.map((row) => row.id),
+            ),
+        )
+        // Ordering on both columns matches intervals_session_lap, so SQLite reads
+        // them in index order instead of sorting; grouping below preserves it.
+        .orderBy(asc(stationIntervals.sessionId), asc(stationIntervals.lapIndex))
+
+    const bySession = new Map<string, Omit<(typeof intervals)[number], 'sessionId'>[]>()
+    for (const { sessionId, ...interval } of intervals) {
+        const list = bySession.get(sessionId)
+        if (list == null) {
+            bySession.set(sessionId, [interval])
+        } else {
+            list.push(interval)
+        }
+    }
+    return rows.map((row) => ({ ...row, intervals: bySession.get(row.id) ?? [] }))
 }
 
-//! One session with its intervals in lap order, station names resolved. Scoped
-//! to the user: another user's session id reads as missing, not forbidden.
+//! One session with its intervals in order, station names resolved. Scoped to
+//! the user: another user's session id reads as missing, not forbidden.
 export async function getSession(db: Db, userId: string, id: string) {
     const [session] = await db
         .select()
@@ -166,20 +225,7 @@ export async function getSession(db: Db, userId: string, id: string) {
     }
 
     const intervals = await db
-        .select({
-            lapIndex: stationIntervals.lapIndex,
-            station: stations.name,
-            thermalClass: stations.thermalClass,
-            isTransition: stations.isTransition,
-            startedAt: stationIntervals.startedAt,
-            endedAt: stationIntervals.endedAt,
-            elapsedS: stationIntervals.elapsedS,
-            timerS: stationIntervals.timerS,
-            avgHr: stationIntervals.avgHr,
-            maxHr: stationIntervals.maxHr,
-            calories: stationIntervals.calories,
-            cycles: stationIntervals.cycles,
-        })
+        .select(intervalColumns)
         .from(stationIntervals)
         .innerJoin(stations, eq(stations.id, stationIntervals.stationId))
         .where(eq(stationIntervals.sessionId, id))

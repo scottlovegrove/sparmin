@@ -239,14 +239,25 @@ every file regardless. So:
 
 Hono on Workers. All routes authenticated except `/api/auth/*`.
 
-| Method   | Route               | Notes                                |
-| -------- | ------------------- | ------------------------------------ |
-| `POST`   | `/api/sessions`     | Ingest. Body = parsed payload (§5.1) |
-| `GET`    | `/api/sessions`     | List, paginated, `started_at DESC`   |
-| `GET`    | `/api/sessions/:id` | Session + intervals                  |
-| `DELETE` | `/api/sessions/:id` |                                      |
-| `GET`    | `/api/stations`     | The enum + thermal classes           |
-| `*`      | `/api/auth/*`       | better-auth handler                  |
+| Method   | Route               | Notes                                                                         |
+| -------- | ------------------- | ----------------------------------------------------------------------------- |
+| `POST`   | `/api/sessions`     | Ingest. Body = parsed payload (§5.1)                                          |
+| `GET`    | `/api/sessions`     | List, paginated, `started_at DESC`. `?from`/`?to`/`?include=intervals` (§5.3) |
+| `GET`    | `/api/sessions/:id` | Session + intervals                                                           |
+| `DELETE` | `/api/sessions/:id` |                                                                               |
+| `GET`    | `/api/stations`     | The enum + thermal classes                                                    |
+| `*`      | `/api/auth/*`       | better-auth handler                                                           |
+
+Reads are scoped to the current user, and another user's session id is a `404`,
+not a `403` — an id must not be probeable for existence.
+
+**Naming across the boundary.** The ingest payload speaks FIT (`laps`,
+`lapIndex`) because it is the parser's output; everything read back speaks the
+domain (`intervals`, `order`). One row is a stay at one station, or the walk
+between two — `lap` is an artefact of how it was recorded, and doesn't belong in
+a read API. `lap_index` stays the column name: it is the FIT `message_index` and
+half the `(session_id, lap_index)` key, so it is honest internally and simply
+aliased on the way out.
 
 ### 5.1 Ingest payload
 
@@ -308,6 +319,34 @@ Validate with Zod. The client is untrusted in principle; in practice the blast r
 
 Write session + intervals in a single D1 batch (`db.batch()`) so a partial import can't land.
 
+### 5.3 Listing sessions
+
+```
+GET /api/sessions?from=2026-07-01&to=2026-07-31&include=intervals&limit=20&offset=0
+```
+
+| Param     | Meaning                                                                          |
+| --------- | -------------------------------------------------------------------------------- |
+| `from`    | ISO date or date-time. A bare date means that day from `00:00:00Z`, inclusive    |
+| `to`      | ISO date or date-time. A bare date means that day through `23:59:59Z`, inclusive |
+| `include` | `intervals` — return each session's stays as well as its summary                 |
+| `limit`   | Default 20, max 100                                                              |
+| `offset`  | Default 0                                                                        |
+
+- **Both range ends are inclusive**, so `from=2026-07-01&to=2026-07-31` is the whole
+  of July as a date picker means it. Bounds are UTC; sessions carry `utc_offset_s`
+  if a local-day reading is ever wanted.
+- **A bad limit is a `400`, not a silent clamp** — quietly returning a different
+  page than was asked for is worse than refusing. D1 is single-threaded, so the cap
+  also stops one huge read stalling the queue.
+- **`include=intervals` costs one extra query per page, never one per session.**
+  The rows come back in `(session_id, lap_index)` order — matching
+  `intervals_session_lap`, so SQLite reads them in index order rather than sorting —
+  and are grouped in memory.
+- **Stats do not belong here.** Shipping every stay to the client to sum them is the
+  wrong shape; aggregate in SQL against `idx_intervals_user_station`, which exists
+  for exactly that and is so far unused. See §8.
+
 ---
 
 ## 6. Auth
@@ -358,7 +397,7 @@ dev              wrangler dev
 
 ## 8. Deferred
 
-- **Stats.** Schema supports per-session detail and cross-session trends (hot/cold minutes, sweat loss, HR recovery, streaks). Nothing built.
+- **Stats.** Schema supports per-session detail and cross-session trends (hot/cold minutes, HR recovery, streaks). Nothing built. When it lands it wants its own aggregating endpoint (`GET /api/stats?from=&to=`) rather than `?include=intervals` — the client should never pull thousands of stays to sum them itself. `idx_intervals_user_station` is `(user_id, station_id, started_at)` and exists for precisely this.
 - **Watch push.** `Communications.makeWebRequest` + device pairing code, replacing manual export. Same ingest endpoint — but the existing `buildPayload()` shape differs from §5.1 (see the note there); reconcile before wiring it.
 - **Venues.** Station names are hardcoded to one spa's circuit, so v1 only really serves people at that venue. A `venues` dimension is the unlock if this ever goes wider — worth remembering `stations.name` is currently globally unique, which is the constraint that'd have to give.
 - **Garmin-derived metrics** (Body Battery, training load). Would require the official Garmin Connect Developer Program with per-user OAuth. Explicitly avoided.
