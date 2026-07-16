@@ -9,7 +9,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "deploy": "wrangler deploy",
-        "cf-typegen": "wrangler types",
+        "cf-typegen": "wrangler types --strict-vars=false",
         "type-check": "tsc -b",
         "test": "vitest run",
         "db:generate": "drizzle-kit generate",

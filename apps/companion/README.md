@@ -61,6 +61,13 @@ Everything under `/api` needs a session except `/api/health` and `/api/auth/*` â
 the guard is registered before the routes, so anything added later is closed
 unless it's deliberately opened.
 
+Secrets are declared by hand in `worker/env.d.ts`, not picked up by
+`cf-typegen` â€” it can only see them if they're in your local `.dev.vars`, which
+would make the committed types depend on a file that isn't in the repo and drop
+them in CI. The committed `worker-configuration.d.ts` is the one generated
+**without** `.dev.vars`; regenerating with it present adds a harmless duplicate
+line that isn't worth committing.
+
 **Before deploying:** set the secrets, which never live in the repo.
 
 ```bash
