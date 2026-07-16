@@ -1,0 +1,102 @@
+import { useCallback, useEffect, useState } from 'react'
+
+type SessionRow = {
+    id: string
+    startedAt: number
+    utcOffsetS: number | null
+    totalElapsedS: number
+    totalCalories: number | null
+    avgHr: number | null
+    maxHr: number | null
+}
+
+type State =
+    | { status: 'loading' }
+    | { status: 'ready'; sessions: SessionRow[] }
+    | { status: 'error'; message: string }
+
+//! Sessions are stored as UTC seconds with the offset the watch recorded, so a
+//! visit reads back at the time it actually happened rather than the reader's
+//! current timezone.
+function formatWhen(startedAt: number, utcOffsetS: number | null) {
+    const local = new Date((startedAt + (utcOffsetS ?? 0)) * 1000)
+    return new Intl.DateTimeFormat('en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'UTC',
+    }).format(local)
+}
+
+function formatDuration(seconds: number) {
+    const total = Math.round(seconds)
+    const hours = Math.floor(total / 3600)
+    const minutes = Math.round((total % 3600) / 60)
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+}
+
+export function SessionList({ reloadKey }: { reloadKey: number }) {
+    const [state, setState] = useState<State>({ status: 'loading' })
+
+    const load = useCallback(async () => {
+        try {
+            const res = await fetch('/api/sessions')
+            if (!res.ok) {
+                throw new Error(`The server returned ${res.status}`)
+            }
+            const body = (await res.json()) as { sessions: SessionRow[] }
+            setState({ status: 'ready', sessions: body.sessions })
+        } catch (err) {
+            setState({ status: 'error', message: (err as Error).message })
+        }
+    }, [])
+
+    useEffect(() => {
+        void load()
+    }, [load, reloadKey])
+
+    if (state.status === 'loading') {
+        return (
+            <section className="card">
+                <h2>Your sessions</h2>
+                <p className="muted">Loading…</p>
+            </section>
+        )
+    }
+
+    if (state.status === 'error') {
+        return (
+            <section className="card">
+                <h2>Your sessions</h2>
+                <p className="error">{state.message}</p>
+            </section>
+        )
+    }
+
+    return (
+        <section className="card">
+            <h2>Your sessions</h2>
+            {state.sessions.length === 0 ? (
+                <p className="muted">Nothing yet. Import a .fit export to see it here.</p>
+            ) : (
+                <ul className="sessions">
+                    {state.sessions.map((session) => (
+                        <li key={session.id}>
+                            <span className="when">
+                                {formatWhen(session.startedAt, session.utcOffsetS)}
+                            </span>
+                            <span className="stats muted small">
+                                {formatDuration(session.totalElapsedS)}
+                                {session.avgHr != null && ` · ${session.avgHr} bpm avg`}
+                                {session.maxHr != null && ` · ${session.maxHr} max`}
+                                {session.totalCalories != null && ` · ${session.totalCalories} cal`}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </section>
+    )
+}
