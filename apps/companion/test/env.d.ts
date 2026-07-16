@@ -7,5 +7,8 @@
 declare namespace Cloudflare {
     interface Env {
         TEST_MIGRATIONS: import('cloudflare:test').D1Migration[]
+        // A real FIT export's bytes, read in node by vitest.config.ts — workerd's
+        // filesystem isn't the repo's, so the fixture has to be passed in.
+        TEST_FIT_FIXTURE: number[]
     }
 }

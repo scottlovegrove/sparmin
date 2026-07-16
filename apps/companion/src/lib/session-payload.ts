@@ -35,5 +35,13 @@ export const parsedSessionSchema = z.object({
     laps: z.array(parsedLapSchema).min(1),
 })
 
+// What POST /api/sessions accepts: the parsed session plus the client-minted
+// idempotency uuid. The client is untrusted in principle; in practice the blast
+// radius is a user's own data.
+export const ingestPayloadSchema = parsedSessionSchema.extend({
+    id: z.uuid(),
+})
+
 export type ParsedLap = z.infer<typeof parsedLapSchema>
 export type ParsedSession = z.infer<typeof parsedSessionSchema>
+export type IngestPayload = z.infer<typeof ingestPayloadSchema>
