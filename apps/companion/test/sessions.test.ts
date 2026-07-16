@@ -192,7 +192,7 @@ describe('POST /api/sessions', () => {
 
     it('deleting a session takes its intervals with it', async () => {
         await post(payload())
-        await env.DB.prepare('PRAGMA foreign_keys = ON').run()
+        // D1 enforces foreign keys by default, so the cascade needs no PRAGMA.
         await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(SESSION_ID).run()
 
         expect(await countRows('station_intervals')).toBe(0)

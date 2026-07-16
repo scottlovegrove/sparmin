@@ -1,14 +1,63 @@
 import { asc } from 'drizzle-orm'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import { stations } from '../src/db/schema'
 import { ingestPayloadSchema } from '../src/lib/session-payload'
 import { currentUserId } from './auth'
 import { createDb } from './db'
-import { ingestSession } from './sessions'
+import {
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
+    deleteSession,
+    getSession,
+    ingestSession,
+    listSessions,
+} from './sessions'
 
 // `Env` is generated from wrangler.jsonc by `npm run cf-typegen`
 // (worker-configuration.d.ts) and carries the bindings.
 const app = new Hono<{ Bindings: Env }>()
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+
+// Range bounds are ISO — `2026-07-01` or a full date-time — and become the unix
+// seconds the rows are stored in. A bare date means the whole of that day in UTC,
+// inclusive at both ends, so `from=2026-07-01&to=2026-07-31` is all of July as a
+// date picker would mean it.
+function isoBoundary(endOfDay: boolean) {
+    return z.string().transform((value, ctx) => {
+        const iso = DATE_ONLY.test(value)
+            ? `${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`
+            : value
+        const ms = Date.parse(iso)
+        if (Number.isNaN(ms)) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Expected an ISO date (2026-07-01) or date-time',
+            })
+            return z.NEVER
+        }
+        return Math.floor(ms / 1000)
+    })
+}
+
+// Query params arrive as strings or not at all; coerce and bound them here so the
+// handlers get real values. An out-of-range limit is a 400 rather than a silent
+// clamp — better to tell the caller than to quietly return a different page.
+const listQuerySchema = z
+    .object({
+        limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+        offset: z.coerce.number().int().nonnegative().default(0),
+        from: isoBoundary(false).optional(),
+        to: isoBoundary(true).optional(),
+        // Stays cost an extra query, so they are opt-in — but one query for the
+        // page, never one per session.
+        include: z.literal('intervals').optional(),
+    })
+    .refine((q) => q.from == null || q.to == null || q.from <= q.to, {
+        message: '`from` must not be after `to`',
+        path: ['from'],
+    })
 
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
@@ -43,6 +92,49 @@ app.post('/api/sessions', async (c) => {
         return c.json({ status: 'duplicate', id: parsed.data.id }, 409)
     }
     return c.json({ status: 'created', id: parsed.data.id }, 201)
+})
+
+// The user's sessions, newest first, optionally bounded by an ISO date range.
+// Summary rows by default; `include=intervals` brings the stays too, so a period
+// view doesn't need a call per session.
+app.get('/api/sessions', async (c) => {
+    const query = listQuerySchema.safeParse({
+        limit: c.req.query('limit'),
+        offset: c.req.query('offset'),
+        from: c.req.query('from'),
+        to: c.req.query('to'),
+        include: c.req.query('include'),
+    })
+    if (!query.success) {
+        return c.json({ error: 'invalid_query', issues: query.error.issues }, 400)
+    }
+
+    const { limit, offset, from, to, include } = query.data
+    const rows = await listSessions(createDb(c.env.DB), currentUserId(c), {
+        limit,
+        offset,
+        from,
+        to,
+        includeIntervals: include === 'intervals',
+    })
+    return c.json({ sessions: rows, limit, offset })
+})
+
+app.get('/api/sessions/:id', async (c) => {
+    const result = await getSession(createDb(c.env.DB), currentUserId(c), c.req.param('id'))
+    if (result == null) {
+        return c.json({ error: 'not_found' }, 404)
+    }
+    return c.json(result)
+})
+
+app.delete('/api/sessions/:id', async (c) => {
+    const deleted = await deleteSession(createDb(c.env.DB), currentUserId(c), c.req.param('id'))
+    if (!deleted) {
+        return c.json({ error: 'not_found' }, 404)
+    }
+    // Intervals go with it via ON DELETE CASCADE.
+    return c.body(null, 204)
 })
 
 export default app
