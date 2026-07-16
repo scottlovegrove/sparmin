@@ -8,11 +8,11 @@
   ],
   "scripts": {
     "build:watch": "npm run build -w @sparmin/watch",
-    "dev:web": "npm run dev -w @sparmin/web",
-    "build:web": "npm run build -w @sparmin/web",
-    "preview:web": "npm run preview -w @sparmin/web",
-    "check": "oxlint apps/web/src && oxfmt --check",
-    "fix": "oxlint apps/web/src --fix && oxfmt"
+    "dev:marketing": "npm run dev -w @sparmin/marketing",
+    "build:marketing": "npm run build -w @sparmin/marketing",
+    "preview:marketing": "npm run preview -w @sparmin/marketing",
+    "check": "oxlint apps/marketing/src && oxfmt --check",
+    "fix": "oxlint apps/marketing/src --fix && oxfmt"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.9",

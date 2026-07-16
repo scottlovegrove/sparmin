@@ -51,8 +51,8 @@ to the watch's `GARMIN/APPS/`.
      a feature). It's the only record of the app's version — a v3 manifest has no
      version field — and it's what the Settings → About page shows and what you
      type into the store dashboard.
-  2. Add the matching note in the `apps/web` workspace: a new
-     `apps/web/src/content/changelog/<version>.md` (frontmatter `version` +
+  2. Add the matching note in the `apps/marketing` workspace: a new
+     `apps/marketing/src/content/changelog/<version>.md` (frontmatter `version` +
      `summary`, then user-facing bullets — copy the newest file).
 
   Either half without the other is a bug: an un-bumped version means nobody can

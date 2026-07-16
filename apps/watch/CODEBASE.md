@@ -30,7 +30,7 @@ live HR, and (deferred) can POST a summary to a backend for Strava labelling.
 ## Top-level layout
 
 This app is the `apps/watch` workspace of the Sparmin monorepo; the tree below
-is rooted at `apps/watch/` (the sibling `apps/web/` holds the marketing site).
+is rooted at `apps/watch/` (the sibling `apps/marketing/` holds the marketing site).
 All build tooling self-locates, so paths here are relative to this directory.
 
 ```

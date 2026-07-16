@@ -1,5 +1,5 @@
 {
-  "name": "@sparmin/web",
+  "name": "@sparmin/marketing",
   "version": "0.0.0",
   "private": true,
   "description": "Sparmin marketing website — Astro, statically built, deployed to GitHub Pages.",
