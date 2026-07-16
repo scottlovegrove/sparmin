@@ -1,9 +1,14 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { sessions, stationIntervals, stations } from '../src/db/schema'
 import type { IngestPayload } from '../src/lib/session-payload'
 import type { Db } from './db'
 
 export type IngestResult = { status: 'created' } | { status: 'duplicate' }
+
+// Pagination bounds for the session list. The cap stops a client asking for the
+// lot: D1 is single-threaded, so one huge read stalls every queued query.
+export const DEFAULT_PAGE_SIZE = 20
+export const MAX_PAGE_SIZE = 100
 
 //! Resolve every station label in the payload to a stations.id, inserting any
 //! label the catalogue doesn't know as `unclassified` rather than rejecting the
@@ -119,4 +124,76 @@ export async function ingestSession(
     // One batch, so a half-imported session can never land.
     await db.batch([sessionRow, ...intervalRows])
     return { status: 'created' }
+}
+
+//! One page of the user's sessions, newest first. Summary rows only — the laps
+//! are a separate read (getSession), so the list stays cheap however long the
+//! history gets.
+export async function listSessions(
+    db: Db,
+    userId: string,
+    { limit, offset }: { limit: number; offset: number },
+) {
+    return db
+        .select({
+            id: sessions.id,
+            startedAt: sessions.startedAt,
+            endedAt: sessions.endedAt,
+            utcOffsetS: sessions.utcOffsetS,
+            totalElapsedS: sessions.totalElapsedS,
+            totalCalories: sessions.totalCalories,
+            avgHr: sessions.avgHr,
+            maxHr: sessions.maxHr,
+            deviceProduct: sessions.deviceProduct,
+        })
+        .from(sessions)
+        .where(eq(sessions.userId, userId))
+        .orderBy(desc(sessions.startedAt))
+        .limit(limit)
+        .offset(offset)
+}
+
+//! One session with its intervals in lap order, station names resolved. Scoped
+//! to the user: another user's session id reads as missing, not forbidden.
+export async function getSession(db: Db, userId: string, id: string) {
+    const [session] = await db
+        .select()
+        .from(sessions)
+        .where(and(eq(sessions.id, id), eq(sessions.userId, userId)))
+        .limit(1)
+    if (session == null) {
+        return null
+    }
+
+    const intervals = await db
+        .select({
+            lapIndex: stationIntervals.lapIndex,
+            station: stations.name,
+            thermalClass: stations.thermalClass,
+            isTransition: stations.isTransition,
+            startedAt: stationIntervals.startedAt,
+            endedAt: stationIntervals.endedAt,
+            elapsedS: stationIntervals.elapsedS,
+            timerS: stationIntervals.timerS,
+            avgHr: stationIntervals.avgHr,
+            maxHr: stationIntervals.maxHr,
+            calories: stationIntervals.calories,
+            cycles: stationIntervals.cycles,
+        })
+        .from(stationIntervals)
+        .innerJoin(stations, eq(stations.id, stationIntervals.stationId))
+        .where(eq(stationIntervals.sessionId, id))
+        .orderBy(asc(stationIntervals.lapIndex))
+
+    return { session, intervals }
+}
+
+//! Delete one of the user's sessions. Returns false if it isn't theirs or isn't
+//! there. Intervals go with it via ON DELETE CASCADE.
+export async function deleteSession(db: Db, userId: string, id: string): Promise<boolean> {
+    const deleted = await db
+        .delete(sessions)
+        .where(and(eq(sessions.id, id), eq(sessions.userId, userId)))
+        .returning({ id: sessions.id })
+    return deleted.length > 0
 }

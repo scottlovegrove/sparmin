@@ -318,6 +318,23 @@ Write session + intervals in a single D1 batch (`db.batch()`) so a partial impor
 - **MailChannels' free Workers service was sunset 31 Aug 2024** — ignore any blog post promising free Workers email.
 - **Deliverability is the real risk.** SPF, DKIM and DMARC on the sending subdomain. A magic link in spam is an unrecoverable login.
 
+### 6.1 Retrofitting auth onto the endpoints
+
+Until this lands, `worker/auth.ts` returns a constant `stub-user` and no route
+checks anything — which is only safe because nothing is deployed (§1.1). Routes
+already ask `currentUserId(c)` rather than assuming an identity, so the swap is a
+change there plus a `/api/*` guard, not a sweep through every handler.
+
+Two things that are easy to miss when it happens:
+
+- **The `users` foreign key doesn't exist yet.** `sessions.user_id` and
+  `station_intervals.user_id` are plain columns, because better-auth owns the
+  `users` table and it isn't there to reference. Add the FK (`ON DELETE CASCADE`)
+  in a migration once it is.
+- **Stub-owned rows already exist.** Sessions written during development — local
+  and remote — are owned by `stub-user`. Clear them, or remap them to a real user
+  id, or they end up orphaned against a user that never existed.
+
 ---
 
 ## 7. Local development
