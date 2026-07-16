@@ -1,9 +1,11 @@
 import { desc, sql } from 'drizzle-orm'
 import { check, index, integer, real, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { user } from './auth-schema'
 
 // D1 (SQLite) schema. See docs/spa-logger-spec.md §3.
-// `users` is owned by better-auth and lands with the auth work; the user_id
-// columns below are declared without a foreign key until that table exists.
+// The `user` table is better-auth's, defined in auth-schema.ts from its CLI —
+// note it is singular, and unrelated to the `sessions` table below, which is a
+// spa visit rather than a login.
 
 export const THERMAL_CLASSES = ['hot', 'cold', 'neutral', 'unclassified'] as const
 export type ThermalClass = (typeof THERMAL_CLASSES)[number]
@@ -36,7 +38,9 @@ export const sessions = sqliteTable(
     'sessions',
     {
         id: text('id').primaryKey(), // uuid v4, generated client-side
-        userId: text('user_id').notNull(),
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
         startedAt: integer('started_at').notNull(), // unix seconds, UTC
         endedAt: integer('ended_at').notNull(),
         utcOffsetS: integer('utc_offset_s'),
@@ -66,7 +70,9 @@ export const stationIntervals = sqliteTable(
         sessionId: text('session_id')
             .notNull()
             .references(() => sessions.id, { onDelete: 'cascade' }),
-        userId: text('user_id').notNull(),
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
         stationId: integer('station_id')
             .notNull()
             .references(() => stations.id),

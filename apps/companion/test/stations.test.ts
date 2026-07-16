@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
 import app from '../worker'
+import { signIn } from './auth-helper'
 
 type StationRow = {
     id: number
@@ -10,7 +11,8 @@ type StationRow = {
 }
 
 const get = async () => {
-    const res = await app.request('/api/stations', {}, env)
+    const { headers } = await signIn()
+    const res = await app.request('/api/stations', { headers }, env)
     return { res, body: (await res.json()) as { stations: StationRow[] } }
 }
 

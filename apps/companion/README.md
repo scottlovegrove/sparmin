@@ -34,6 +34,53 @@ npm run deploy         # wrangler deploy
 Run any of these from `apps/companion/`, or from the repo root via the
 `*:companion` convenience scripts.
 
+## Auth
+
+Magic link only, via better-auth. There are no passwords.
+
+```bash
+cp .dev.vars.example .dev.vars    # git-ignored; put local config + secrets here
+```
+
+**No email provider is needed to work on the app.** Without `RESEND_API_KEY`, the
+magic link prints to the wrangler console — sign in by opening the link it logs.
+In production a missing key is an error rather than a fallback, so a live link can
+never end up in the logs.
+
+`worker/auth.ts` builds the auth instance per request, because bindings don't
+exist at module scope on Workers. `better-auth.config.ts` exists only for
+`@better-auth/cli generate` — keep its plugin list in step with `auth.ts`, or the
+generated schema stops matching what runs:
+
+```bash
+npx @better-auth/cli generate --config ./better-auth.config.ts --output ./src/db/auth-schema.ts
+npm run db:generate    # then a migration for the change
+```
+
+Everything under `/api` needs a session except `/api/health` and `/api/auth/*` —
+the guard is registered before the routes, so anything added later is closed
+unless it's deliberately opened.
+
+Secrets are declared by hand in `worker/env.d.ts`, not picked up by
+`cf-typegen` — it can only see them if they're in your local `.dev.vars`, which
+would make the committed types depend on a file that isn't in the repo and drop
+them in CI. The committed `worker-configuration.d.ts` is the one generated
+**without** `.dev.vars`; regenerating with it present adds a harmless duplicate
+line that isn't worth committing.
+
+**Before deploying:** set the secrets, which never live in the repo. Wrangler
+prompts for the value, so it stays out of your shell history.
+
+```bash
+npm run secret BETTER_AUTH_SECRET   # a fresh one: openssl rand -hex 32
+npm run secret RESEND_API_KEY
+npm run secrets                     # lists the names, never the values
+```
+
+From the repo root these are `secret:companion` / `secrets:companion` — wrangler
+needs this workspace's `wrangler.jsonc`, so bare `wrangler secret put` from the
+root fails with "Required Worker name missing".
+
 ## Database (D1 + Drizzle)
 
 The schema lives in `src/db/schema.ts`; migrations are generated from it into
@@ -46,7 +93,13 @@ npx wrangler d1 migrations apply DB --remote          # apply to production
 ```
 
 Always apply migrations with `wrangler`, never `drizzle-kit migrate` (it wants
-d1-http credentials and targets production). Local D1 is a real SQLite file under
+d1-http credentials and targets production).
+
+**Drizzle only numbers its own migrations.** Hand-written ones (the station seed)
+are invisible to its journal, so a generated migration can collide with them — if
+it does, renumber the new file and bump its `idx`/`tag` in `migrations/meta/_journal.json`
+to match. Read what it generates, too: its SQLite table-rebuild path mangles the
+`desc` index in `idx_sessions_user_time`, which `0002` fixes by hand. Local D1 is a real SQLite file under
 `.wrangler/state/` — open it with any SQLite client. Tests don't need any of this:
 the vitest pool reads `./migrations` and applies them to each isolated test
 database automatically (`test/apply-migrations.ts`).

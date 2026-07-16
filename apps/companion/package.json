@@ -9,7 +9,9 @@
         "build": "vite build",
         "preview": "vite preview",
         "deploy": "wrangler deploy",
-        "cf-typegen": "wrangler types",
+        "secret": "wrangler secret put",
+        "secrets": "wrangler secret list",
+        "cf-typegen": "wrangler types --strict-vars=false",
         "type-check": "tsc -b",
         "test": "vitest run",
         "db:generate": "drizzle-kit generate",
@@ -20,8 +22,10 @@
     },
     "dependencies": {
         "@garmin/fitsdk": "21.208.0",
+        "better-auth": "1.6.23",
         "drizzle-orm": "0.45.2",
         "hono": "4.12.30",
+        "resend": "6.17.2",
         "zod": "4.4.3"
     },
     "devDependencies": {
