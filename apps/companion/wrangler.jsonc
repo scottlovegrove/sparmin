@@ -1,0 +1,19 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "sparmin-companion",
+    "main": "./worker/index.ts",
+    "compatibility_date": "2026-07-16",
+    "compatibility_flags": ["nodejs_compat"],
+    // The Worker serves the built SPA as static assets and handles the API.
+    // `/api/*` always hits the Worker first; every other path serves an asset,
+    // falling back to index.html for client-side routing.
+    "assets": {
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"],
+    },
+    "observability": {
+        "enabled": true,
+    },
+    // D1 binding (`DB`) and its `migrations_dir` are added with the schema.
+}

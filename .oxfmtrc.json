@@ -21,6 +21,7 @@
         "**/node_modules/**",
         "**/.astro/**",
         "**/*.toml",
-        "apps/watch/**"
+        "apps/watch/**",
+        "**/worker-configuration.d.ts"
     ]
 }

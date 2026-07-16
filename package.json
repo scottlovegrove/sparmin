@@ -11,8 +11,11 @@
     "dev:marketing": "npm run dev -w @sparmin/marketing",
     "build:marketing": "npm run build -w @sparmin/marketing",
     "preview:marketing": "npm run preview -w @sparmin/marketing",
-    "check": "oxlint apps/marketing/src && oxfmt --check",
-    "fix": "oxlint apps/marketing/src --fix && oxfmt"
+    "dev:companion": "npm run dev -w @sparmin/companion",
+    "build:companion": "npm run build -w @sparmin/companion",
+    "test:companion": "npm run test -w @sparmin/companion",
+    "check": "oxlint apps/marketing/src apps/companion/src apps/companion/worker apps/companion/test && oxfmt --check",
+    "fix": "oxlint apps/marketing/src apps/companion/src apps/companion/worker apps/companion/test --fix && oxfmt"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.9",
