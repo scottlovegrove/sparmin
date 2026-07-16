@@ -31,7 +31,7 @@ grow charts, date pickers and the deferred Stats screens without changing this.
 | API      | Hono on the same Cloudflare Worker                      | Native D1 binding — `env.DB`, no connection string                                                                                              |
 | DB       | Cloudflare D1 (SQLite)                                  | Free tier, no pooler, no pause, Time Travel backups                                                                                             |
 | Auth     | better-auth, magic link                                 | Runs on Workers, D1 store via Drizzle; same-origin cookie                                                                                       |
-| Email    | Cloudflare Email Service or Resend                      | Check CF Email Service GA status first                                                                                                          |
+| Email    | Resend                                                  | GA, and free for arbitrary recipients — Cloudflare's needs a paid plan for those and is still beta (§6)                                         |
 
 **Cost:** free at hobby scale. Only email has a meaningful ceiling.
 
@@ -40,12 +40,34 @@ client parser and the server ingest — one source of truth for the §5.1 payloa
 
 ### 1.1 Hosting
 
-Served from a subdomain of `scottlovegrove.co.uk`, not a `workers.dev` address —
-the same domain as the marketing site (`sparmin.scottlovegrove.co.uk`, Astro on
-GitHub Pages). The two stay separate deployments; only the parent domain is
-shared. The subdomain choice also fixes the auth cookie scope (§6) and the
-magic-link sending domain (SPF/DKIM/DMARC), so it wants settling before auth
-lands.
+| Host                               | Serves                                |
+| ---------------------------------- | ------------------------------------- |
+| `sparmin.scottlovegrove.co.uk`     | Marketing site, Astro on GitHub Pages |
+| `app.sparmin.scottlovegrove.co.uk` | The companion Worker                  |
+
+DNS for `scottlovegrove.co.uk` is on Cloudflare, so the Worker's hostname is a
+proxied record it owns outright. The marketing site's record stays **DNS-only**
+and continues to go straight to GitHub Pages.
+
+**Why not `sparmin.scottlovegrove.co.uk/app`.** It was the preference, and it is
+possible — proxy the marketing record through Cloudflare and put a Worker route on
+`/app*`, letting everything else fall through to GitHub Pages. But it means
+proxying a working GitHub Pages site through Cloudflare, and GitHub renews its
+Let's Encrypt certificate via an HTTP challenge that the proxy can interfere with.
+That is TLS on the marketing site wagered for a path prefix, and the prefix buys
+nothing a subdomain doesn't (see the redirect note below). Revisit only if the two
+ever genuinely need one origin.
+
+**Signed-in visitors at the marketing root.** The intent is that a signed-in
+visitor hitting the marketing site lands in the app. This can't be a server-side
+redirect either way — GitHub Pages is static and cannot read a cookie. So it is
+client-side, and the session cookie is `httpOnly` and unreadable to JS by design.
+The way through is a second, non-sensitive hint cookie (say `sparmin_signed_in=1`,
+not `httpOnly`) set on `sparmin.scottlovegrove.co.uk` alongside the real session
+cookie, so both hosts see it: the marketing page reads the hint and redirects,
+while the credential itself stays out of JS. Worth noting the hint is a hint —
+never a grant. It also shouldn't redirect the whole site, or a signed-in user can
+never read the changelog.
 
 **Nothing is deployed until auth is in place.** The ingest endpoint writes to the
 database, so exposing it before §6 lands would leave it open to the internet. The
@@ -353,7 +375,22 @@ GET /api/sessions?from=2026-07-01&to=2026-07-31&include=intervals&limit=20&offse
 
 - **better-auth** magic-link plugin, Drizzle adapter, D1 store.
 - **Same-origin cookie.** Because the SPA and API are one Worker (§1), the session cookie is first-party — no cross-origin `SameSite=None` / CORS credential juggling, which is the usual magic-link pain point.
-- Email via **Cloudflare Email Service** (`EMAIL` binding, Wrangler emulates locally — check GA status and free allowance) or **Resend** (official Workers tutorial, free tier, domain verification).
+- **Email via Resend.** Settled July 2026 after checking both:
+
+    |                      | Resend                   | Cloudflare Email Service          |
+    | -------------------- | ------------------------ | --------------------------------- |
+    | Arbitrary recipients | Free — 3,000/mo, 100/day | **Workers Paid ($5/mo)** required |
+    | Status               | GA                       | Public beta since Apr 2026        |
+    | Cost to integrate    | An API key secret        | None — native `env.EMAIL` binding |
+
+    Cloudflare's is the more elegant integration and its free tier is real — but
+    only for _verified destination addresses in your own account_, i.e. yourself.
+    The moment a stranger signs in it is $5/mo, and this is meant for ordinary
+    people at a spa, not for one developer. Beta is also the wrong bet for the auth
+    path specifically: if the API shifts, nobody can log in. Revisit when it hits
+    GA. 100/day is not a constraint — that is 100 logins a day against long-lived
+    sessions.
+
 - **MailChannels' free Workers service was sunset 31 Aug 2024** — ignore any blog post promising free Workers email.
 - **Deliverability is the real risk.** SPF, DKIM and DMARC on the sending subdomain. A magic link in spam is an unrecoverable login.
 
@@ -406,6 +443,7 @@ dev              wrangler dev
 
 ## 9. Open items
 
-- Confirm Cloudflare Email Service GA status + free allowance vs Resend.
+- ~~Confirm Cloudflare Email Service GA status + free allowance vs Resend.~~ Done — Resend (§6).
 - `lap.timestamp` in the CIQ app: likely **not** app-fixable — the watch only calls `addLap()`/`finish()`; Garmin owns the lap timestamp. Confirm whether it's controllable at all; if not, drop this item. The parser's `start_time + total_elapsed_time` derivation (§4.3) is self-sufficient regardless.
-- Seed `stations` with the CIQ enum + thermal classes. **`Hydro pool` and `Heated loungers` need a judgement call** — neither is inferable from its name.
+- ~~Seed `stations` with the CIQ enum + thermal classes.~~ Done — both judgement calls settled as `hot`, along with the fire and ice room (§3).
+- Whether the marketing site's root should redirect signed-in visitors into the app, and where the hint cookie is set (§1.1). Not blocking; needs the app deployed first.
