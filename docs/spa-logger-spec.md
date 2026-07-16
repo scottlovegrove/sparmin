@@ -38,6 +38,30 @@ grow charts, date pickers and the deferred Stats screens without changing this.
 Shared Zod schemas/types live once in the workspace and are imported by both the
 client parser and the server ingest — one source of truth for the §5.1 payload.
 
+### 1.1 Hosting
+
+Served from a subdomain of `scottlovegrove.co.uk`, not a `workers.dev` address —
+the same domain as the marketing site (`sparmin.scottlovegrove.co.uk`, Astro on
+GitHub Pages). The two stay separate deployments; only the parent domain is
+shared. The subdomain choice also fixes the auth cookie scope (§6) and the
+magic-link sending domain (SPF/DKIM/DMARC), so it wants settling before auth
+lands.
+
+**Nothing is deployed until auth is in place.** The ingest endpoint writes to the
+database, so exposing it before §6 lands would leave it open to the internet. The
+D1 database itself is already provisioned (`sparmin-companion`, WEUR) and
+migrated.
+
+Deployment work still outstanding — small, rides along with the auth or UI PR
+rather than being its own:
+
+- A `deploy-companion.yml` workflow. Wrangler in CI needs a `CLOUDFLARE_API_TOKEN`
+  repo secret; a local `wrangler login` is not usable from Actions.
+- The custom domain route, and whether remote migrations run in the deploy step or
+  stay manual.
+- Later, once users can log in: what the marketing site does for a logged-in
+  visitor. Deferred — it doesn't block anything here.
+
 ---
 
 ## 2. Build order — PR plan
