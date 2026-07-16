@@ -17,13 +17,12 @@
     },
     // Drizzle writes migrations to ./migrations; apply them with
     // `wrangler d1 migrations apply DB --local|--remote`, never `drizzle-kit migrate`.
-    // `database_id` is filled in once the remote D1 database is created; local
-    // development and tests use miniflare's SQLite and ignore it.
+    // Local development and tests use miniflare's own SQLite and ignore database_id.
     "d1_databases": [
         {
             "binding": "DB",
             "database_name": "sparmin-companion",
-            "database_id": "local",
+            "database_id": "20557b88-99d9-43c9-9544-36aa2c03bfed",
             "migrations_dir": "migrations",
         },
     ],
