@@ -1,8 +1,8 @@
-name: Web CI
+name: Marketing CI
 on:
     pull_request:
         paths:
-            - 'apps/web/**'
+            - 'apps/marketing/**'
             # shared lint/format config the integrity-check depends on
             - '.oxlintrc.json'
             - '.oxfmtrc.json'
@@ -11,15 +11,15 @@ on:
             # the whole npm-workspaces monorepo, so any dep bump anywhere rewrites it and
             # would fire this CI unrelated to the site. A real dep change to the site
             # always touches one of the package.json files globbed above.
-            - '.github/workflows/web-ci.yml'
+            - '.github/workflows/marketing-ci.yml'
 
 # Only a single workflow will run at a time. Cancel any in-progress run.
 concurrency:
-    group: web-ci-${{ github.ref }}
+    group: marketing-ci-${{ github.ref }}
     cancel-in-progress: true
 
 jobs:
-    web-ci:
+    marketing-ci:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
@@ -33,5 +33,5 @@ jobs:
               run: npm ci
 
             - name: Run CI check
-              working-directory: apps/web
+              working-directory: apps/marketing
               run: npm run integrity-check

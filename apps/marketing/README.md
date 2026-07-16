@@ -1,4 +1,4 @@
-# @sparmin/web
+# @sparmin/marketing
 
 The Sparmin marketing site: one page explaining the watch app (what it is,
 screenshots, FAQ, support via GitHub issues) plus a changelog page. Built with
@@ -10,9 +10,9 @@ From the repo root (npm workspaces — no need to `cd` in):
 
 ```sh
 npm install          # once
-npm run dev:web      # dev server at http://localhost:4321
-npm run build:web    # type-check (astro check) + static build → apps/web/dist
-npm run preview:web  # serve the built output
+npm run dev:marketing      # dev server at http://localhost:4321
+npm run build:marketing    # type-check (astro check) + static build → apps/marketing/dist
+npm run preview:marketing  # serve the built output
 ```
 
 ## Checks
@@ -23,13 +23,13 @@ the repo root (`.oxlintrc.json`, `.oxfmtrc.json`); `apps/watch` is excluded from
 both, being Monkey C.
 
 ```sh
-npm run check -w @sparmin/web             # lint + format check
-npm run fix -w @sparmin/web               # apply both
-npm run type-check -w @sparmin/web        # astro check
-npm run integrity-check -w @sparmin/web   # clean + check + type-check + build
+npm run check -w @sparmin/marketing             # lint + format check
+npm run fix -w @sparmin/marketing               # apply both
+npm run type-check -w @sparmin/marketing        # astro check
+npm run integrity-check -w @sparmin/marketing   # clean + check + type-check + build
 ```
 
-`integrity-check` is what CI runs (`.github/workflows/web-ci.yml`, on every PR
+`integrity-check` is what CI runs (`.github/workflows/marketing-ci.yml`, on every PR
 touching the site), so run it before pushing and it should not surprise you.
 
 ## Layout
@@ -65,8 +65,8 @@ summary: One line on what this release is about.
 
 ## Deployment
 
-`.github/workflows/deploy-web.yml` builds and publishes to GitHub Pages on every
-push to `main` that touches `apps/web`. In the repo's **Settings → Pages**, the
+`.github/workflows/deploy-marketing.yml` builds and publishes to GitHub Pages on every
+push to `main` that touches `apps/marketing`. In the repo's **Settings → Pages**, the
 source must be set to **GitHub Actions**.
 
 The site lives at **https://sparmin.scottlovegrove.co.uk**, so it sits at the

@@ -6,10 +6,10 @@ website.
 
 ## Workspaces
 
-| Path         | Package          | What it is                                                       |
-| ------------ | ---------------- | ---------------------------------------------------------------- |
-| `apps/watch` | `@sparmin/watch` | The Connect IQ watch app (Monkey C). Build/test with `build.sh`. |
-| `apps/web`   | `@sparmin/web`   | Marketing site + changelog (Astro), deployed to GitHub Pages.    |
+| Path             | Package              | What it is                                                       |
+| ---------------- | -------------------- | ---------------------------------------------------------------- |
+| `apps/watch`     | `@sparmin/watch`     | The Connect IQ watch app (Monkey C). Build/test with `build.sh`. |
+| `apps/marketing` | `@sparmin/marketing` | Marketing site + changelog (Astro), deployed to GitHub Pages.    |
 
 npm workspaces tie the two together (`apps/*`), but the watch app is **not** a
 Node project — its `package.json` only exposes the `build.sh` targets so they
@@ -24,14 +24,14 @@ Each workspace is self-contained; work inside its directory.
 cd apps/watch && ./build.sh          # side-load the primary devices
 npm run build:watch                  # …or drive it from the repo root
 
-# Website — see apps/web/README.md.
-npm run dev:web                      # dev server
-npm run build:web                    # type-check + static build
+# Website — see apps/marketing/README.md.
+npm run dev:marketing                # dev server
+npm run build:marketing              # type-check + static build
 ```
 
 ## Linting and formatting
 
-The Node side of the repo (i.e. `apps/web`) is linted with
+The Node side of the repo (i.e. `apps/marketing`) is linted with
 [oxlint](https://oxc.rs) and formatted with oxfmt, configured in `.oxlintrc.json`
 and `.oxfmtrc.json`. The watch app is Monkey C and is excluded from both.
 

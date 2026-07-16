@@ -1,15 +1,15 @@
 name: Deploy website
 
-# Builds apps/web and publishes it to GitHub Pages. Only web changes trigger it —
-# the watch app has nothing to do with the site.
+# Builds apps/marketing and publishes it to GitHub Pages. Only marketing changes
+# trigger it — the watch app has nothing to do with the site.
 on:
     push:
         branches: [main]
         paths:
-            - 'apps/web/**'
+            - 'apps/marketing/**'
             - 'package.json'
             - 'package-lock.json'
-            - '.github/workflows/deploy-web.yml'
+            - '.github/workflows/deploy-marketing.yml'
     workflow_dispatch:
 
 permissions:
@@ -32,11 +32,11 @@ jobs:
                   node-version: 22
                   cache: npm
             - run: npm ci
-            - run: npm run build:web
+            - run: npm run build:marketing
             - uses: actions/configure-pages@v5
             - uses: actions/upload-pages-artifact@v3
               with:
-                  path: apps/web/dist
+                  path: apps/marketing/dist
 
     deploy:
         needs: build

@@ -10,7 +10,7 @@ not at the root.
   in [`apps/watch/AGENTS.md`](./apps/watch/AGENTS.md), its map in
   `apps/watch/CODEBASE.md`, its build/run/test guide in `apps/watch/README.md`.
   **Read those before touching the watch app.**
-- **`apps/web`** — the marketing site and the public changelog, an Astro app
+- **`apps/marketing`** — the marketing site and the public changelog, an Astro app
   served from `sparmin.scottlovegrove.co.uk`. Releases live as one Markdown file
   per version in `src/content/changelog/`.
 
@@ -22,6 +22,6 @@ not at the root.
   shared root tooling without a reason — the two apps have nothing in common but
   the brand. **The one exception:** a watch release spans both — bumping
   `Version.APP` in `apps/watch/source/Version.mc` must come with a new changelog
-  entry in `apps/web/src/content/changelog/`. See `apps/watch/AGENTS.md`.
+  entry in `apps/marketing/src/content/changelog/`. See `apps/watch/AGENTS.md`.
 - **Per-workspace docs are authoritative.** When you change the watch app, the
   rules in `apps/watch/AGENTS.md` apply in full and override anything vague here.
