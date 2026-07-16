@@ -17,5 +17,11 @@
         "no-unused-private-class-members": "error",
         "import/no-namespace": "error"
     },
-    "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/.astro/**", "**/*.astro"]
+    "ignorePatterns": [
+        "**/dist/**",
+        "**/node_modules/**",
+        "**/.astro/**",
+        "**/*.astro",
+        "**/worker-configuration.d.ts"
+    ]
 }

@@ -1,0 +1,40 @@
+{
+    "name": "@sparmin/companion",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Sparmin companion app — thermal spa session logger. React + Vite SPA served by a Hono Cloudflare Worker with D1.",
+    "type": "module",
+    "scripts": {
+        "dev": "vite dev",
+        "build": "vite build",
+        "preview": "vite preview",
+        "deploy": "wrangler deploy",
+        "cf-typegen": "wrangler types",
+        "type-check": "tsc -b",
+        "test": "vitest run",
+        "db:generate": "drizzle-kit generate",
+        "check": "tsc -b && oxlint src worker test && oxfmt --check",
+        "fix": "oxlint src worker test --fix && oxfmt",
+        "clean": "rimraf dist .wrangler",
+        "integrity-check": "npm-run-all clean check build test"
+    },
+    "dependencies": {
+        "drizzle-orm": "0.45.2",
+        "hono": "4.12.30"
+    },
+    "devDependencies": {
+        "@cloudflare/vite-plugin": "1.45.0",
+        "@cloudflare/vitest-pool-workers": "0.18.5",
+        "@cloudflare/workers-types": "5.20260716.1",
+        "@types/node": "26.1.1",
+        "@types/react": "19.2.17",
+        "@types/react-dom": "19.2.3",
+        "@vitejs/plugin-react": "6.0.3",
+        "drizzle-kit": "0.31.10",
+        "react": "19.2.7",
+        "react-dom": "19.2.7",
+        "vite": "8.1.5",
+        "vitest": "4.1.10",
+        "wrangler": "4.111.0"
+    }
+}

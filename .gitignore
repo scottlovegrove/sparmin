@@ -2,9 +2,12 @@
 node_modules/
 *.log
 
-# --- Astro (apps/web) ---
+# --- Astro (apps/marketing) ---
 dist/
 .astro/
+
+# --- Cloudflare Workers (apps/companion) ---
+.wrangler/
 
 # --- VS Code: ignore local machine settings, keep shared recommendations ---
 .vscode/*
