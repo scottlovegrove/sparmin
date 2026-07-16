@@ -73,6 +73,16 @@ describe('the /api guard', () => {
         expect(res.status).toBe(200)
     })
 
+    it('refuses to run at all without a secret, rather than using a guessable one', () => {
+        // Handed no secret, better-auth falls back to a default published in its
+        // own source, and only rejects it when NODE_ENV is exactly "production" —
+        // which a Worker need not set. A deploy that forgets `wrangler secret put`
+        // would otherwise serve forgeable sessions.
+        expect(() => createAuth({ ...env, BETTER_AUTH_SECRET: '' })).toThrow(
+            /BETTER_AUTH_SECRET is not set/,
+        )
+    })
+
     it('refuses a cross-site request that carries a session', async () => {
         const { headers } = await signIn()
 

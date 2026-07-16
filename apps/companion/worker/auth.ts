@@ -15,6 +15,17 @@ export type SendLink = (env: Env, link: { email: string; url: string }) => Promi
 // `sendLink` is injectable so tests can capture the link rather than send it, and
 // still drive the real sign-in flow.
 export function createAuth(env: Env, sendLink: SendLink = sendMagicLinkEmail) {
+    // Fail closed. Handed no secret, better-auth falls back to a default that is
+    // published in its own source — sessions would be signed with a value anyone
+    // can read, so anyone could forge one. It only refuses that itself when
+    // NODE_ENV is exactly "production", which is Node's variable and nothing a
+    // Worker is obliged to set. The secret arrives out of band via
+    // `wrangler secret put`, so a deploy that forgets it must break loudly here
+    // rather than come up with forgeable sessions.
+    if (!env.BETTER_AUTH_SECRET) {
+        throw new Error('BETTER_AUTH_SECRET is not set — refusing to run with a guessable secret')
+    }
+
     const db = createDb(env.DB)
     return betterAuth({
         ...authOptions,
