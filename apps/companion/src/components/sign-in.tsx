@@ -11,15 +11,21 @@ export function SignIn() {
         event.preventDefault()
         setState({ status: 'sending' })
 
-        const { error } = await authClient.signIn.magicLink({ email, callbackURL: '/' })
-        if (error) {
-            setState({
-                status: 'error',
-                message: error.message ?? 'Something went wrong sending your link',
-            })
-            return
+        try {
+            const { error } = await authClient.signIn.magicLink({ email, callbackURL: '/' })
+            if (error) {
+                setState({
+                    status: 'error',
+                    message: error.message ?? 'Something went wrong sending your link',
+                })
+                return
+            }
+            setState({ status: 'sent' })
+        } catch {
+            // A dropped connection rejects rather than returning an error, and
+            // without this the button sits disabled on "Sending…" for ever.
+            setState({ status: 'error', message: "Couldn't reach the server — try again" })
         }
-        setState({ status: 'sent' })
     }
 
     if (state.status === 'sent') {

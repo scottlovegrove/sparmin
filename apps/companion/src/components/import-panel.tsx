@@ -14,6 +14,9 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
     const [rows, setRows] = useState<Row[]>([])
     const [isOver, setIsOver] = useState(false)
     const fileInput = useRef<HTMLInputElement>(null)
+    // Identifies the batch on screen. A second drop replaces the rows, so an
+    // earlier run still in flight must not write its results over them.
+    const batch = useRef(0)
 
     // Fetch the parser as soon as there's somewhere to drop a file, so the first
     // import doesn't stall on the download.
@@ -24,6 +27,7 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
         if (list.length === 0) {
             return
         }
+        const mine = ++batch.current
         setRows(list.map((file) => ({ name: file.name, status: 'working' })))
 
         // Sequential on purpose: D1 is single-threaded, and a handful of files
@@ -35,6 +39,9 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
                 outcome = await importFit(file)
             } catch {
                 outcome = { status: 'rejected', reason: "That file couldn't be read" }
+            }
+            if (batch.current !== mine) {
+                return
             }
             anyImported ||= outcome.status === 'imported'
             setRows((current) =>

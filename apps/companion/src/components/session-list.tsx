@@ -18,7 +18,7 @@ type State =
 //! Sessions are stored as UTC seconds with the offset the watch recorded, so a
 //! visit reads back at the time it actually happened rather than the reader's
 //! current timezone.
-function formatWhen(startedAt: number, utcOffsetS: number | null) {
+export function formatWhen(startedAt: number, utcOffsetS: number | null) {
     const local = new Date((startedAt + (utcOffsetS ?? 0)) * 1000)
     return new Intl.DateTimeFormat('en-GB', {
         weekday: 'short',
@@ -30,10 +30,12 @@ function formatWhen(startedAt: number, utcOffsetS: number | null) {
     }).format(local)
 }
 
-function formatDuration(seconds: number) {
-    const total = Math.round(seconds)
-    const hours = Math.floor(total / 3600)
-    const minutes = Math.round((total % 3600) / 60)
+// Round to minutes first, then split. Splitting first and rounding the remainder
+// lets it carry past the hour without anything noticing — 59:59 renders as "60m".
+export function formatDuration(seconds: number) {
+    const totalMinutes = Math.round(seconds / 60)
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
 }
 
