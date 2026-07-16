@@ -1,11 +1,49 @@
-import type { Context } from 'hono'
+import { betterAuth } from 'better-auth'
+import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { magicLink } from 'better-auth/plugins'
+import { account, session, user, verification } from '../src/db/auth-schema'
+import { authOptions } from './auth-options'
+import { createDb } from './db'
+import { sendMagicLinkEmail } from './email'
 
-// Placeholder identity until better-auth lands and every /api/* route is guarded
-// by a real session (docs/spa-logger-spec.md §6). Routes call this rather than
-// reading a user id from the request, so swapping in the real session is a change
-// here and not at every call site. Nothing is deployed while this is the truth.
-export const STUB_USER_ID = 'stub-user'
+export type SendLink = (env: Env, link: { email: string; url: string }) => Promise<void>
 
-export function currentUserId(_c: Context): string {
-    return STUB_USER_ID
+// Bindings only exist inside a request on Workers, so the auth instance is built
+// per request rather than at module scope. It is a plain object over the D1
+// binding — there is no connection to pool or reuse.
+//
+// `sendLink` is injectable so tests can capture the link rather than send it, and
+// still drive the real sign-in flow.
+export function createAuth(env: Env, sendLink: SendLink = sendMagicLinkEmail) {
+    const db = createDb(env.DB)
+    return betterAuth({
+        ...authOptions,
+        database: drizzleAdapter(db, {
+            provider: 'sqlite',
+            // better-auth's tables are singular (`user`, `session`); ours are not.
+            // Passing them explicitly keeps it off our `sessions` table, which is
+            // a spa visit, not a login.
+            schema: { user, session, account, verification },
+        }),
+        baseURL: env.BETTER_AUTH_URL,
+        secret: env.BETTER_AUTH_SECRET,
+        plugins: [
+            magicLink({
+                // 5 minutes is better-auth's default and about right: long enough
+                // to switch to a mail app, short enough that a leaked link is stale.
+                expiresIn: 300,
+                sendMagicLink: ({ email, url }) => sendLink(env, { email, url }),
+            }),
+        ],
+    })
+}
+
+export type Auth = ReturnType<typeof createAuth>
+
+//! The signed-in user's id, or null. Identity comes from the session cookie via
+//! better-auth — never from anything the caller can set. Takes the headers rather
+//! than a request context so it stays independent of the router.
+export async function currentUserId(env: Env, headers: Headers): Promise<string | null> {
+    const session = await createAuth(env).api.getSession({ headers })
+    return session?.user.id ?? null
 }

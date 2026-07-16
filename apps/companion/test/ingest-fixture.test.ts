@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
 import { parseFit } from '../src/lib/fit/parse-fit'
 import app from '../worker'
+import { signIn } from './auth-helper'
 
 // The 8 July recording: made by the watch build that never wrote the developer
 // field_description, so its station labels only survive the number-based read.
@@ -11,13 +12,14 @@ import app from '../worker'
 // checks they meet.
 describe('ingesting a real FIT export', () => {
     it('parses and imports, resolving every lap to a seeded station', async () => {
+        const { headers } = await signIn()
         const parsed = parseFit(Uint8Array.from(env.TEST_FIT_FIXTURE))
 
         const res = await app.request(
             '/api/sessions',
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { ...headers, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: crypto.randomUUID(), ...parsed }),
             },
             env,

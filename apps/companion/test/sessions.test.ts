@@ -2,7 +2,7 @@ import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { IngestPayload } from '../src/lib/session-payload'
 import app from '../worker'
-import { STUB_USER_ID } from '../worker/auth'
+import { type SignedIn, signIn } from './auth-helper'
 
 const SESSION_ID = '11111111-2222-4333-8444-555555555555'
 
@@ -48,12 +48,16 @@ function payload(overrides: Partial<IngestPayload> = {}): IngestPayload {
     }
 }
 
+// Signed in fresh per test, so these exercise the real guard rather than
+// assuming an identity.
+let me: SignedIn
+
 const post = (body: unknown) =>
     app.request(
         '/api/sessions',
         {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...me.headers, 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         },
         env,
@@ -67,6 +71,8 @@ const countRows = async (table: string) => {
 describe('POST /api/sessions', () => {
     beforeEach(async () => {
         await env.DB.prepare('DELETE FROM sessions').run()
+        await env.DB.prepare('DELETE FROM user').run()
+        me = await signIn()
     })
 
     it('creates the session and one interval per lap', async () => {
@@ -84,7 +90,7 @@ describe('POST /api/sessions', () => {
         const row = await env.DB.prepare('SELECT * FROM sessions').first<Record<string, unknown>>()
         expect(row).toMatchObject({
             id: SESSION_ID,
-            user_id: STUB_USER_ID,
+            user_id: me.userId,
             started_at: 1783496460,
             ended_at: 1783498774,
             utc_offset_s: 3600,
@@ -181,7 +187,7 @@ describe('POST /api/sessions', () => {
             '/api/sessions',
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { ...me.headers, 'Content-Type': 'application/json' },
                 body: 'not json',
             },
             env,

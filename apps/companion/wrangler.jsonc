@@ -15,6 +15,14 @@
     "observability": {
         "enabled": true,
     },
+    // BETTER_AUTH_SECRET and RESEND_API_KEY are secrets, not vars — set them with
+    // `wrangler secret put`, and in .dev.vars locally (git-ignored). Only the
+    // non-sensitive ones live here.
+    "vars": {
+        "ENVIRONMENT": "production",
+        "BETTER_AUTH_URL": "https://app.sparmin.scottlovegrove.co.uk",
+        "EMAIL_FROM": "Sparmin <hello@sparmin.scottlovegrove.co.uk>",
+    },
     // Drizzle writes migrations to ./migrations; apply them with
     // `wrangler d1 migrations apply DB --local|--remote`, never `drizzle-kit migrate`.
     // Local development and tests use miniflare's own SQLite and ignore database_id.

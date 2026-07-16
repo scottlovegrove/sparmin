@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { stations } from '../src/db/schema'
 import { ingestPayloadSchema } from '../src/lib/session-payload'
-import { currentUserId } from './auth'
+import { createAuth, currentUserId } from './auth'
 import { createDb } from './db'
 import {
     DEFAULT_PAGE_SIZE,
@@ -16,7 +16,33 @@ import {
 
 // `Env` is generated from wrangler.jsonc by `npm run cf-typegen`
 // (worker-configuration.d.ts) and carries the bindings.
-const app = new Hono<{ Bindings: Env }>()
+const app = new Hono<{ Bindings: Env; Variables: { userId: string } }>()
+
+// Everything under /api needs a session except these: the auth endpoints
+// themselves (you can't be signed in while signing in) and the liveness check,
+// which says nothing about anyone's data.
+function isPublic(pathname: string) {
+    return pathname === '/api/health' || pathname.startsWith('/api/auth/')
+}
+
+// Registered before any route, so a route added later is guarded by default
+// rather than by remembering to guard it. The session is resolved once here and
+// handed to handlers, rather than each one re-reading it.
+app.use('/api/*', async (c, next) => {
+    if (isPublic(new URL(c.req.url).pathname)) {
+        return next()
+    }
+    const userId = await currentUserId(c.env, c.req.raw.headers)
+    if (userId == null) {
+        return c.json({ error: 'unauthorized' }, 401)
+    }
+    c.set('userId', userId)
+    await next()
+})
+
+// better-auth owns its own routes: sign-in, magic-link verification, sign-out,
+// session. It reads the raw request, so Hono just hands it over.
+app.on(['GET', 'POST'], '/api/auth/*', (c) => createAuth(c.env).handler(c.req.raw))
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 
@@ -86,7 +112,7 @@ app.post('/api/sessions', async (c) => {
         return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
     }
 
-    const result = await ingestSession(createDb(c.env.DB), currentUserId(c), parsed.data)
+    const result = await ingestSession(createDb(c.env.DB), c.get('userId'), parsed.data)
     if (result.status === 'duplicate') {
         // Not a failure: the user re-dropped a file they already imported.
         return c.json({ status: 'duplicate', id: parsed.data.id }, 409)
@@ -110,7 +136,7 @@ app.get('/api/sessions', async (c) => {
     }
 
     const { limit, offset, from, to, include } = query.data
-    const rows = await listSessions(createDb(c.env.DB), currentUserId(c), {
+    const rows = await listSessions(createDb(c.env.DB), c.get('userId'), {
         limit,
         offset,
         from,
@@ -121,7 +147,7 @@ app.get('/api/sessions', async (c) => {
 })
 
 app.get('/api/sessions/:id', async (c) => {
-    const result = await getSession(createDb(c.env.DB), currentUserId(c), c.req.param('id'))
+    const result = await getSession(createDb(c.env.DB), c.get('userId'), c.req.param('id'))
     if (result == null) {
         return c.json({ error: 'not_found' }, 404)
     }
@@ -129,7 +155,7 @@ app.get('/api/sessions/:id', async (c) => {
 })
 
 app.delete('/api/sessions/:id', async (c) => {
-    const deleted = await deleteSession(createDb(c.env.DB), currentUserId(c), c.req.param('id'))
+    const deleted = await deleteSession(createDb(c.env.DB), c.get('userId'), c.req.param('id'))
     if (!deleted) {
         return c.json({ error: 'not_found' }, 404)
     }

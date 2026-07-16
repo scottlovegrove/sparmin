@@ -8,6 +8,10 @@ dist/
 
 # --- Cloudflare Workers (apps/companion) ---
 .wrangler/
+# Local secrets for `wrangler dev`. Never commit — this repo is public.
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 
 # --- VS Code: ignore local machine settings, keep shared recommendations ---
 .vscode/*
