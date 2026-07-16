@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type SessionRow = {
     id: string
@@ -42,22 +42,30 @@ export function formatDuration(seconds: number) {
 export function SessionList({ reloadKey }: { reloadKey: number }) {
     const [state, setState] = useState<State>({ status: 'loading' })
 
-    const load = useCallback(async () => {
-        try {
-            const res = await fetch('/api/sessions')
-            if (!res.ok) {
-                throw new Error(`The server returned ${res.status}`)
-            }
-            const body = (await res.json()) as { sessions: SessionRow[] }
-            setState({ status: 'ready', sessions: body.sessions })
-        } catch (err) {
-            setState({ status: 'error', message: (err as Error).message })
-        }
-    }, [])
-
     useEffect(() => {
+        // An import can land while the first load is still in flight, and the
+        // older response must not be the one that wins — abort it instead.
+        const aborter = new AbortController()
+
+        async function load() {
+            try {
+                const res = await fetch('/api/sessions', { signal: aborter.signal })
+                if (!res.ok) {
+                    throw new Error(`The server returned ${res.status}`)
+                }
+                const body = (await res.json()) as { sessions: SessionRow[] }
+                setState({ status: 'ready', sessions: body.sessions })
+            } catch (err) {
+                if (aborter.signal.aborted) {
+                    return
+                }
+                setState({ status: 'error', message: (err as Error).message })
+            }
+        }
+
         void load()
-    }, [load, reloadKey])
+        return () => aborter.abort()
+    }, [reloadKey])
 
     if (state.status === 'loading') {
         return (

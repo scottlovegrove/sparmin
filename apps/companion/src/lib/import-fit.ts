@@ -3,6 +3,11 @@ export type ImportOutcome =
     | { status: 'duplicate' }
     | { status: 'rejected'; reason: string }
 
+// A real spa export is tens of kilobytes; the longest imaginable activity is a
+// few megabytes. Anything past this is a renamed file or a mistake, and reading
+// it in would take the tab down before anything got to reject it.
+const MAX_BYTES = 10 * 1024 * 1024
+
 // The FIT SDK is most of this app's JavaScript, and nobody needs it to read the
 // sign-in screen or their session list — so it loads on the first import rather
 // than on first paint.
@@ -17,6 +22,11 @@ export function preloadParser() {
 //! Parse one exported FIT and post the result. The file itself never leaves the
 //! browser — only the parsed session does (spec §1).
 export async function importFit(file: File): Promise<ImportOutcome> {
+    // Checked before the file is read, not after: the point is to not read it.
+    if (file.size > MAX_BYTES) {
+        return { status: 'rejected', reason: 'Too big to be a spa session' }
+    }
+
     const { parseFit, FitParseError } = await loadParser()
 
     let payload

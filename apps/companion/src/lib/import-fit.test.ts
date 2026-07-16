@@ -71,4 +71,19 @@ describe('importFit', () => {
 
         expect(outcome).toMatchObject({ status: 'rejected' })
     })
+
+    it('refuses an oversized file without reading it into memory', async () => {
+        const fetchMock = mockFetch(201)
+        // Claims to be 11 MB. A real export is tens of kilobytes, and reading
+        // something huge in would take the tab down before anything rejected it.
+        const huge = fitFile()
+        const readSpy = vi.spyOn(huge, 'arrayBuffer')
+        vi.spyOn(huge, 'size', 'get').mockReturnValue(11 * 1024 * 1024)
+
+        const outcome = await importFit(huge)
+
+        expect(outcome).toEqual({ status: 'rejected', reason: 'Too big to be a spa session' })
+        expect(readSpy).not.toHaveBeenCalled()
+        expect(fetchMock).not.toHaveBeenCalled()
+    })
 })

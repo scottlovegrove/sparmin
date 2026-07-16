@@ -23,23 +23,39 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
     useEffect(preloadParser, [])
 
     async function handleFiles(files: FileList | null) {
-        const list = [...(files ?? [])].filter((file) => file.name.toLowerCase().endsWith('.fit'))
+        const list = [...(files ?? [])]
         if (list.length === 0) {
             return
         }
         const mine = ++batch.current
-        setRows(list.map((file) => ({ name: file.name, status: 'working' })))
+
+        // Everything the user picked gets a row, including files this can't
+        // possibly read — dropping a photo and watching nothing happen is worse
+        // than being told why.
+        const isFit = (file: File) => file.name.toLowerCase().endsWith('.fit')
+        setRows(
+            list.map((file) =>
+                isFit(file)
+                    ? { name: file.name, status: 'working' }
+                    : { name: file.name, status: 'rejected', reason: 'Not a .fit export' },
+            ),
+        )
 
         // Sequential on purpose: D1 is single-threaded, and a handful of files
         // finishing in order reads better than a race.
         let anyImported = false
         for (const [index, file] of list.entries()) {
+            if (!isFit(file)) {
+                continue
+            }
             let outcome: ImportOutcome
             try {
                 outcome = await importFit(file)
             } catch {
                 outcome = { status: 'rejected', reason: "That file couldn't be read" }
             }
+            // A newer batch has replaced these rows; its results are the ones on
+            // screen, so stop rather than write over them.
             if (batch.current !== mine) {
                 return
             }
