@@ -22,6 +22,7 @@
         "**/.astro/**",
         "**/*.toml",
         "apps/watch/**",
-        "**/worker-configuration.d.ts"
+        "**/worker-configuration.d.ts",
+        "**/migrations/meta/**"
     ]
 }

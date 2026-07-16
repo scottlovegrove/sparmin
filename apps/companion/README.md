@@ -36,7 +36,8 @@ Run any of these from `apps/companion/`, or from the repo root via the
 
 ## Database (D1 + Drizzle)
 
-The D1 binding and migrations land with the schema work. The workflow will be:
+The schema lives in `src/db/schema.ts`; migrations are generated from it into
+`./migrations` and applied with wrangler:
 
 ```bash
 npm run db:generate                                   # drizzle-kit generate → ./migrations
@@ -44,7 +45,22 @@ npx wrangler d1 migrations apply DB --local           # apply locally
 npx wrangler d1 migrations apply DB --remote          # apply to production
 ```
 
-Always apply migrations with `wrangler`, never `drizzle-kit migrate`. Local D1 is
-a real SQLite file under `.wrangler/state/` — open it with any SQLite client.
+Always apply migrations with `wrangler`, never `drizzle-kit migrate` (it wants
+d1-http credentials and targets production). Local D1 is a real SQLite file under
+`.wrangler/state/` — open it with any SQLite client. Tests don't need any of this:
+the vitest pool reads `./migrations` and applies them to each isolated test
+database automatically (`test/apply-migrations.ts`).
+
+`stations` is seeded by migration from the watch's catalogue
+(`apps/watch/source/SpaActivity.mc`) — those names are the raw values the watch
+writes into each FIT lap, so they are the join key and must match exactly.
+
+**Before the first remote deploy** the D1 database has to exist, and its id has to
+go into `wrangler.jsonc` (`database_id`, currently the local placeholder):
+
+```bash
+npx wrangler d1 create sparmin-companion             # prints the database_id
+npx wrangler d1 migrations apply DB --remote
+```
 
 **WSL2:** keep the repo on the Linux filesystem (`~/`), not `/mnt/c`.
