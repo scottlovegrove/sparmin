@@ -9,6 +9,8 @@
         "build": "vite build",
         "preview": "vite preview",
         "deploy": "wrangler deploy",
+        "secret": "wrangler secret put",
+        "secrets": "wrangler secret list",
         "cf-typegen": "wrangler types --strict-vars=false",
         "type-check": "tsc -b",
         "test": "vitest run",

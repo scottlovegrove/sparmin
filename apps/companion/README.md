@@ -68,12 +68,18 @@ them in CI. The committed `worker-configuration.d.ts` is the one generated
 **without** `.dev.vars`; regenerating with it present adds a harmless duplicate
 line that isn't worth committing.
 
-**Before deploying:** set the secrets, which never live in the repo.
+**Before deploying:** set the secrets, which never live in the repo. Wrangler
+prompts for the value, so it stays out of your shell history.
 
 ```bash
-npx wrangler secret put BETTER_AUTH_SECRET   # openssl rand -hex 32
-npx wrangler secret put RESEND_API_KEY
+npm run secret BETTER_AUTH_SECRET   # a fresh one: openssl rand -hex 32
+npm run secret RESEND_API_KEY
+npm run secrets                     # lists the names, never the values
 ```
+
+From the repo root these are `secret:companion` / `secrets:companion` — wrangler
+needs this workspace's `wrangler.jsonc`, so bare `wrangler secret put` from the
+root fails with "Required Worker name missing".
 
 ## Database (D1 + Drizzle)
 
