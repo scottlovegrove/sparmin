@@ -17,6 +17,9 @@ dist/
 .vscode/*
 !.vscode/extensions.json
 
+# --- Browser automation scratch (snapshots, screenshots) ---
+.playwright-cli/
+
 # --- OS cruft ---
 .DS_Store
 Thumbs.db

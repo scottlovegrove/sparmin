@@ -1,24 +1,40 @@
-import { useEffect, useState } from 'react'
-
-type HealthState = 'checking' | 'ok' | 'unreachable'
+import { useState } from 'react'
+import { ImportPanel } from './components/import-panel'
+import { SessionList } from './components/session-list'
+import { SignIn } from './components/sign-in'
+import { signOut, useSession } from './lib/auth-client'
 
 export function App() {
-    const [health, setHealth] = useState<HealthState>('checking')
+    const { data: session, isPending } = useSession()
+    // Bumped after an import so the list refetches rather than going stale.
+    const [reloadKey, setReloadKey] = useState(0)
 
-    useEffect(() => {
-        fetch('/api/health')
-            .then((res) => res.json() as Promise<{ status: string }>)
-            .then((data) => setHealth(data.status === 'ok' ? 'ok' : 'unreachable'))
-            .catch(() => setHealth('unreachable'))
-    }, [])
+    // Blank rather than a flash of the sign-in screen: the session is a cookie
+    // round-trip away, and showing "sign in" to someone already signed in reads
+    // as being logged out.
+    if (isPending) {
+        return <main className="shell" />
+    }
+
+    if (session == null) {
+        return (
+            <main className="shell">
+                <SignIn />
+            </main>
+        )
+    }
 
     return (
-        <main>
-            <h1>Sparmin Companion</h1>
-            <p>Thermal spa session logger. Scaffold only — nothing to log yet.</p>
-            <p>
-                API health: <strong>{health}</strong>
-            </p>
+        <main className="shell">
+            <header className="bar">
+                <span className="brand">Sparmin</span>
+                <span className="muted small">{session.user.email}</span>
+                <button type="button" className="link" onClick={() => void signOut()}>
+                    Sign out
+                </button>
+            </header>
+            <ImportPanel onImported={() => setReloadKey((key) => key + 1)} />
+            <SessionList reloadKey={reloadKey} />
         </main>
     )
 }

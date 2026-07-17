@@ -1,3 +1,5 @@
+/* Deliberately small and framework-free: this is a handful of screens, and a
+   design system would be more code than the app. */
 :root {
     color-scheme: light dark;
     font-family:
@@ -5,14 +7,231 @@
         -apple-system,
         sans-serif;
     line-height: 1.5;
+
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #14181d;
+    --muted: #5d6673;
+    --line: #dfe3e8;
+    --accent: #0b6b6b;
+    --accent-text: #ffffff;
+    --ok: #0f7b4f;
+    --warn: #8a6100;
+    --bad: #9b2226;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #101418;
+        --card: #171d23;
+        --text: #e8ecf1;
+        --muted: #99a3b0;
+        --line: #2a333d;
+        --accent: #4fd1c5;
+        --accent-text: #06231f;
+        --ok: #63d297;
+        --warn: #e0b252;
+        --bad: #f08a8a;
+    }
+}
+
+* {
+    box-sizing: border-box;
 }
 
 body {
     margin: 0;
+    background: var(--bg);
+    color: var(--text);
 }
 
-main {
-    max-width: 40rem;
+.shell {
+    max-width: 42rem;
     margin: 0 auto;
-    padding: 2rem 1.5rem;
+    padding: 1.5rem 1rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-height: 100vh;
+}
+
+.bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.25rem 0.25rem 0;
+}
+
+.brand {
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin-right: auto;
+}
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+}
+
+h1,
+h2 {
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.02em;
+}
+
+h1 {
+    font-size: 1.5rem;
+}
+
+h2 {
+    font-size: 1.1rem;
+}
+
+p {
+    margin: 0 0 0.75rem;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+.small {
+    font-size: 0.85rem;
+}
+
+.error {
+    color: var(--bad);
+}
+
+label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.25rem;
+}
+
+input[type='email'] {
+    width: 100%;
+    padding: 0.6rem 0.7rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    background: var(--bg);
+    color: inherit;
+    font: inherit;
+}
+
+button {
+    font: inherit;
+    cursor: pointer;
+}
+
+form button[type='submit'] {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.link {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--accent);
+    text-decoration: underline;
+    font-size: 0.85rem;
+}
+
+.dropzone {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+    padding: 2rem 1rem;
+    border: 1.5px dashed var(--line);
+    border-radius: 0.6rem;
+    background: none;
+    color: inherit;
+    text-align: center;
+    transition:
+        border-color 120ms,
+        background 120ms;
+}
+
+.dropzone:hover,
+.dropzone.is-over {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.results,
+.sessions {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+}
+
+.results li,
+.sessions li {
+    display: flex;
+    gap: 0.25rem 0.75rem;
+    align-items: baseline;
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--line);
+    /* On a narrow screen the two halves stack rather than fight: the stats don't
+       wrap, so without this they squeeze the date until it breaks mid-word. */
+    flex-wrap: wrap;
+}
+
+.file,
+.when {
+    margin-right: auto;
+}
+
+.file {
+    overflow-wrap: anywhere;
+}
+
+.when {
+    white-space: nowrap;
+}
+
+.results .outcome {
+    text-align: right;
+    font-size: 0.85rem;
+}
+
+.results .imported .outcome {
+    color: var(--ok);
+}
+
+.results .duplicate .outcome {
+    color: var(--warn);
+}
+
+.results .rejected .outcome {
+    color: var(--bad);
+}
+
+.sessions .stats {
+    text-align: right;
+    white-space: nowrap;
+}
+
+code {
+    font-size: 0.9em;
+    padding: 0.1em 0.3em;
+    border-radius: 0.25rem;
+    background: var(--bg);
 }
