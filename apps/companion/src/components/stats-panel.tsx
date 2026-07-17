@@ -42,7 +42,10 @@ export function StatsPanel({ reloadKey }: { reloadKey: number }) {
 
         async function load() {
             const now = Math.floor(Date.now() / 1000)
-            const from = isoDay(now - days * 86400)
+            // days - 1, because both ends are inclusive dates: today counts as one
+            // of them. Going back a full 30 from today asks for 31 days and quietly
+            // flatters every total under a button that says 30.
+            const from = isoDay(now - (days - 1) * 86400)
             try {
                 const res = await fetch(`/api/stats?from=${from}&to=${isoDay(now)}`, {
                     signal: aborter.signal,

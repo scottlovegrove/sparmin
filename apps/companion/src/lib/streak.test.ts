@@ -37,31 +37,54 @@ describe('currentStreak', () => {
 
     it('counts consecutive weeks', () => {
         const visits = [at(1), at(-6), at(-13)] // this week, and the two before
-        expect(currentStreak(visits, now)).toBe(3)
+        expect(currentStreak(visits, now, 0)).toBe(3)
     })
 
     it('survives a current week with nothing in it yet', () => {
         // It's Wednesday and you haven't been. Last week you did. Not broken.
-        expect(currentStreak([at(-6), at(-13)], now)).toBe(2)
+        expect(currentStreak([at(-6), at(-13)], now, 0)).toBe(2)
     })
 
     it('ends at the first empty week', () => {
         // This week and last, then a gap, then more — the gap is the end of it.
         const visits = [at(1), at(-6), at(-20), at(-27)]
-        expect(currentStreak(visits, now)).toBe(2)
+        expect(currentStreak(visits, now, 0)).toBe(2)
     })
 
     it('counts weeks kept up, not visits made', () => {
         // Four visits, all in one week.
-        expect(currentStreak([at(0), at(1), at(2), at(3)], now)).toBe(1)
+        expect(currentStreak([at(0), at(1), at(2), at(3)], now, 0)).toBe(1)
     })
 
     it('is nothing when the last visit is long past', () => {
-        expect(currentStreak([at(-30)], now)).toBe(0)
+        expect(currentStreak([at(-30)], now, 0)).toBe(0)
     })
 
     it('is nothing when there are no visits at all', () => {
-        expect(currentStreak([], now)).toBe(0)
+        expect(currentStreak([], now, 0)).toBe(0)
+    })
+
+    it('does not depend on which visit the database happened to return first', () => {
+        // The offset deciding which week `now` is in used to be read off visits[0],
+        // so an unordered query could move the answer.
+        const visits = [at(1, 3600), at(-6, 0), at(-13, 3600)]
+        const reversed = [...visits].reverse()
+
+        expect(currentStreak(visits, now, 3600)).toBe(currentStreak(reversed, now, 3600))
+    })
+
+    it('takes the week `now` is in from the offset it is given', () => {
+        // One visit, Friday 10 July. It is 23:30 UTC on Sunday 19 July — which is
+        // already Monday the 20th an hour ahead, and so a week later.
+        const sundayNight = MON_13_JUL + 6 * DAY + 84600
+        const visitedFriday10th = [at(-3)]
+
+        // In UTC it is still the week of the 13th: the 10th was last week, so the
+        // streak is alive at one.
+        expect(currentStreak(visitedFriday10th, sundayNight, 0)).toBe(1)
+        // An hour ahead it is the week of the 20th, and the week of the 13th passed
+        // with no visit in it. That is a lapse.
+        expect(currentStreak(visitedFriday10th, sundayNight, 3600)).toBe(0)
     })
 })
 

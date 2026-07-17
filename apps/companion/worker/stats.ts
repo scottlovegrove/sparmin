@@ -70,10 +70,15 @@ export async function getStats(
     // A streak is "as of now", not "within the range" — asking about July shouldn't
     // report a streak that ended in July as though it were still running. So it is
     // always measured against every visit, whatever range is on screen.
+    //
+    // Ordered, and not incidentally: the newest visit's offset is the best guess at
+    // where the user is now, which decides the week `now` falls in. Unordered, that
+    // would come from whichever row the database returned first.
     const allVisits: Visit[] = await db
         .select({ startedAt: sessions.startedAt, utcOffsetS: sessions.utcOffsetS })
         .from(sessions)
         .where(eq(sessions.userId, userId))
+        .orderBy(asc(sessions.startedAt))
 
     const totals = { hotS: 0, coldS: 0, neutralS: 0 }
     for (const row of byStation) {
@@ -89,7 +94,7 @@ export async function getStats(
         sessions: visits.length,
         ...totals,
         perWeek: visitsPerWeek(visits.length, from, to),
-        streakWeeks: currentStreak(allVisits, now),
+        streakWeeks: currentStreak(allVisits, now, allVisits.at(-1)?.utcOffsetS ?? null),
         stations: byStation
             .map((row) => ({
                 station: row.station,

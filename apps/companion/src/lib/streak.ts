@@ -19,12 +19,21 @@ export function weekOf({ startedAt, utcOffsetS }: Visit): number {
 //! been yet, which is not a broken streak. It ends at the first week with nothing
 //! in it. Two visits in one week are one week, not two: this counts weeks kept up,
 //! not visits made.
-export function currentStreak(visits: readonly Visit[], now: number): number {
+//!
+//! `nowOffsetS` decides which local week `now` falls in, and has to be passed
+//! rather than picked out of the visits: taking it from whichever one the database
+//! happened to return first makes the answer depend on row order, and a visit from
+//! last summer carries last summer's offset.
+export function currentStreak(
+    visits: readonly Visit[],
+    now: number,
+    nowOffsetS: number | null,
+): number {
     if (visits.length === 0) {
         return 0
     }
     const weeks = new Set(visits.map(weekOf))
-    let week = weekOf({ startedAt: now, utcOffsetS: visits[0].utcOffsetS })
+    let week = weekOf({ startedAt: now, utcOffsetS: nowOffsetS })
 
     if (!weeks.has(week)) {
         week -= 1
