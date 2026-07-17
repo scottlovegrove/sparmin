@@ -1,3 +1,4 @@
+import { passkey } from '@better-auth/passkey'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { magicLink } from 'better-auth/plugins'
@@ -16,5 +17,11 @@ const schemaOnlyDb = drizzle(null as unknown as D1Database)
 export const auth = betterAuth({
     ...authOptions,
     database: drizzleAdapter(schemaOnlyDb, { provider: 'sqlite' }),
-    plugins: [magicLink({ sendMagicLink: async () => {} })],
+    // rpID/rpName here are placeholders: schema generation only reads the plugin
+    // list to know which tables to emit, not its options. The Worker sets the real
+    // values per request from BETTER_AUTH_URL.
+    plugins: [
+        magicLink({ sendMagicLink: async () => {} }),
+        passkey({ rpID: 'localhost', rpName: 'Sparmin' }),
+    ],
 })

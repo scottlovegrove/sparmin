@@ -20,11 +20,13 @@
         "integrity-check": "npm-run-all clean check build test"
     },
     "dependencies": {
+        "@better-auth/passkey": "1.6.23",
         "@garmin/fitsdk": "21.208.0",
         "better-auth": "1.6.23",
         "drizzle-orm": "0.45.2",
         "hono": "4.12.30",
         "resend": "6.17.2",
+        "wouter": "3.10.0",
         "zod": "4.4.3"
     },
     "devDependencies": {

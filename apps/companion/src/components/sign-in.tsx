@@ -6,6 +6,9 @@ type State = { status: 'idle' | 'sending' | 'sent' } | { status: 'error'; messag
 export function SignIn() {
     const [email, setEmail] = useState('')
     const [state, setState] = useState<State>({ status: 'idle' })
+    const [passkeyState, setPasskeyState] = useState<
+        { status: 'idle' | 'signing' } | { status: 'error'; message: string }
+    >({ status: 'idle' })
 
     async function handleSubmit(event: FormEvent) {
         event.preventDefault()
@@ -25,6 +28,29 @@ export function SignIn() {
             // A dropped connection rejects rather than returning an error, and
             // without this the button sits disabled on "Sending…" for ever.
             setState({ status: 'error', message: "Couldn't reach the server — try again" })
+        }
+    }
+
+    async function handlePasskey() {
+        setPasskeyState({ status: 'signing' })
+        try {
+            const result = await authClient.signIn.passkey()
+            // A cancelled or dismissed prompt resolves with an error rather than
+            // throwing, and leaves the app on the sign-in screen either way.
+            if (result?.error) {
+                setPasskeyState({
+                    status: 'error',
+                    message: result.error.message ?? "That passkey didn't work — try again",
+                })
+                return
+            }
+            // On success the session cookie is set and useSession swaps the app to
+            // the signed-in view, so there's nothing to do here.
+        } catch {
+            setPasskeyState({
+                status: 'error',
+                message: 'No passkey was used. You can still sign in with an emailed link.',
+            })
         }
     }
 
@@ -72,6 +98,22 @@ export function SignIn() {
             </form>
             {state.status === 'error' && <p className="error">{state.message}</p>}
             <p className="muted small">No password. We email you a link that signs you in.</p>
+
+            <div className="or">or</div>
+
+            <button
+                type="button"
+                className="button secondary"
+                disabled={passkeyState.status === 'signing'}
+                onClick={() => void handlePasskey()}
+            >
+                {passkeyState.status === 'signing'
+                    ? 'Waiting for passkey…'
+                    : 'Sign in with a passkey'}
+            </button>
+            {passkeyState.status === 'error' && (
+                <p className="error small">{passkeyState.message}</p>
+            )}
         </section>
     )
 }

@@ -37,11 +37,20 @@ There is no deploy script: deploys come from CI, off main (see below).
 
 ## Auth
 
-Magic link only, via better-auth. There are no passwords.
+Magic link **or passkey**, via better-auth. There are no passwords. Magic link is
+the way in on a new device; once signed in, a user can register a passkey from the
+settings screen and use it to sign in thereafter.
 
 ```bash
 cp .dev.vars.example .dev.vars    # git-ignored; put local config + secrets here
 ```
+
+Passkeys use the `@better-auth/passkey` plugin (pinned to the same version as
+better-auth). It adds one `passkey` table and its own `/api/auth/passkey/*`
+endpoints, and mints the same session cookie a magic link does. The relying-party
+id (`rpID`) and `origin` are derived from `BETTER_AUTH_URL` — no extra secret or
+var. WebAuthn needs a secure context: the production domain already has a
+certificate, and `localhost` counts as secure so dev works over plain http.
 
 **No email provider is needed to work on the app.** Without `RESEND_API_KEY`, the
 magic link prints to the wrangler console — sign in by opening the link it logs.
