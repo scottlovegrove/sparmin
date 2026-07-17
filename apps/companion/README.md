@@ -119,7 +119,7 @@ the `--remote` command above is for when you want to do it by hand.
 ## Deploying
 
 Pushing to `main` deploys, via `.github/workflows/deploy-companion.yml`, to
-<https://app.sparmin.scottlovegrove.co.uk>. Nothing else does — there is no manual
+<https://sparmin-app.scottlovegrove.co.uk>. Nothing else does — there is no manual
 trigger and no deploy script, so what is live is always a commit on main that
 passed the checks. The workflow re-runs `integrity-check` rather than assuming a
 PR gated it, since main takes direct pushes; then applies migrations, then
@@ -131,6 +131,15 @@ run `wrangler deploy` by hand. The point is that the repo has one obvious path.)
 `workers_dev` is off deliberately: a `*.workers.dev` address would serve the same
 app from an origin the session cookie and `BETTER_AUTH_URL` know nothing about.
 One hostname, one origin.
+
+**The hostname is one label deep, and has to stay that way.** A Workers custom
+domain is served by the zone's edge certificate, and the free Universal one covers
+`scottlovegrove.co.uk` and `*.scottlovegrove.co.uk` — a wildcard matches one label
+and doesn't cascade. `app.sparmin.scottlovegrove.co.uk` was tried and can't work:
+DNS resolves, the Worker sits behind it, and every request dies on the TLS
+handshake with no certificate (`ERR_SSL_VERSION_OR_CIPHER_MISMATCH`). Nothing about
+that resolves with time. Covering a deeper name needs Total TLS → Advanced
+Certificate Manager → a paid add-on. Hence the hyphen.
 
 ### What CI needs
 

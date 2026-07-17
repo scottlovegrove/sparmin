@@ -8,11 +8,15 @@
     // from an origin the session cookie and BETTER_AUTH_URL know nothing about,
     // and leave it reachable at a URL nobody is thinking about.
     "workers_dev": false,
-    // Wrangler creates the DNS record and certificate for this on first deploy;
-    // the zone is already on Cloudflare.
+    // Wrangler creates the DNS record for this on deploy. One label deep on
+    // purpose: a Workers custom domain is served by the zone's edge certificate,
+    // and the free Universal one covers scottlovegrove.co.uk and
+    // *.scottlovegrove.co.uk only — a wildcard doesn't cascade. Anything deeper
+    // (app.sparmin.scottlovegrove.co.uk, say) resolves and then fails the TLS
+    // handshake with no certificate at all, and no amount of waiting fixes it.
     "routes": [
         {
-            "pattern": "app.sparmin.scottlovegrove.co.uk",
+            "pattern": "sparmin-app.scottlovegrove.co.uk",
             "custom_domain": true,
         },
     ],
@@ -32,7 +36,7 @@
     // non-sensitive ones live here.
     "vars": {
         "ENVIRONMENT": "production",
-        "BETTER_AUTH_URL": "https://app.sparmin.scottlovegrove.co.uk",
+        "BETTER_AUTH_URL": "https://sparmin-app.scottlovegrove.co.uk",
         "EMAIL_FROM": "Sparmin <hello@sparmin.scottlovegrove.co.uk>",
     },
     // Drizzle writes migrations to ./migrations; apply them with

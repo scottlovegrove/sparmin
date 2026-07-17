@@ -43,11 +43,21 @@ client parser and the server ingest — one source of truth for the §5.1 payloa
 | Host                               | Serves                                |
 | ---------------------------------- | ------------------------------------- |
 | `sparmin.scottlovegrove.co.uk`     | Marketing site, Astro on GitHub Pages |
-| `app.sparmin.scottlovegrove.co.uk` | The companion Worker                  |
+| `sparmin-app.scottlovegrove.co.uk` | The companion Worker                  |
 
 DNS for `scottlovegrove.co.uk` is on Cloudflare, so the Worker's hostname is a
 proxied record it owns outright. The marketing site's record stays **DNS-only**
 and continues to go straight to GitHub Pages.
+
+**The Worker's hostname is one label deep, and has to be.** A Workers custom
+domain is served by the zone's edge certificate, and the free Universal one covers
+`scottlovegrove.co.uk` and `*.scottlovegrove.co.uk` — a wildcard matches one label,
+it doesn't cascade. `app.sparmin.scottlovegrove.co.uk` was tried first and can
+never work: DNS resolves, the Worker is live behind it, and every request dies on
+the TLS handshake with no certificate at all. Covering it needs Total TLS, which
+needs Advanced Certificate Manager, which is a paid add-on — real money, forever,
+for one extra label. Hence the hyphen. Anything added to this zone later wants the
+same constraint.
 
 **Why not `sparmin.scottlovegrove.co.uk/app`.** It was the preference, and it is
 possible — proxy the marketing record through Cloudflare and put a Worker route on
@@ -63,11 +73,19 @@ visitor hitting the marketing site lands in the app. This can't be a server-side
 redirect either way — GitHub Pages is static and cannot read a cookie. So it is
 client-side, and the session cookie is `httpOnly` and unreadable to JS by design.
 The way through is a second, non-sensitive hint cookie (say `sparmin_signed_in=1`,
-not `httpOnly`) set on `sparmin.scottlovegrove.co.uk` alongside the real session
-cookie, so both hosts see it: the marketing page reads the hint and redirects,
-while the credential itself stays out of JS. Worth noting the hint is a hint —
-never a grant. It also shouldn't redirect the whole site, or a signed-in user can
-never read the changelog.
+not `httpOnly`), set alongside the real session cookie: the marketing page reads
+the hint and redirects, while the credential itself stays out of JS.
+
+The two hosts are siblings rather than parent and child, so their only shared
+ancestor is the zone apex — the hint needs `Domain=scottlovegrove.co.uk` to be
+legible to both. That is wider than ideal: every subdomain of the zone can then
+read it. It is a boolean saying somebody is signed in, not a credential, so the
+cost is small, but it is the reason to keep it a boolean and nothing more.
+
+**The session cookie does not move.** No `Domain` attribute, so it stays host-only
+on the Worker's hostname and is never sent anywhere else. The hint is a hint —
+never a grant. The redirect also shouldn't take the whole site, or a signed-in
+user can never read the changelog.
 
 **Nothing was deployed until auth was in place** (§6): the ingest endpoint writes
 to the database, so exposing it earlier would have left it open to the internet.
