@@ -16,7 +16,7 @@
         "db:generate": "drizzle-kit generate",
         "check": "tsc -b && oxlint src worker test && oxfmt --check",
         "fix": "oxlint src worker test --fix && oxfmt",
-        "clean": "rimraf dist .wrangler",
+        "clean": "rimraf dist .wrangler/tmp .wrangler/deploy",
         "integrity-check": "npm-run-all clean check build test"
     },
     "dependencies": {
