@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
-import app from '../worker'
 import { signIn } from './auth-helper'
+import { getJson } from './helpers'
 
 type StationRow = {
     id: number
@@ -10,17 +10,13 @@ type StationRow = {
     isTransition: boolean
 }
 
-const get = async () => {
-    const { headers } = await signIn()
-    const res = await app.request('/api/stations', { headers }, env)
-    return { res, body: (await res.json()) as { stations: StationRow[] } }
-}
+const get = async () => getJson<{ stations: StationRow[] }>('/api/stations', await signIn())
 
 describe('GET /api/stations', () => {
     it('returns the seeded catalogue in watch order', async () => {
-        const { res, body } = await get()
+        const { status, body } = await get()
 
-        expect(res.status).toBe(200)
+        expect(status).toBe(200)
         expect(body.stations.map((s) => s.name)).toEqual([
             'Outdoor cold plunge',
             'Indoor cold plunge',

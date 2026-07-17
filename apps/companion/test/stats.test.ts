@@ -1,64 +1,22 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { IngestPayload } from '../src/lib/session-payload'
 import app from '../worker'
-import { type SignedIn, signIn } from './auth-helper'
+import type { SignedIn } from './auth-helper'
+import { resetWithPair, seedSession as seed, sessionPayload, stayLaps, uuid } from './helpers'
 
 let me: SignedIn
 let other: SignedIn
 
 async function reset() {
-    await env.DB.prepare('DELETE FROM sessions').run()
-    await env.DB.prepare('DELETE FROM user').run()
-    me = await signIn('me@example.com')
-    other = await signIn('other@example.com')
+    ;({ me, other } = await resetWithPair())
 }
 
-const uuid = (n: number) => `2222222${n}-2222-4333-8444-555555555555`
 const DAY = 86400
 
 type Stay = { station: string; elapsedS: number }
 
-function payload(id: string, startedAt: number, stays: Stay[]): IngestPayload {
-    return {
-        id,
-        device: { serial: '1234567890', product: 'vivoactive5' },
-        session: {
-            startedAt,
-            endedAt: startedAt + 3000,
-            utcOffsetS: 0,
-            totalElapsedS: 3000,
-            totalTimerS: 3000,
-            totalCalories: null,
-            avgHr: null,
-            maxHr: null,
-        },
-        laps: stays.map((stay, i) => ({
-            lapIndex: i,
-            station: stay.station,
-            startedAt: startedAt + i * 60,
-            elapsedS: stay.elapsedS,
-            timerS: stay.elapsedS,
-            avgHr: null,
-            maxHr: null,
-            calories: null,
-            cycles: null,
-        })),
-    }
-}
-
-async function seed(who: SignedIn, body: IngestPayload) {
-    const res = await app.request(
-        '/api/sessions',
-        {
-            method: 'POST',
-            headers: { ...who.headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        },
-        env,
-    )
-    expect(res.status).toBe(201)
-}
+const payload = (id: string, startedAt: number, stays: Stay[]) =>
+    sessionPayload({ id, startedAt, laps: stayLaps(startedAt, stays) })
 
 type Stats = {
     sessions: number

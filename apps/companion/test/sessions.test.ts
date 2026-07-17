@@ -1,77 +1,20 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { IngestPayload } from '../src/lib/session-payload'
 import app from '../worker'
 import { type SignedIn, signIn } from './auth-helper'
+import { countRows, postSession, resetUsers, sessionPayload as payload, uuid } from './helpers'
 
-const SESSION_ID = '11111111-2222-4333-8444-555555555555'
-
-function payload(overrides: Partial<IngestPayload> = {}): IngestPayload {
-    return {
-        id: SESSION_ID,
-        device: { serial: '1234567890', product: 'vivoactive5' },
-        session: {
-            startedAt: 1783496460,
-            endedAt: 1783498774,
-            utcOffsetS: 3600,
-            totalElapsedS: 2313.637,
-            totalTimerS: 2313.637,
-            totalCalories: 267,
-            avgHr: 99,
-            maxHr: 133,
-        },
-        laps: [
-            {
-                lapIndex: 0,
-                station: 'transition',
-                startedAt: 1783496460,
-                elapsedS: 0.092,
-                timerS: 0.092,
-                avgHr: null,
-                maxHr: null,
-                calories: null,
-                cycles: null,
-            },
-            {
-                lapIndex: 1,
-                station: 'Himalayan salt sauna',
-                startedAt: 1783496461,
-                elapsedS: 899.945,
-                timerS: 899.945,
-                avgHr: 98,
-                maxHr: 119,
-                calories: 109,
-                cycles: 3,
-            },
-        ],
-        ...overrides,
-    }
-}
+const SESSION_ID = uuid(1)
 
 // Signed in fresh per test, so these exercise the real guard rather than
 // assuming an identity.
 let me: SignedIn
 
-const post = (body: unknown) =>
-    app.request(
-        '/api/sessions',
-        {
-            method: 'POST',
-            headers: { ...me.headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        },
-        env,
-    )
-
-const countRows = async (table: string) => {
-    const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first<{ n: number }>()
-    return row?.n ?? 0
-}
+const post = (body: unknown) => postSession(me, body)
 
 describe('POST /api/sessions', () => {
     beforeEach(async () => {
-        await env.DB.prepare('DELETE FROM sessions').run()
-        await env.DB.prepare('DELETE FROM user').run()
+        await resetUsers()
         me = await signIn()
     })
 

@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import app from '../worker'
 import { signIn } from './auth-helper'
+import { resetUsers } from './helpers'
 
 // The passkey plugin's own endpoints. A full register/authenticate ceremony needs
 // a virtual authenticator (see @simplewebauthn's test helpers) and belongs in a
@@ -9,13 +10,8 @@ import { signIn } from './auth-helper'
 // which demand a session, and that the relying-party config derives from
 // BETTER_AUTH_URL. The ceremony itself is exercised end-to-end by hand.
 
-async function clearData() {
-    await env.DB.prepare('DELETE FROM sessions').run()
-    await env.DB.prepare('DELETE FROM user').run()
-}
-
 describe('passkey endpoints', () => {
-    beforeEach(clearData)
+    beforeEach(resetUsers)
 
     it('will not list a user’s passkeys without a session', async () => {
         const res = await app.request('/api/auth/passkey/list-user-passkeys', {}, env)
