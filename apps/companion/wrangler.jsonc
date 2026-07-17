@@ -4,6 +4,18 @@
     "main": "./worker/index.ts",
     "compatibility_date": "2026-07-16",
     "compatibility_flags": ["nodejs_compat"],
+    // One hostname, and only one. A workers.dev address would serve the same app
+    // from an origin the session cookie and BETTER_AUTH_URL know nothing about,
+    // and leave it reachable at a URL nobody is thinking about.
+    "workers_dev": false,
+    // Wrangler creates the DNS record and certificate for this on first deploy;
+    // the zone is already on Cloudflare.
+    "routes": [
+        {
+            "pattern": "app.sparmin.scottlovegrove.co.uk",
+            "custom_domain": true,
+        },
+    ],
     // The Worker serves the built SPA as static assets and handles the API.
     // `/api/*` always hits the Worker first; every other path serves an asset,
     // falling back to index.html for client-side routing.

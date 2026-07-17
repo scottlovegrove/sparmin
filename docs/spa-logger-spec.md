@@ -69,20 +69,22 @@ while the credential itself stays out of JS. Worth noting the hint is a hint —
 never a grant. It also shouldn't redirect the whole site, or a signed-in user can
 never read the changelog.
 
-**Nothing is deployed until auth is in place.** The ingest endpoint writes to the
-database, so exposing it before §6 lands would leave it open to the internet. The
-D1 database itself is already provisioned (`sparmin-companion`, WEUR) and
-migrated.
+**Nothing was deployed until auth was in place** (§6): the ingest endpoint writes
+to the database, so exposing it earlier would have left it open to the internet.
 
-Deployment work still outstanding — small, rides along with the auth or UI PR
-rather than being its own:
+**Deploys come from CI, off `main`, and from nowhere else** — no manual trigger,
+no deploy script. What is live is a commit that passed the checks. The workflow
+re-runs them rather than assuming a PR gated it, since `main` takes direct
+pushes; then migrates, then deploys, so the new code never meets the old schema.
+It needs a `CLOUDFLARE_API_TOKEN` — a local `wrangler login` is a personal OAuth
+token and no use from Actions.
 
-- A `deploy-companion.yml` workflow. Wrangler in CI needs a `CLOUDFLARE_API_TOKEN`
-  repo secret; a local `wrangler login` is not usable from Actions.
-- The custom domain route, and whether remote migrations run in the deploy step or
-  stay manual.
-- Later, once users can log in: what the marketing site does for a logged-in
-  visitor. Deferred — it doesn't block anything here.
+`workers_dev` is off: a `*.workers.dev` address would serve the same app from an
+origin the session cookie and `BETTER_AUTH_URL` know nothing about, and leave it
+reachable at a URL nobody is thinking about.
+
+Still open, and not blocking: what the marketing site does for a signed-in
+visitor (see the redirect note above).
 
 ---
 

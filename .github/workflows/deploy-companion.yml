@@ -1,0 +1,57 @@
+name: Deploy companion
+
+# Deploys apps/companion to Cloudflare. Only ever from main, and only from here:
+# there is deliberately no workflow_dispatch and no manual path, so what is live
+# is always a commit on main that got through CI.
+on:
+    push:
+        branches: [main]
+        paths:
+            - 'apps/companion/**'
+            - 'package.json'
+            - 'package-lock.json'
+            - '.github/workflows/deploy-companion.yml'
+
+permissions:
+    contents: read
+
+# Never cancel a deploy in flight — migrations run in it, and a half-applied
+# schema is worse than a slow queue.
+concurrency:
+    group: deploy-companion
+    cancel-in-progress: false
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        environment: production
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            # main takes direct pushes (docs, config), so the checks run again
+            # here rather than trusting that a PR gated everything that lands.
+            - name: Run CI check
+              working-directory: apps/companion
+              run: npm run integrity-check
+
+            # Before the deploy, so the new code never meets the old schema.
+            # Migrations to date are additive, so the running code tolerates them.
+            - name: Apply database migrations
+              working-directory: apps/companion
+              run: npx wrangler d1 migrations apply DB --remote
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+            - name: Deploy
+              working-directory: apps/companion
+              run: npx wrangler deploy
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
