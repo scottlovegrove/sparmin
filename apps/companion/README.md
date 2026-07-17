@@ -45,6 +45,26 @@ settings screen and use it to sign in thereafter.
 cp .dev.vars.example .dev.vars    # git-ignored; put local config + secrets here
 ```
 
+### Dev secrets (SOPS)
+
+A working `.dev.vars` is shared, encrypted, as `.dev.vars.sops` (committed) using
+[SOPS](https://getsops.io/) with an `age` backend — the same key pair as
+`~/shiftsync`, so if `SOPS_AGE_KEY` is already in your shell it Just Works. Only
+values are encrypted; keys and comments stay readable in `git diff`. From the repo
+root:
+
+```bash
+npm run secrets:decrypt -w @sparmin/companion   # .dev.vars.sops → .dev.vars (git-ignored)
+npm run secrets:view    -w @sparmin/companion   # print the plaintext without writing it
+npm run secrets:edit    -w @sparmin/companion   # edit values in-place, re-encrypts on save
+```
+
+To change a shared value: `secrets:edit` (or edit `.dev.vars` then
+`secrets:encrypt`), then commit the updated `.dev.vars.sops`. Without the key,
+fall back to `cp .dev.vars.example .dev.vars` above — everything but
+`BETTER_AUTH_SECRET` is non-sensitive, and that can be any random string for dev.
+The config and public recipient live in `.sops.yaml`.
+
 Passkeys use the `@better-auth/passkey` plugin (pinned to the same version as
 better-auth). It adds one `passkey` table and its own `/api/auth/passkey/*`
 endpoints, and mints the same session cookie a magic link does. The relying-party
