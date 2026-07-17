@@ -1,0 +1,6 @@
+# SOPS config — see https://getsops.io/. Backend is `age` (no cloud auth).
+# The private key is the SOPS_AGE_KEY env var (shared, already on all machines);
+# the value below is the matching PUBLIC recipient — non-secret, safe to commit.
+creation_rules:
+    - path_regex: \.dev\.vars$
+      age: 'age1yq0ed2vceglnvaakf2l7t0cly95xa7js9v9kzgd543ha3pz7syrq5c5kzx'

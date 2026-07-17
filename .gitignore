@@ -12,6 +12,8 @@ dist/
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+# ...but the SOPS-encrypted secrets ARE committed (safe — only values encrypted).
+!.dev.vars.sops
 
 # --- VS Code: ignore local machine settings, keep shared recommendations ---
 .vscode/*
