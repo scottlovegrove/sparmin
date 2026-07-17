@@ -200,6 +200,7 @@ CREATE INDEX idx_intervals_user_station ON station_intervals (user_id, station_i
 - **`user_id` denormalised onto `station_intervals`.** Deliberate. Every cross-session stat filters by user, and D1 is single-threaded — index directly rather than join through `sessions` on every read.
 - **Session totals stored verbatim AND derivable from laps.** Garmin's own totals are the source of truth for the session; per-station rollups are computed.
 - **Indexes matter more than usual.** D1 is single-threaded: an unindexed scan blocks every queued query. Verify with `EXPLAIN QUERY PLAN` — want `SEARCH TABLE USING INDEX`, never `SCAN TABLE`.
+- **What `idx_intervals_user_station` actually covers.** `(user_id, station_id, started_at)` serves grouping by station well: within a user the index already orders rows that way, so per-station totals need no temp B-tree. It does **not** narrow a date range on its own — `started_at` is the third column, so with no `station_id` to fix, a range query reads all of that user's rows and filters them in memory. At one user and a couple of thousand stays a year that costs nothing; a `(user_id, started_at)` index is the answer if it ever does. The index was described here as existing "for exactly" the stats queries, which was half true — worth knowing which half.
 
 ---
 
@@ -287,6 +288,7 @@ Hono on Workers. All routes authenticated except `/api/auth/*`.
 | `GET`    | `/api/sessions`     | List, paginated, `started_at DESC`. `?from`/`?to`/`?include=intervals` (§5.3) |
 | `GET`    | `/api/sessions/:id` | Session + intervals                                                           |
 | `DELETE` | `/api/sessions/:id` |                                                                               |
+| `GET`    | `/api/stats`        | Totals over a period. `?from`/`?to` required (§5.4)                           |
 | `GET`    | `/api/stations`     | The enum + thermal classes                                                    |
 | `*`      | `/api/auth/*`       | better-auth handler                                                           |
 
@@ -386,8 +388,48 @@ GET /api/sessions?from=2026-07-01&to=2026-07-31&include=intervals&limit=20&offse
   `intervals_session_lap`, so SQLite reads them in index order rather than sorting —
   and are grouped in memory.
 - **Stats do not belong here.** Shipping every stay to the client to sum them is the
-  wrong shape; aggregate in SQL against `idx_intervals_user_station`, which exists
-  for exactly that and is so far unused. See §8.
+  wrong shape; they are aggregated in SQL by `GET /api/stats` instead (§5.4).
+
+### 5.4 Stats
+
+```
+GET /api/stats?from=2026-07-01&to=2026-07-31
+```
+
+Same ISO bounds as §5.3, but **required**: a total means nothing without the period
+it covers. Returns time by thermal class, per-station totals and counts, the visit
+rate, and the streak.
+
+- **The rate is the count over the range asked for, and nothing cleverer.** It was
+  briefly measured from the first visit instead, so a year-long range wouldn't
+  divide by fifty-two and call four a week "0.1". That was worse: a window starting
+  at the first visit gives that visit no time before it, so two visits exactly a
+  week apart read as two a week, and a first-ever visit today read as seven. Worse
+  still, the number could not be checked against anything on screen. A short history
+  under a long range genuinely does read 0.1 a week; that is true, and it corrects
+  itself.
+- **The streak is measured as of now, not within the range.** Asking about April
+  must not report a streak that ended in April as though it were still running, so
+  it is always computed against every visit whatever range is on screen. It survives
+  an empty current week — it's Tuesday and you haven't been, which is not a lapse —
+  and counts weeks kept up rather than visits made.
+- **Weeks are local weeks**, starting Monday, using the offset the watch recorded:
+  a Sunday-night visit belongs to the week it was a Sunday in, wherever it is later
+  read from.
+- **Transitions are excluded from every total.** Real time, but not a visit to
+  anything, and not characterisable (§5.5).
+
+### 5.5 Naming, and what the numbers may not claim
+
+- A **session** is a whole trip; a **stay** is one stop at one station. Neither may
+  borrow the other's word — "visits" doing both jobs is the same ambiguity a level
+  down, so a station is somewhere you've been _n_ **times**.
+- **The gap between two stations goes unnamed.** It might be a walk, a shower, a
+  queue. The recording cannot say, so nothing may claim it: an arrow and a duration,
+  no label.
+- **Calories are not shown.** Garmin's figure for sitting in a sauna is body heat
+  raising a heart rate, not work done. Beside a spa session it reads as exercise. It
+  is the most tempting number in the data and the most misleading.
 
 ---
 
@@ -454,7 +496,7 @@ dev              wrangler dev
 
 ## 8. Deferred
 
-- **Stats.** Schema supports per-session detail and cross-session trends (hot/cold minutes, HR recovery, streaks). Nothing built. When it lands it wants its own aggregating endpoint (`GET /api/stats?from=&to=`) rather than `?include=intervals` — the client should never pull thousands of stays to sum them itself. `idx_intervals_user_station` is `(user_id, station_id, started_at)` and exists for precisely this.
+- ~~**Stats.**~~ Built: `GET /api/stats?from=&to=` aggregates in SQL — time by thermal class, per-station totals, visit rate and streak. Heat adaptation (average HR in a station tracked over months, which should fall as you acclimatise) is the obvious next one, and wants a year of history before it says anything.
 - **Watch push.** `Communications.makeWebRequest` + device pairing code, replacing manual export. Same ingest endpoint — but the existing `buildPayload()` shape differs from §5.1 (see the note there); reconcile before wiring it.
 - **Venues.** Station names are hardcoded to one spa's circuit, so v1 only really serves people at that venue. A `venues` dimension is the unlock if this ever goes wider — worth remembering `stations.name` is currently globally unique, which is the constraint that'd have to give.
 - **Garmin-derived metrics** (Body Battery, training load). Would require the official Garmin Connect Developer Program with per-user OAuth. Explicitly avoided.
