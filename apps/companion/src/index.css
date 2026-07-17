@@ -553,3 +553,48 @@ code {
     border-radius: 0.25rem;
     background: var(--bg);
 }
+
+/* Destructive action: a filled red button for the one thing that can't be undone
+   (account deletion). Same footprint as `.button`, different intent. */
+.button.danger {
+    background: var(--bad);
+    color: var(--card);
+}
+
+/* The confirm modal: a tinted full-screen backdrop and a centred panel. There's
+   one dialog in the app, so this is a handful of classes rather than a library. */
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgb(0 0 0 / 0.5);
+}
+
+.modal {
+    width: 100%;
+    max-width: 24rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+}
+
+.modal p {
+    margin-bottom: 1.25rem;
+}
+
+/* Buttons sit side by side here, so they shed the full-width footprint `.button`
+   carries elsewhere. */
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.modal-actions .button {
+    width: auto;
+}

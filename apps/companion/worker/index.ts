@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { stations } from '../src/db/schema'
 import { ingestPayloadSchema } from '../src/lib/session-payload'
+import { deleteAccount } from './account'
 import { createAuth, currentUserId } from './auth'
 import { createDb } from './db'
 import {
@@ -189,6 +190,15 @@ app.delete('/api/sessions/:id', async (c) => {
         return c.json({ error: 'not_found' }, 404)
     }
     // Intervals go with it via ON DELETE CASCADE.
+    return c.body(null, 204)
+})
+
+// Hard-delete the caller's account and all of their data. The cookie identity
+// guarantees they can only ever delete themselves. Their login session goes with
+// the account, so a repeat call is stopped by the guard (401) rather than
+// reaching here again; `deleteAccount` still answers a missing user harmlessly.
+app.delete('/api/account', async (c) => {
+    await deleteAccount(createDb(c.env.DB), c.get('userId'))
     return c.body(null, 204)
 })
 
