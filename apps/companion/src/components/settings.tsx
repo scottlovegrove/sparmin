@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { Link } from 'wouter'
-import { authClient, useListPasskeys } from '../lib/auth-client'
+import { authClient, signOut, useListPasskeys } from '../lib/auth-client'
+import { ConfirmDialog } from './confirm-dialog'
 
 // Passkeys that live on a synced provider (iCloud Keychain, a password manager)
 // survive losing the device; ones bound to a single device don't. Worth saying,
@@ -120,6 +121,84 @@ export function Settings() {
                 </form>
                 {error && <p className="error small">{error}</p>}
             </section>
+
+            <DangerZone />
         </main>
+    )
+}
+
+// Two prompts before anything happens, then a hard delete — the user asked for
+// exactly this, and the data (every session and stat) doesn't come back.
+type DeleteStep = 'idle' | 'first' | 'second'
+
+function DangerZone() {
+    const [step, setStep] = useState<DeleteStep>('idle')
+    const [busy, setBusy] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+
+    async function handleDelete() {
+        setBusy(true)
+        setError(null)
+
+        let res: Response
+        try {
+            res = await fetch('/api/account', { method: 'DELETE' })
+        } catch {
+            setError("Couldn't reach the server — try again.")
+            setStep('idle')
+            setBusy(false)
+            return
+        }
+        if (!res.ok) {
+            setError("Your account couldn't be deleted — try again.")
+            setStep('idle')
+            setBusy(false)
+            return
+        }
+
+        // Deleted — that's terminal. Signing out is only best-effort cleanup of
+        // the now-dead cookie: even if it fails, `useSession`'s next fetch 401s
+        // and drops the app to the sign-in screen. Don't surface its failure as a
+        // delete failure, and leave `busy` set — this component unmounts with the
+        // account rather than returning to an interactive state.
+        await signOut().catch(() => {})
+    }
+
+    return (
+        <section className="card">
+            <h2>Danger zone</h2>
+            <p className="muted small">
+                Delete your account and every session, stay and passkey stored with it. This is
+                permanent — it can’t be undone.
+            </p>
+            <button type="button" className="button danger" onClick={() => setStep('first')}>
+                Delete account
+            </button>
+            {error && <p className="error small">{error}</p>}
+
+            {step === 'first' && (
+                <ConfirmDialog
+                    title="Delete your account?"
+                    message="This permanently erases your account and all of your data. It can’t be undone."
+                    confirmText="Delete"
+                    isDestructive
+                    onConfirm={() => setStep('second')}
+                    onCancel={() => setStep('idle')}
+                />
+            )}
+
+            {step === 'second' && (
+                <ConfirmDialog
+                    title="Are you really sure?"
+                    message="Every session, stay and stat will be gone forever. There is no way to get them back."
+                    confirmText="Yes, delete everything"
+                    busyText="Deleting…"
+                    isDestructive
+                    busy={busy}
+                    onConfirm={() => void handleDelete()}
+                    onCancel={() => setStep('idle')}
+                />
+            )}
+        </section>
     )
 }
