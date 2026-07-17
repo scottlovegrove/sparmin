@@ -34,6 +34,11 @@ export function createAuth(env: Env, sendLink: SendLink = sendMagicLinkEmail) {
     }
 
     const db = createDb(env.DB)
+    // Parse once so the passkey relying-party config is taken from the URL's parts
+    // rather than the raw string: `origin` must match the browser's origin exactly
+    // (a stray trailing slash or path would fail WebAuthn verification), and `rpID`
+    // is the bare host.
+    const authUrl = new URL(env.BETTER_AUTH_URL)
     return betterAuth({
         ...authOptions,
         database: drizzleAdapter(db, {
@@ -54,14 +59,14 @@ export function createAuth(env: Env, sendLink: SendLink = sendMagicLinkEmail) {
             }),
             // Passkeys sit alongside magic link, minting the same session cookie.
             // The relying-party id is the site's registrable domain and `origin`
-            // its full URL — both derive from BETTER_AUTH_URL so no extra config is
-            // needed. In production that is the app's own hostname; in dev it is
+            // its scheme+host — both derive from BETTER_AUTH_URL so no extra config
+            // is needed. In production that is the app's own hostname; in dev it is
             // `localhost`, which browsers treat as a secure context so WebAuthn
             // works over plain http.
             passkey({
-                rpID: new URL(env.BETTER_AUTH_URL).hostname,
+                rpID: authUrl.hostname,
                 rpName: 'Sparmin',
-                origin: env.BETTER_AUTH_URL,
+                origin: authUrl.origin,
             }),
         ],
     })

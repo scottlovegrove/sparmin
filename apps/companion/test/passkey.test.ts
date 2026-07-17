@@ -55,6 +55,25 @@ describe('passkey endpoints', () => {
         expect(options.challenge).toBeTruthy()
     })
 
+    it('still offers registration options on a session older than a day', async () => {
+        const { headers, userId } = await signIn()
+        // better-auth normally demands a session "fresh" within the last day before
+        // it will register a passkey. Ours last a month, so freshAge is turned off;
+        // age the session well past a day and registration must still be offered.
+        const longAgo = Date.now() - 40 * 24 * 60 * 60 * 1000
+        await env.DB.prepare('UPDATE session SET created_at = ? WHERE user_id = ?')
+            .bind(longAgo, userId)
+            .run()
+
+        const res = await app.request(
+            '/api/auth/passkey/generate-register-options',
+            { headers },
+            env,
+        )
+
+        expect(res.status).toBe(200)
+    })
+
     it('lets a signed-out visitor start a passkey sign-in', async () => {
         // The authenticate step is the way in, so unlike registration it must work
         // before there is any session.

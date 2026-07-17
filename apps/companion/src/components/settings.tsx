@@ -20,7 +20,7 @@ function formatAdded(createdAt: Date | string): string {
 export function Settings() {
     // The passkey client refetches this list itself after an add or a remove, so
     // there's no reload key to thread through.
-    const { data: passkeys, isPending } = useListPasskeys()
+    const { data: passkeys, isPending, error: listError } = useListPasskeys()
     const [name, setName] = useState('')
     const [adding, setAdding] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -75,6 +75,10 @@ export function Settings() {
 
                 {isPending ? (
                     <p className="muted small">Loading…</p>
+                ) : listError ? (
+                    <p className="error small">
+                        Couldn’t load your passkeys — reload to try again.
+                    </p>
                 ) : passkeys && passkeys.length > 0 ? (
                     <ul className="passkeys">
                         {passkeys.map((passkey) => (
