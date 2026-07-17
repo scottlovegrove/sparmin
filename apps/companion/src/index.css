@@ -319,6 +319,130 @@ button:disabled {
     opacity: 1;
 }
 
+.stats-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: baseline;
+    margin-bottom: 0.75rem;
+}
+
+.stats-head h2 {
+    margin: 0 auto 0 0;
+}
+
+.ranges {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.range {
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: none;
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+
+.range.is-on {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.figures {
+    display: flex;
+    gap: 1.5rem;
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+}
+
+.figures li {
+    display: flex;
+    flex-direction: column;
+}
+
+.figure {
+    font-size: 1.6rem;
+    font-weight: 650;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Heat against cold as one bar. Two numbers side by side don't show a ratio;
+   a bar does, and the ratio is the point. */
+.balance {
+    margin-bottom: 1rem;
+}
+
+/* Not `.bar` — that's the header, and its align-items would centre these to
+   nothing. */
+.balance-bar {
+    display: flex;
+    height: 0.5rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--line);
+}
+
+.hot-part {
+    background: var(--warn);
+}
+
+.cold-part {
+    background: var(--accent);
+}
+
+.balance-key {
+    margin: 0.4rem 0 0;
+}
+
+.balance-key strong {
+    color: var(--text);
+}
+
+.station-totals {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.station-totals li {
+    display: grid;
+    grid-template-columns: 0.6rem 1fr auto auto;
+    gap: 0.6rem;
+    align-items: baseline;
+    padding: 0.3rem 0;
+    border-top: 1px solid var(--line);
+    font-size: 0.9rem;
+}
+
+.station-totals .dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.35;
+}
+
+.station-totals .hot .dot {
+    background: var(--warn);
+    opacity: 1;
+}
+
+.station-totals .cold .dot {
+    background: var(--accent);
+    opacity: 1;
+}
+
+.station-totals .length {
+    min-width: 3.5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 /* Read out, not shown: on screen the arrow says it, but "0:32" alone would be
    meaningless to a screen reader. */
 .sr-only {

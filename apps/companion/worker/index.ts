@@ -13,6 +13,7 @@ import {
     ingestSession,
     listSessions,
 } from './sessions'
+import { getStats } from './stats'
 
 // `Env` is generated from wrangler.jsonc by `npm run cf-typegen`
 // (worker-configuration.d.ts) and carries the bindings.
@@ -85,6 +86,15 @@ const listQuerySchema = z
         path: ['from'],
     })
 
+// Same bounds as the list, and required rather than optional: a total is only
+// meaningful next to the period it covers, so the caller has to say which.
+const statsQuerySchema = z
+    .object({ from: isoBoundary(false), to: isoBoundary(true) })
+    .refine((q) => q.from <= q.to, {
+        message: '`from` must not be after `to`',
+        path: ['from'],
+    })
+
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
 // The station catalogue: the closed set of labels the watch can write, with the
@@ -144,6 +154,25 @@ app.get('/api/sessions', async (c) => {
         includeIntervals: include === 'intervals',
     })
     return c.json({ sessions: rows, limit, offset })
+})
+
+// Totals over a period: time by thermal class, where it went, and whether the
+// habit is holding. Summed in SQL — see stats.ts.
+app.get('/api/stats', async (c) => {
+    const query = statsQuerySchema.safeParse({
+        from: c.req.query('from'),
+        to: c.req.query('to'),
+    })
+    if (!query.success) {
+        return c.json({ error: 'invalid_query', issues: query.error.issues }, 400)
+    }
+
+    const stats = await getStats(createDb(c.env.DB), c.get('userId'), {
+        from: query.data.from,
+        to: query.data.to,
+        now: Math.floor(Date.now() / 1000),
+    })
+    return c.json(stats)
 })
 
 app.get('/api/sessions/:id', async (c) => {
