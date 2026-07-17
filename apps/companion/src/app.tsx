@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ImportPanel } from './components/import-panel'
 import { SessionList } from './components/session-list'
 import { SignIn } from './components/sign-in'
+import { StatsPanel } from './components/stats-panel'
 import { signOut, useSession } from './lib/auth-client'
 
 export function App() {
@@ -34,6 +35,7 @@ export function App() {
                 </button>
             </header>
             <ImportPanel onImported={() => setReloadKey((key) => key + 1)} />
+            <StatsPanel reloadKey={reloadKey} />
             <SessionList reloadKey={reloadKey} />
         </main>
     )
