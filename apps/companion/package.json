@@ -8,7 +8,6 @@
         "dev": "vite dev",
         "build": "vite build",
         "preview": "vite preview",
-        "deploy": "wrangler deploy",
         "secret": "wrangler secret put",
         "secrets": "wrangler secret list",
         "cf-typegen": "wrangler types --strict-vars=false",
@@ -17,7 +16,7 @@
         "db:generate": "drizzle-kit generate",
         "check": "tsc -b && oxlint src worker test && oxfmt --check",
         "fix": "oxlint src worker test --fix && oxfmt",
-        "clean": "rimraf dist .wrangler",
+        "clean": "rimraf dist .wrangler/tmp .wrangler/deploy",
         "integrity-check": "npm-run-all clean check build test"
     },
     "dependencies": {

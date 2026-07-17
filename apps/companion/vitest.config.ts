@@ -34,14 +34,19 @@ export default defineConfig({
                             bindings: {
                                 TEST_MIGRATIONS: migrations,
                                 TEST_FIT_FIXTURE: fixtureBytes,
-                                // Auth config is pinned here rather than left to
-                                // .dev.vars, which is git-ignored and so absent in
-                                // CI. Tests should not depend on a developer's
-                                // local secrets file. None of these are real.
+                                // Every value the app reads is pinned here rather
+                                // than left to .dev.vars, which is git-ignored and
+                                // so absent in CI and different on every machine.
+                                // None of these are real.
                                 ENVIRONMENT: 'test',
                                 BETTER_AUTH_URL: 'http://localhost:5173',
                                 BETTER_AUTH_SECRET: 'test-only-secret-not-used-anywhere-real',
                                 EMAIL_FROM: 'Sparmin <test@example.com>',
+                                // Blank on purpose, and not negotiable: with a key
+                                // the suite sends real mail to the addresses the
+                                // tests invent, every run. Blank takes the branch
+                                // that logs the link instead.
+                                RESEND_API_KEY: '',
                             },
                         },
                     }),

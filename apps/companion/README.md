@@ -28,11 +28,12 @@ npm run test           # vitest (workerd pool)
 npm run check          # tsc -b + oxlint + oxfmt --check
 npm run fix            # oxlint --fix + oxfmt
 npm run cf-typegen     # regenerate worker-configuration.d.ts from wrangler.jsonc
-npm run deploy         # wrangler deploy
 ```
 
 Run any of these from `apps/companion/`, or from the repo root via the
 `*:companion` convenience scripts.
+
+There is no deploy script: deploys come from CI, off main (see below).
 
 ## Auth
 
@@ -108,12 +109,42 @@ database automatically (`test/apply-migrations.ts`).
 (`apps/watch/source/SpaActivity.mc`) — those names are the raw values the watch
 writes into each FIT lap, so they are the join key and must match exactly.
 
-**Before the first remote deploy** the D1 database has to exist, and its id has to
-go into `wrangler.jsonc` (`database_id`, currently the local placeholder):
-
-```bash
-npx wrangler d1 create sparmin-companion             # prints the database_id
-npx wrangler d1 migrations apply DB --remote
-```
+The production database already exists (`sparmin-companion`, WEUR) and its id is
+in `wrangler.jsonc`. That id names the database; it isn't a credential, so it
+belongs in the config like any other binding. Deploys apply migrations for you —
+the `--remote` command above is for when you want to do it by hand.
 
 **WSL2:** keep the repo on the Linux filesystem (`~/`), not `/mnt/c`.
+
+## Deploying
+
+Pushing to `main` deploys, via `.github/workflows/deploy-companion.yml`, to
+<https://app.sparmin.scottlovegrove.co.uk>. Nothing else does — there is no manual
+trigger and no deploy script, so what is live is always a commit on main that
+passed the checks. The workflow re-runs `integrity-check` rather than assuming a
+PR gated it, since main takes direct pushes; then applies migrations, then
+deploys, in that order, so the new code never meets the old schema.
+
+(Removing the script is a signpost, not a lock: anyone with credentials can still
+run `wrangler deploy` by hand. The point is that the repo has one obvious path.)
+
+`workers_dev` is off deliberately: a `*.workers.dev` address would serve the same
+app from an origin the session cookie and `BETTER_AUTH_URL` know nothing about.
+One hostname, one origin.
+
+### What CI needs
+
+A `CLOUDFLARE_API_TOKEN` repository secret — a local `wrangler login` is a
+personal OAuth token and is no use from Actions. Create it at
+[Cloudflare → API Tokens](https://dash.cloudflare.com/profile/api-tokens),
+starting from the **Edit Cloudflare Workers** template, which needs adding to:
+
+| Scope               | Why                                         |
+| ------------------- | ------------------------------------------- |
+| Account → D1 → Edit | applying migrations                         |
+| Zone → DNS → Edit   | the custom domain's record, on first deploy |
+
+Restrict it to this account and the `scottlovegrove.co.uk` zone. The `production`
+environment in the workflow is where it should live, rather than as a plain
+repository secret: it means only a run targeting that environment can read it,
+and it gives somewhere to require an approval later if that ever seems worth it.

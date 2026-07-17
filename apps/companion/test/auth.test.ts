@@ -73,6 +73,13 @@ describe('the /api guard', () => {
         expect(res.status).toBe(200)
     })
 
+    it('never has an email key, whatever the developer has in .dev.vars', () => {
+        // With one, the suite mails the addresses these tests invent — every run,
+        // for real. The config pins it blank; this is what notices if that stops
+        // being true.
+        expect(env.RESEND_API_KEY).toBeFalsy()
+    })
+
     it('refuses to run at all without a secret, rather than using a guessable one', () => {
         // Handed no secret, better-auth falls back to a default published in its
         // own source, and only rejects it when NODE_ENV is exactly "production" —
