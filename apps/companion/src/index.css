@@ -112,7 +112,8 @@ label {
     margin-bottom: 0.25rem;
 }
 
-input[type='email'] {
+input[type='email'],
+input[type='text'] {
     width: 100%;
     padding: 0.6rem 0.7rem;
     margin-bottom: 0.75rem;
@@ -141,6 +142,74 @@ form button[type='submit'] {
 button:disabled {
     opacity: 0.6;
     cursor: default;
+}
+
+/* A standalone full-width button — same footprint as a form's submit, but usable
+   outside a form (passkey sign-in, "add a passkey"). */
+.button {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+/* Secondary: an outline, so the emailed link stays the obvious primary action. */
+.button.secondary {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--text);
+}
+
+/* A quiet divider between the two ways in. */
+.or {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1rem 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.or::before,
+.or::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+}
+
+/* A registered passkey: its name, a quiet line about where it lives, and the way
+   to remove it — laid out like the session and result lists elsewhere. */
+.passkeys {
+    list-style: none;
+    margin: 1rem 0;
+    padding: 0;
+}
+
+.passkeys li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    padding: 0.6rem 0;
+    border-top: 1px solid var(--line);
+}
+
+.passkey-name {
+    font-weight: 550;
+}
+
+.passkey-meta {
+    margin-right: auto;
+}
+
+.add-passkey {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
 }
 
 .link {

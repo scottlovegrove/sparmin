@@ -1,7 +1,14 @@
+import { passkey } from '@better-auth/passkey'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { magicLink } from 'better-auth/plugins'
-import { account, session, user, verification } from '../src/db/auth-schema'
+import {
+    account,
+    passkey as passkeyTable,
+    session,
+    user,
+    verification,
+} from '../src/db/auth-schema'
 import { authOptions } from './auth-options'
 import { createDb } from './db'
 import { sendMagicLinkEmail } from './email'
@@ -34,7 +41,7 @@ export function createAuth(env: Env, sendLink: SendLink = sendMagicLinkEmail) {
             // better-auth's tables are singular (`user`, `session`); ours are not.
             // Passing them explicitly keeps it off our `sessions` table, which is
             // a spa visit, not a login.
-            schema: { user, session, account, verification },
+            schema: { user, session, account, verification, passkey: passkeyTable },
         }),
         baseURL: env.BETTER_AUTH_URL,
         secret: env.BETTER_AUTH_SECRET,
@@ -44,6 +51,17 @@ export function createAuth(env: Env, sendLink: SendLink = sendMagicLinkEmail) {
                 // to switch to a mail app, short enough that a leaked link is stale.
                 expiresIn: 300,
                 sendMagicLink: ({ email, url }) => sendLink(env, { email, url }),
+            }),
+            // Passkeys sit alongside magic link, minting the same session cookie.
+            // The relying-party id is the site's registrable domain and `origin`
+            // its full URL — both derive from BETTER_AUTH_URL so no extra config is
+            // needed. In production that is the app's own hostname; in dev it is
+            // `localhost`, which browsers treat as a secure context so WebAuthn
+            // works over plain http.
+            passkey({
+                rpID: new URL(env.BETTER_AUTH_URL).hostname,
+                rpName: 'Sparmin',
+                origin: env.BETTER_AUTH_URL,
             }),
         ],
     })
