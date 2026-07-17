@@ -15,9 +15,10 @@ not at the root.
   per version in `src/content/changelog/`.
 - **`apps/companion`** — the thermal spa session logger: a React + Vite SPA served
   by a Hono Cloudflare Worker with a D1 backend, deployed as one Worker. Its
-  build/run guide is in [`apps/companion/README.md`](./apps/companion/README.md);
-  the spec and PR plan are in
-  [`docs/spa-logger-spec.md`](./docs/spa-logger-spec.md).
+  build/run guide is in [`apps/companion/README.md`](./apps/companion/README.md),
+  its workspace rules (including the shared test setup) in
+  [`apps/companion/AGENTS.md`](./apps/companion/AGENTS.md); the spec and PR plan
+  are in [`docs/spa-logger-spec.md`](./docs/spa-logger-spec.md).
 
 ## Root rules
 

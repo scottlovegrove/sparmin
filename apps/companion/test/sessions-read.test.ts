@@ -2,7 +2,8 @@ import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { IngestPayload } from '../src/lib/session-payload'
 import app from '../worker'
-import { type SignedIn, signIn } from './auth-helper'
+import type { SignedIn } from './auth-helper'
+import { countRows, resetWithPair, seedSession, sessionPayload, uuid } from './helpers'
 
 // Signed in fresh per test. `other` is a genuine second user — the user_id
 // foreign key means a made-up id can't stand in for one any more.
@@ -10,72 +11,13 @@ let me: SignedIn
 let other: SignedIn
 
 async function reset() {
-    await env.DB.prepare('DELETE FROM sessions').run()
-    await env.DB.prepare('DELETE FROM user').run()
-    me = await signIn('me@example.com')
-    other = await signIn('other@example.com')
+    ;({ me, other } = await resetWithPair())
 }
 
-function payload(id: string, startedAt: number, laps?: IngestPayload['laps']): IngestPayload {
-    return {
-        id,
-        device: { serial: '1234567890', product: 'vivoactive5' },
-        session: {
-            startedAt,
-            endedAt: startedAt + 2313,
-            utcOffsetS: 3600,
-            totalElapsedS: 2313.637,
-            totalTimerS: 2313.637,
-            totalCalories: 267,
-            avgHr: 99,
-            maxHr: 133,
-        },
-        laps: laps ?? [
-            {
-                lapIndex: 0,
-                station: 'transition',
-                startedAt,
-                elapsedS: 60,
-                timerS: 60,
-                avgHr: null,
-                maxHr: null,
-                calories: null,
-                cycles: null,
-            },
-            {
-                lapIndex: 1,
-                station: 'Himalayan salt sauna',
-                startedAt: startedAt + 60,
-                elapsedS: 899.945,
-                timerS: 899.945,
-                avgHr: 98,
-                maxHr: 119,
-                calories: 109,
-                cycles: 3,
-            },
-        ],
-    }
-}
+const payload = (id: string, startedAt: number, laps?: IngestPayload['laps']) =>
+    sessionPayload({ id, startedAt, laps })
 
-const uuid = (n: number) => `1111111${n}-2222-4333-8444-555555555555`
-
-async function seed(body: IngestPayload) {
-    const res = await app.request(
-        '/api/sessions',
-        {
-            method: 'POST',
-            headers: { ...me.headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        },
-        env,
-    )
-    expect(res.status).toBe(201)
-}
-
-const countRows = async (table: string) => {
-    const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first<{ n: number }>()
-    return row?.n ?? 0
-}
+const seed = (body: IngestPayload) => seedSession(me, body)
 
 describe('GET /api/sessions', () => {
     beforeEach(reset)

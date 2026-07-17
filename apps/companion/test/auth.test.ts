@@ -3,21 +3,17 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import app from '../worker'
 import { createAuth } from '../worker/auth'
 import { TEST_EMAIL, signIn } from './auth-helper'
+import { postSession, resetUsers, sessionPayload, uuid } from './helpers'
 
-const SESSION_ID = '11111111-2222-4333-8444-555555555555'
+const SESSION_ID = uuid(1)
 
 // better-auth refuses a state-changing request whose Origin isn't its own — CSRF
 // protection. A browser always sends one; app.request doesn't, so tests hitting
 // better-auth's own endpoints have to look like a browser.
 const browserHeaders = { origin: env.BETTER_AUTH_URL }
 
-async function clearData() {
-    await env.DB.prepare('DELETE FROM sessions').run()
-    await env.DB.prepare('DELETE FROM user').run()
-}
-
 describe('the /api guard', () => {
-    beforeEach(clearData)
+    beforeEach(resetUsers)
 
     // Every route that touches a user's data, and the methods that reach them.
     const guarded: [string, string][] = [
@@ -106,7 +102,7 @@ describe('the /api guard', () => {
 })
 
 describe('magic link sign-in', () => {
-    beforeEach(clearData)
+    beforeEach(resetUsers)
 
     it('creates the user on first sign-in and reuses them after', async () => {
         await signIn()
@@ -120,42 +116,7 @@ describe('magic link sign-in', () => {
         const alice = await signIn('alice@example.com')
         const bob = await signIn('bob@example.com')
 
-        const payload = {
-            id: SESSION_ID,
-            device: { serial: '1234567890', product: 'vivoactive5' },
-            session: {
-                startedAt: 1783496460,
-                endedAt: 1783498774,
-                utcOffsetS: 3600,
-                totalElapsedS: 2313.637,
-                totalTimerS: 2313.637,
-                totalCalories: 267,
-                avgHr: 99,
-                maxHr: 133,
-            },
-            laps: [
-                {
-                    lapIndex: 0,
-                    station: 'Himalayan salt sauna',
-                    startedAt: 1783496460,
-                    elapsedS: 900,
-                    timerS: 900,
-                    avgHr: 98,
-                    maxHr: 119,
-                    calories: 109,
-                    cycles: null,
-                },
-            ],
-        }
-        await app.request(
-            '/api/sessions',
-            {
-                method: 'POST',
-                headers: { ...alice.headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            },
-            env,
-        )
+        await postSession(alice, sessionPayload({ id: SESSION_ID }))
 
         // Alice sees her import; Bob sees nothing and can't fetch it by id.
         const hers = await (
