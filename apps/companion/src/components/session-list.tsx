@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SessionDetail } from './session-detail'
 
 type SessionRow = {
     id: string
@@ -41,6 +42,7 @@ export function formatDuration(seconds: number) {
 
 export function SessionList({ reloadKey }: { reloadKey: number }) {
     const [state, setState] = useState<State>({ status: 'loading' })
+    const [openId, setOpenId] = useState<string | null>(null)
 
     useEffect(() => {
         // An import can land while the first load is still in flight, and the
@@ -92,19 +94,34 @@ export function SessionList({ reloadKey }: { reloadKey: number }) {
                 <p className="muted">Nothing yet. Import a .fit export to see it here.</p>
             ) : (
                 <ul className="sessions">
-                    {state.sessions.map((session) => (
-                        <li key={session.id}>
-                            <span className="when">
-                                {formatWhen(session.startedAt, session.utcOffsetS)}
-                            </span>
-                            <span className="stats muted small">
-                                {formatDuration(session.totalElapsedS)}
-                                {session.avgHr != null && ` · ${session.avgHr} bpm avg`}
-                                {session.maxHr != null && ` · ${session.maxHr} max`}
-                                {session.totalCalories != null && ` · ${session.totalCalories} cal`}
-                            </span>
-                        </li>
-                    ))}
+                    {state.sessions.map((session) => {
+                        const isOpen = openId === session.id
+                        return (
+                            <li key={session.id}>
+                                <button
+                                    type="button"
+                                    className="session-row"
+                                    aria-expanded={isOpen}
+                                    // One at a time: this is for looking into a
+                                    // visit, not comparing two side by side.
+                                    onClick={() => setOpenId(isOpen ? null : session.id)}
+                                >
+                                    <span className="when">
+                                        {formatWhen(session.startedAt, session.utcOffsetS)}
+                                    </span>
+                                    <span className="stats muted small">
+                                        {formatDuration(session.totalElapsedS)}
+                                        {session.avgHr != null && ` · ${session.avgHr} bpm avg`}
+                                        {session.maxHr != null && ` · ${session.maxHr} max`}
+                                    </span>
+                                    <span className="chevron" aria-hidden="true">
+                                        {isOpen ? '▾' : '▸'}
+                                    </span>
+                                </button>
+                                {isOpen && <SessionDetail id={session.id} />}
+                            </li>
+                        )
+                    })}
                 </ul>
             )}
         </section>
