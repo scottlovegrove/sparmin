@@ -40,7 +40,13 @@ export function formatDuration(seconds: number) {
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
 }
 
-export function SessionList({ reloadKey }: { reloadKey: number }) {
+export function SessionList({
+    reloadKey,
+    onChanged,
+}: {
+    reloadKey: number
+    onChanged?: () => void
+}) {
     const [state, setState] = useState<State>({ status: 'loading' })
     const [openId, setOpenId] = useState<string | null>(null)
 
@@ -118,7 +124,7 @@ export function SessionList({ reloadKey }: { reloadKey: number }) {
                                         {isOpen ? '▾' : '▸'}
                                     </span>
                                 </button>
-                                {isOpen && <SessionDetail id={session.id} />}
+                                {isOpen && <SessionDetail id={session.id} onChanged={onChanged} />}
                             </li>
                         )
                     })}

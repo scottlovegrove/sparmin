@@ -21,14 +21,19 @@ test/       Vitest tests, run in workerd via @cloudflare/vitest-pool-workers.
 ## Commands
 
 ```bash
-npm run dev            # vite dev — SPA + Worker with HMR
+npm run dev            # vite dev — SPA + Worker with HMR (applies local migrations first)
 npm run build          # vite build — client bundle + Worker
 npm run preview        # preview the production build locally
 npm run test           # vitest (workerd pool)
+npm run db:migrate     # apply pending migrations to the local D1
 npm run check          # tsc -b + oxlint + oxfmt --check
 npm run fix            # oxlint --fix + oxfmt
 npm run cf-typegen     # regenerate worker-configuration.d.ts from wrangler.jsonc
 ```
+
+A fresh clone has an empty local D1, so `dev` runs `db:migrate` first (via
+`predev`) — otherwise the first sign-in fails with `no such table`. It's
+idempotent: once the schema is current it's a no-op.
 
 Run any of these from `apps/companion/`, or from the repo root via the
 `*:companion` convenience scripts.

@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm'
 import { sessions, stationIntervals, stations } from '../src/db/schema'
-import type { IngestPayload } from '../src/lib/session-payload'
+import type { IngestPayload, LapGroup } from '../src/lib/session-payload'
 import type { Db } from './db'
 
 export type IngestResult = { status: 'created' } | { status: 'duplicate' }
@@ -242,4 +242,151 @@ export async function deleteSession(db: Db, userId: string, id: string): Promise
         .where(and(eq(sessions.id, id), eq(sessions.userId, userId)))
         .returning({ id: sessions.id })
     return deleted.length > 0
+}
+
+export type ReplaceResult =
+    | { status: 'not_found' }
+    | { status: 'invalid'; message: string }
+    | { status: 'updated' }
+
+// One stored lap — the fields a merge needs to fold several into one.
+type LapRow = {
+    order: number
+    startedAt: number
+    endedAt: number
+    elapsedS: number
+    timerS: number | null
+    avgHr: number | null
+    maxHr: number | null
+    calories: number | null
+    cycles: number | null
+}
+
+// Sum the defined values, or null when every one is missing — so merging laps
+// that never recorded calories yields "no data", not a false zero.
+function sumDefined(values: readonly (number | null)[]): number | null {
+    const present = values.filter((value): value is number => value != null)
+    return present.length === 0 ? null : present.reduce((a, b) => a + b, 0)
+}
+
+// Fold a group's members into a single lap. One member passes straight through —
+// its recorded boundaries and HR are kept exactly, so the recording's own
+// (sometimes overlapping) edges survive. Several are a merge: the lap spans the
+// first member's start to the last's end, and HR is duration-weighted from the
+// members' own averages, since the per-second samples aren't stored to recompute
+// from. Members arrive in recorded order.
+function deriveLap(members: readonly LapRow[]): Omit<LapRow, 'order'> {
+    const first = members[0]
+    if (members.length === 1) {
+        const { order: _order, ...rest } = first
+        return rest
+    }
+
+    const last = members[members.length - 1]
+    const weighted = members.filter((m): m is LapRow & { avgHr: number } => m.avgHr != null)
+    const weightedSeconds = weighted.reduce((sum, m) => sum + m.elapsedS, 0)
+    const maxes = members.map((m) => m.maxHr).filter((hr): hr is number => hr != null)
+
+    return {
+        startedAt: first.startedAt,
+        endedAt: last.endedAt,
+        // The span across the group, keeping the recording's own boundaries.
+        elapsedS: last.endedAt - first.startedAt,
+        timerS: sumDefined(members.map((m) => m.timerS)),
+        avgHr:
+            weightedSeconds === 0
+                ? null
+                : Math.round(
+                      weighted.reduce((sum, m) => sum + m.avgHr * m.elapsedS, 0) / weightedSeconds,
+                  ),
+        maxHr: maxes.length === 0 ? null : Math.max(...maxes),
+        calories: sumDefined(members.map((m) => m.calories)),
+        cycles: sumDefined(members.map((m) => m.cycles)),
+    }
+}
+
+//! Replace a session's laps with an edited grouping (merges, relabels). Scoped to
+//! the user: another user's id reads as missing, not forbidden. The groups must
+//! cover every current lap exactly once and in order — anything else is rejected
+//! rather than guessed at. An unknown station name is rejected too (the editor
+//! picks from the closed catalogue, so an unknown label is a bug, not a new
+//! station to grow it with, unlike import). Timing and HR are rebuilt from the
+//! stored rows, never re-derived from the client, so the recording's own
+//! boundaries survive. Session totals are left as the device's original truth;
+//! the per-station stats derive from the intervals, so they follow on next read.
+export async function replaceLaps(
+    db: Db,
+    userId: string,
+    id: string,
+    groups: LapGroup[],
+): Promise<ReplaceResult> {
+    const [session] = await db
+        .select({ id: sessions.id })
+        .from(sessions)
+        .where(and(eq(sessions.id, id), eq(sessions.userId, userId)))
+        .limit(1)
+    if (session == null) {
+        return { status: 'not_found' }
+    }
+
+    const original: LapRow[] = await db
+        .select({
+            order: stationIntervals.lapIndex,
+            startedAt: stationIntervals.startedAt,
+            endedAt: stationIntervals.endedAt,
+            elapsedS: stationIntervals.elapsedS,
+            timerS: stationIntervals.timerS,
+            avgHr: stationIntervals.avgHr,
+            maxHr: stationIntervals.maxHr,
+            calories: stationIntervals.calories,
+            cycles: stationIntervals.cycles,
+        })
+        .from(stationIntervals)
+        .where(eq(stationIntervals.sessionId, id))
+        .orderBy(asc(stationIntervals.lapIndex))
+
+    // The groups have to be a re-partition of exactly these laps: every original
+    // order once, in the order they were recorded. That's the only constraint —
+    // it's what makes a merge a merge rather than a rewrite of the timeline, and
+    // it sidesteps the recording's imperfect boundaries entirely.
+    const flattened = groups.flatMap((group) => group.laps)
+    const expected = original.map((lap) => lap.order)
+    const covers =
+        flattened.length === expected.length && flattened.every((order, i) => order === expected[i])
+    if (!covers) {
+        return {
+            status: 'invalid',
+            message: 'The edited laps must cover every original lap exactly once, in order',
+        }
+    }
+
+    const names = [...new Set(groups.map((group) => group.station))]
+    const known = await db
+        .select({ id: stations.id, name: stations.name })
+        .from(stations)
+        .where(inArray(stations.name, names))
+    const byName = new Map(known.map((s) => [s.name, s.id]))
+    const missing = names.filter((name) => !byName.has(name))
+    if (missing.length > 0) {
+        return { status: 'invalid', message: `Unknown station: ${missing.join(', ')}` }
+    }
+
+    const byOrder = new Map(original.map((lap) => [lap.order, lap]))
+    const del = db.delete(stationIntervals).where(eq(stationIntervals.sessionId, id))
+    const inserts = groups.map((group, index) => {
+        // Coverage above guarantees every order resolves.
+        const members = group.laps.map((order) => byOrder.get(order) as LapRow)
+        return db.insert(stationIntervals).values({
+            sessionId: id,
+            userId,
+            stationId: byName.get(group.station) as number,
+            // Renumbered 0..n-1 by order, so intervals_session_lap stays unique.
+            lapIndex: index,
+            ...deriveLap(members),
+        })
+    })
+    // Delete-then-reinsert in one batch, so the session never has a partial or
+    // half-swapped lap set.
+    await db.batch([del, ...inserts])
+    return { status: 'updated' }
 }

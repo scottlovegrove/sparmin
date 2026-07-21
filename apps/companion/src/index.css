@@ -547,6 +547,47 @@ button:disabled {
     color: var(--text);
 }
 
+/* The quiet way into editing a session's laps, tucked under its breakdown. */
+.edit-laps {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+
+/* Edit mode: a station picker and a duration per lap, with the merge control
+   where the arrow sits in the read view — same three columns, now interactive. */
+.stays.editor li {
+    grid-template-columns: 1fr auto auto;
+    padding: 0.25rem 0;
+}
+
+.stay-station {
+    width: 100%;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid var(--line);
+    border-radius: 0.4rem;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.85rem;
+}
+
+.merge {
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* Save and cancel sit side by side, like the modal's actions rather than the
+   full-width buttons elsewhere. */
+.editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.editor-actions .button {
+    width: auto;
+}
+
 code {
     font-size: 0.9em;
     padding: 0.1em 0.3em;

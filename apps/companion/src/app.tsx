@@ -25,7 +25,9 @@ function Home({ email }: { email: string }) {
             </header>
             <ImportPanel onImported={() => setReloadKey((key) => key + 1)} />
             <StatsPanel reloadKey={reloadKey} />
-            <SessionList reloadKey={reloadKey} />
+            {/* Editing a session's laps shifts the derived stats, so refresh the
+                page the same way an import does. */}
+            <SessionList reloadKey={reloadKey} onChanged={() => setReloadKey((key) => key + 1)} />
         </main>
     )
 }
