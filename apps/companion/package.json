@@ -5,6 +5,7 @@
     "description": "Sparmin companion app — thermal spa session logger. React + Vite SPA served by a Hono Cloudflare Worker with D1.",
     "type": "module",
     "scripts": {
+        "predev": "npm run db:migrate",
         "dev": "vite dev",
         "build": "vite build",
         "preview": "vite preview",
@@ -18,6 +19,7 @@
         "type-check": "tsc -b",
         "test": "vitest run",
         "db:generate": "drizzle-kit generate",
+        "db:migrate": "wrangler d1 migrations apply DB --local",
         "check": "tsc -b && oxlint src worker test && oxfmt --check",
         "fix": "oxlint src worker test --fix && oxfmt",
         "clean": "rimraf dist .wrangler/tmp .wrangler/deploy",

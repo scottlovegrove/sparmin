@@ -2,7 +2,7 @@ import { asc } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { stations } from '../src/db/schema'
-import { ingestPayloadSchema } from '../src/lib/session-payload'
+import { ingestPayloadSchema, replaceLapsSchema } from '../src/lib/session-payload'
 import { deleteAccount } from './account'
 import { createAuth, currentUserId } from './auth'
 import { createDb } from './db'
@@ -13,6 +13,7 @@ import {
     getSession,
     ingestSession,
     listSessions,
+    replaceLaps,
 } from './sessions'
 import { getStats } from './stats'
 
@@ -182,6 +183,30 @@ app.get('/api/sessions/:id', async (c) => {
         return c.json({ error: 'not_found' }, 404)
     }
     return c.json(result)
+})
+
+// Replace a session's laps with an edited set — merges and relabels the user
+// made in the session editor. The FIT is never touched; this rewrites the stored
+// intervals in place. Returns the session in the same shape as GET, so the client
+// can drop the response straight back into the view.
+app.put('/api/sessions/:id/intervals', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = replaceLapsSchema.safeParse(body)
+    if (!parsed.success) {
+        return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
+    }
+
+    const db = createDb(c.env.DB)
+    const userId = c.get('userId')
+    const id = c.req.param('id')
+    const result = await replaceLaps(db, userId, id, parsed.data.groups)
+    if (result.status === 'not_found') {
+        return c.json({ error: 'not_found' }, 404)
+    }
+    if (result.status === 'invalid') {
+        return c.json({ error: 'invalid_laps', message: result.message }, 400)
+    }
+    return c.json(await getSession(db, userId, id))
 })
 
 app.delete('/api/sessions/:id', async (c) => {

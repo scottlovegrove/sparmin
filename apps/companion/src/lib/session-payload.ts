@@ -42,6 +42,24 @@ export const ingestPayloadSchema = parsedSessionSchema.extend({
     id: z.uuid(),
 })
 
+// What PUT /api/sessions/:id/intervals accepts: the session's laps regrouped in
+// the editor. Each group is one lap in the result — its `laps` are the original
+// lap orders (lap_index) folded into it, in order, and `station` is the label to
+// give it. The client never sends timing or HR: the server rebuilds those from
+// the stored rows, so the recording's own (imperfect, sometimes overlapping)
+// boundaries are preserved rather than re-derived and rejected. The groups must
+// cover every original lap exactly once, in order — that's the whole invariant.
+export const lapGroupSchema = z.object({
+    station: z.string().min(1),
+    laps: z.array(z.number().int().nonnegative()).min(1),
+})
+
+export const replaceLapsSchema = z.object({
+    groups: z.array(lapGroupSchema).min(1),
+})
+
 export type ParsedLap = z.infer<typeof parsedLapSchema>
 export type ParsedSession = z.infer<typeof parsedSessionSchema>
 export type IngestPayload = z.infer<typeof ingestPayloadSchema>
+export type LapGroup = z.infer<typeof lapGroupSchema>
+export type ReplaceLaps = z.infer<typeof replaceLapsSchema>
