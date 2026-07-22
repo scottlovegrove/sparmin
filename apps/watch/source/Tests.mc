@@ -328,7 +328,7 @@ function testHrFoldingRejectsInvalidAndTransition(logger) {
 
 (:test)
 function testStripWindowSlidesAtEdges(logger) {
-    var c = new StripController(SpaActivity.allIds(), 3, false); // 10 activities, window 3
+    var c = new StripController(SpaActivity.allIds(), 3, false); // full catalogue, window 3
     Test.assertEqual(c.windowStart, 0);
     c.moveFocus(1);
     c.moveFocus(1);              // focus 2, still fully visible
@@ -342,9 +342,10 @@ function testStripWindowSlidesAtEdges(logger) {
 (:test)
 function testStripWrapsAtStart(logger) {
     var c = new StripController(SpaActivity.allIds(), 3, false);
-    c.moveFocus(-1);             // wrap 0 -> 9
-    Test.assertEqual(c.focusedIndex, 9);
-    Test.assertEqual(c.windowStart, 7); // last three visible
+    var n = SpaActivity.count();
+    c.moveFocus(-1);             // wrap 0 -> last
+    Test.assertEqual(c.focusedIndex, n - 1);
+    Test.assertEqual(c.windowStart, n - 3); // last three visible
     return true;
 }
 
