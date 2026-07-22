@@ -41,7 +41,7 @@ function testDefaultConfigIsFullCatalogue(logger) {
     var cfg = ActivityConfig.load();
     Test.assertEqual(cfg.size(), SpaActivity.count());
     Test.assertEqual(cfg[0], "outdoor_cold_plunge");
-    Test.assertEqual(cfg[cfg.size() - 1], "outdoor_lounger");
+    Test.assertEqual(cfg[cfg.size() - 1], "hot_tub");
     return true;
 }
 

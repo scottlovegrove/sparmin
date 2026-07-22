@@ -29,7 +29,7 @@ cd "$(dirname "$0")/.."
 
 command -v rsvg-convert >/dev/null || { echo "rsvg-convert not found"; exit 1; }
 
-STATIONS=(finnish_sauna fire_ice_room heated_loungers hydro_pool ice_cave \
+STATIONS=(finnish_sauna fire_ice_room heated_loungers hot_tub hydro_pool ice_cave \
           indoor_cold_plunge outdoor_cold_plunge outdoor_lounger salt_sauna steam_room)
 
 # family                icon launcher   (launcher = most common in family;
