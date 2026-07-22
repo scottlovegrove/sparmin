@@ -25,7 +25,8 @@ module ActivityIcons {
                 "fire_ice_room" => Rez.Drawables.st_fire_ice_room,
                 "finnish_sauna" => Rez.Drawables.st_finnish_sauna,
                 "ice_cave" => Rez.Drawables.st_ice_cave,
-                "outdoor_lounger" => Rez.Drawables.st_outdoor_lounger
+                "outdoor_lounger" => Rez.Drawables.st_outdoor_lounger,
+                "hot_tub" => Rez.Drawables.st_hot_tub
             };
         }
         return _syms;

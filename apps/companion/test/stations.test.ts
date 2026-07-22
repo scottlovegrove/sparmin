@@ -29,6 +29,9 @@ describe('GET /api/stations', () => {
             'Ice cave',
             'Outdoor lounger',
             'transition',
+            // Seeded later (migration 0004), so it sorts last by id — after the
+            // original watch-order block, transition included.
+            'Hot tub',
         ])
     })
 
@@ -40,6 +43,7 @@ describe('GET /api/stations', () => {
         expect(byName.get('Hydro pool')?.thermalClass).toBe('hot')
         expect(byName.get('Heated loungers')?.thermalClass).toBe('hot')
         expect(byName.get('Fire and ice room')?.thermalClass).toBe('hot')
+        expect(byName.get('Hot tub')?.thermalClass).toBe('hot')
         expect(byName.get('Ice cave')?.thermalClass).toBe('cold')
         expect(byName.get('Outdoor cold plunge')?.thermalClass).toBe('cold')
         expect(byName.get('Outdoor lounger')?.thermalClass).toBe('neutral')

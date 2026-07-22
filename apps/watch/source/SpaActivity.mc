@@ -18,7 +18,8 @@ module SpaActivity {
         "fire_ice_room",
         "finnish_sauna",
         "ice_cave",
-        "outdoor_lounger"
+        "outdoor_lounger",
+        "hot_tub"
     ];
 
     const NAMES = [
@@ -31,7 +32,8 @@ module SpaActivity {
         "Fire and ice room",
         "Finnish sauna",
         "Ice cave",
-        "Outdoor lounger"
+        "Outdoor lounger",
+        "Hot tub"
     ];
 
     // Short tile labels for the strip, where a full name won't fit (especially
@@ -47,7 +49,8 @@ module SpaActivity {
         "Fire/Ice",
         "Finnish",
         "Ice Cave",
-        "Outdoor"
+        "Outdoor",
+        "Hot Tub"
     ];
 
     function count() {
