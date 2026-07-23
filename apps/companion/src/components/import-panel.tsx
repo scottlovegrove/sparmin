@@ -1,4 +1,5 @@
 import { type ChangeEvent, type DragEvent, useEffect, useRef, useState } from 'react'
+import { expandDrop } from '../lib/expand-drop'
 import { type ImportOutcome, importFit, preloadParser } from '../lib/import-fit'
 
 type Row = { name: string } & ({ status: 'working' } | ImportOutcome)
@@ -29,28 +30,35 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
         }
         const mine = ++batch.current
 
-        // Everything the user picked gets a row, including files this can't
-        // possibly read — dropping a photo and watching nothing happen is worse
-        // than being told why.
-        const isFit = (file: File) => file.name.toLowerCase().endsWith('.fit')
+        // A zip expands into a .fit per entry, so what the user dropped and what
+        // gets imported aren't one-to-one. Unpack first, then work the results.
+        const items = await expandDrop(list)
+        // A newer drop landed while this one was unzipping; its rows own the
+        // screen now, so don't overwrite them.
+        if (batch.current !== mine) {
+            return
+        }
+
+        // Everything gets a row, including files this can't read — dropping a
+        // photo and watching nothing happen is worse than being told why.
         setRows(
-            list.map((file) =>
-                isFit(file)
-                    ? { name: file.name, status: 'working' }
-                    : { name: file.name, status: 'rejected', reason: 'Not a .fit export' },
+            items.map((item) =>
+                'file' in item
+                    ? { name: item.name, status: 'working' }
+                    : { name: item.name, ...item.outcome },
             ),
         )
 
         // Sequential on purpose: D1 is single-threaded, and a handful of files
         // finishing in order reads better than a race.
         let anyImported = false
-        for (const [index, file] of list.entries()) {
-            if (!isFit(file)) {
+        for (const [index, item] of items.entries()) {
+            if (!('file' in item)) {
                 continue
             }
             let outcome: ImportOutcome
             try {
-                outcome = await importFit(file)
+                outcome = await importFit(item.file)
             } catch {
                 outcome = { status: 'rejected', reason: "That file couldn't be read" }
             }
@@ -61,7 +69,7 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
             }
             anyImported ||= outcome.status === 'imported'
             setRows((current) =>
-                current.map((row, i) => (i === index ? { name: file.name, ...outcome } : row)),
+                current.map((row, i) => (i === index ? { name: item.name, ...outcome } : row)),
             )
         }
         if (anyImported) {
@@ -95,13 +103,13 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
                 onDragLeave={() => setIsOver(false)}
                 onDrop={handleDrop}
             >
-                <strong>Drop your .fit exports here</strong>
+                <strong>Drop your .fit or .zip exports here</strong>
                 <span className="muted small">or click to choose — several at once is fine</span>
             </button>
             <input
                 ref={fileInput}
                 type="file"
-                accept=".fit"
+                accept=".fit,.zip"
                 multiple
                 hidden
                 onChange={handleChange}
@@ -109,8 +117,8 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
 
             {rows.length > 0 && (
                 <ul className="results">
-                    {rows.map((row) => (
-                        <li key={row.name} className={row.status}>
+                    {rows.map((row, index) => (
+                        <li key={index} className={row.status}>
                             <span className="file">{row.name}</span>
                             <span className="outcome">
                                 {LABELS[row.status]}
@@ -124,8 +132,9 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
             )}
 
             <p className="muted small">
-                Export an activity from Garmin Connect as a <code>.fit</code> file. It’s read here
-                in your browser — only the session details are sent.
+                Export an activity from Garmin Connect — a <code>.fit</code> file, or the{' '}
+                <code>.zip</code> it downloads as. It’s read here in your browser — only the session
+                details are sent.
             </p>
         </section>
     )
