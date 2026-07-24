@@ -21,12 +21,19 @@ class StripView extends WatchUi.View {
     private var _w as Lang.Number = 0;
     private var _h as Lang.Number = 0;
     private var _cursorShown as Lang.Boolean = false; // reveal the focus ring on touch after a button press
+    private var _is24Hour as Lang.Boolean = true;     // device clock preference, for the header time
+    private var _backNoteMs as Lang.Number = 0;       // when the last back-swipe was swallowed (0 = none)
+
+    //! How long the swallowed-back-swipe note stays up (ms).
+    const BACK_NOTE_MS = 2000;
 
     function initialize(session as SessionManager) {
         View.initialize();
         _session = session;
         _hrDisplay = null;
-        _isTouch = System.getDeviceSettings().isTouchScreen;
+        var settings = System.getDeviceSettings();
+        _isTouch = settings.isTouchScreen;
+        _is24Hour = settings.is24Hour;
         var tiles = _isTouch ? 4 : 3;      // roomy tiles: VA5 4, FR745 3 (§2)
         _ctrl = new StripController(ActivityConfig.load(), tiles, _isTouch);
     }
@@ -43,10 +50,20 @@ class StripView extends WatchUi.View {
     //! Until it is, the bottom-right button keeps its conventional Back meaning.
     function isCursorShown() as Lang.Boolean { return _cursorShown; }
 
+    //! Flash a note after a back-swipe was swallowed mid-session (StripDelegate).
+    //! A gesture that silently does nothing reads as a frozen app, which is the
+    //! thing we're trying not to look like.
+    function noteBackBlocked() as Void {
+        _backNoteMs = System.getTimer();
+        WatchUi.requestUpdate();
+    }
+
 
     function onShow() as Void {
         // Pick up any activity-config changes made on the config screen.
         _ctrl.reload(ActivityConfig.load());
+        // The clock format is a device setting the user can change under us.
+        _is24Hour = System.getDeviceSettings().is24Hour;
         // A finished/discarded session lands back at IDLE — drop the button cursor
         // so no stray focus ring lingers on the start screen.
         if (_session.getState() == STATE_IDLE) {
@@ -167,12 +184,47 @@ class StripView extends WatchUi.View {
         dc.clear();
 
         var state = _session.getState();
+        _drawClock(dc);
         _drawStrip(dc, state);
         _drawTimers(dc, state);
         _drawHr(dc, state);
         if (state == STATE_IDLE) {
             _drawHint(dc);
+        } else if (_backNoteShowing()) {
+            _drawBackNote(dc);
         }
+    }
+
+    //! Time of day, in the strip's top margin. It's here because leaving the app
+    //! to read the watch face is exactly what used to kill a recording — so the
+    //! clock has to be inside the app for there to be no reason to leave.
+    private function _drawClock(dc as Graphics.Dc) as Void {
+        var t = System.getClockTime();
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(_w / 2, _stripTop() / 2, Graphics.FONT_XTINY,
+                    Fmt.clock(t.hour, t.min, _is24Hour),
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    //! Whether the swallowed-back-swipe note is still within its dwell. The timer
+    //! is a free-running millisecond counter that wraps, so a negative age means
+    //! it wrapped — treat that as expired rather than showing the note forever.
+    private function _backNoteShowing() as Lang.Boolean {
+        if (_backNoteMs == 0) {
+            return false;
+        }
+        var age = System.getTimer() - _backNoteMs;
+        if (age < 0 || age >= BACK_NOTE_MS) {
+            _backNoteMs = 0;
+            return false;
+        }
+        return true;
+    }
+
+    private function _drawBackNote(dc as Graphics.Dc) as Void {
+        dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(_w / 2, _h * 0.93, Graphics.FONT_XTINY, "Use End to finish",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     //! True when a tap lands on the idle footer (the "Edit activities" target).

@@ -43,6 +43,17 @@ class DiscardConfirmDelegate extends WatchUi.InputDelegate {
         return false;
     }
 
+    //! Back-swipe cancels back to the end screen, like the bottom-right button.
+    //! Left to the OS it would pop straight to the strip with the session still
+    //! in CONFIRM_END and nothing on screen offering to finish it.
+    function onSwipe(evt as WatchUi.SwipeEvent) as Lang.Boolean {
+        if (!_isTouch || evt.getDirection() != WatchUi.SWIPE_RIGHT) {
+            return false;
+        }
+        _back();
+        return true;
+    }
+
     function onTap(evt as WatchUi.ClickEvent) as Lang.Boolean {
         if (!_isTouch) {
             return false;
