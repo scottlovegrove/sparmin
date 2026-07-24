@@ -510,3 +510,22 @@ function testBuildPayloadShape(logger) {
     Test.assert(p["endedAt"] != null);
     return true;
 }
+
+// ---- Clock formatting ----
+
+(:test)
+function testClock24Hour(logger) {
+    Test.assertEqual(Fmt.clock(9, 5, true), "09:05");
+    Test.assertEqual(Fmt.clock(14, 32, true), "14:32");
+    Test.assertEqual(Fmt.clock(0, 0, true), "00:00");
+    return true;
+}
+
+(:test)
+function testClock12Hour(logger) {
+    Test.assertEqual(Fmt.clock(0, 7, false), "12:07");   // midnight reads as 12
+    Test.assertEqual(Fmt.clock(12, 0, false), "12:00");  // noon stays 12
+    Test.assertEqual(Fmt.clock(13, 5, false), "1:05");
+    Test.assertEqual(Fmt.clock(23, 59, false), "11:59");
+    return true;
+}

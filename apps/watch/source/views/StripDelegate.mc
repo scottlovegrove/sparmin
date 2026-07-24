@@ -93,6 +93,25 @@ class StripDelegate extends WatchUi.InputDelegate {
         return false;
     }
 
+    //! Left-to-right is the system Back gesture. Unhandled, the OS answers it on
+    //! this view — the root one — by closing the app, and a Connect IQ watch-app
+    //! cannot be minimised the way a native activity can: leaving *is* dying. A
+    //! session caught by that exits without Recorder.finish(), so the system
+    //! force-closes the FIT and the open lap keeps the previous lap's label.
+    //! So swallow it while a session is live; the End tile (or a bottom-right
+    //! hold) is the deliberate way out. At IDLE it still exits, as every other
+    //! Garmin app does.
+    function onSwipe(evt as WatchUi.SwipeEvent) as Lang.Boolean {
+        if (!_isTouch || evt.getDirection() != WatchUi.SWIPE_RIGHT) {
+            return false;
+        }
+        if (_session.getState() == STATE_IDLE) {
+            return false;   // let the OS take it — exits the app
+        }
+        _view.noteBackBlocked();
+        return true;
+    }
+
     function onTap(evt as WatchUi.ClickEvent) as Lang.Boolean {
         if (!_isTouch) {
             return false;

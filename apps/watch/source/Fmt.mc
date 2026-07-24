@@ -21,6 +21,22 @@ module Fmt {
         return Lang.format("$1$:$2$", [m.format("%02d"), sec.format("%02d")]);
     }
 
+    //! Time of day as "hh:mm" (24-hour) or "h:mm" (12-hour, no suffix — the
+    //! glanceable digits are the point, and nobody is unsure which half of the
+    //! day they are in). Pure: the caller passes System.getClockTime() values and
+    //! the device's own 24-hour setting, so this stays testable off-device.
+    function clock(hour, minute, is24Hour) as Lang.String {
+        var h = hour.toNumber();
+        if (is24Hour) {
+            return Lang.format("$1$:$2$", [h.format("%02d"), minute.format("%02d")]);
+        }
+        h = h % 12;
+        if (h == 0) {
+            h = 12;
+        }
+        return Lang.format("$1$:$2$", [h.format("%d"), minute.format("%02d")]);
+    }
+
     //! Heart rate as an integer string, "--" when null.
     function hr(value) as Lang.String {
         if (value == null) {

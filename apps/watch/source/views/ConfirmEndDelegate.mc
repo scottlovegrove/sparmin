@@ -53,6 +53,17 @@ class ConfirmEndDelegate extends WatchUi.InputDelegate {
         return false;
     }
 
+    //! Back-swipe here means "not yet" — resume, the same as the top-right button.
+    //! Left to the OS it pops this view but leaves the state machine in
+    //! CONFIRM_END, where the strip underneath ignores every tile tap.
+    function onSwipe(evt as WatchUi.SwipeEvent) as Lang.Boolean {
+        if (!_isTouch || evt.getDirection() != WatchUi.SWIPE_RIGHT) {
+            return false;
+        }
+        _resume();
+        return true;
+    }
+
     function onTap(evt as WatchUi.ClickEvent) as Lang.Boolean {
         if (!_isTouch) {
             return false;

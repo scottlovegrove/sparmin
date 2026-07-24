@@ -40,6 +40,16 @@ to the watch's `GARMIN/APPS/`.
   and drops the coordinates, so coordinate-based tile selection silently breaks.
   Menus (`Menu2`/`CheckboxMenu`) keep `Menu2InputDelegate` — they handle their
   own input.
+- **Every touch delegate must answer `SWIPE_RIGHT`.** Left-to-right is the system
+  Back gesture; return `false` and the OS acts on it. On the root `StripView`
+  that closes the app — and a Connect IQ watch-app cannot be minimised like a
+  native activity, so leaving *is* dying: the session exits without
+  `Recorder.finish()` and the system force-closes the FIT with the previous lap's
+  label still on the open lap. On a pushed view it pops the view while the state
+  machine stays put (`CONFIRM_END`/`SUMMARY`), leaving the strip inert. So a live
+  session swallows the swipe (`StripView.noteBackBlocked()` explains why on
+  screen) and every pushed view maps it to that screen's own cancel/dismiss.
+  Only `STATE_IDLE` on the root view lets it through, which is how you leave.
 - **Zero warnings.** Both device builds must compile with **0 warnings**. Cast
   dynamic dictionaries/arrays to `Lang.Dictionary` / `Lang.Array` and annotate
   return types to avoid "container access" warnings. `hidden`/`class`/etc. are

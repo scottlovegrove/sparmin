@@ -44,6 +44,16 @@ class SummaryDelegate extends WatchUi.InputDelegate {
         return true;
     }
 
+    //! Back-swipe dismisses, like a tap. Left to the OS it would pop the view
+    //! while the state machine stayed in SUMMARY — leaving the strip inert.
+    function onSwipe(evt as WatchUi.SwipeEvent) as Lang.Boolean {
+        if (evt.getDirection() != WatchUi.SWIPE_RIGHT) {
+            return false;
+        }
+        _dismiss();
+        return true;
+    }
+
     function onTap(evt as WatchUi.ClickEvent) as Lang.Boolean {
         _dismiss();
         return true;
