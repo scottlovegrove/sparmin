@@ -26,8 +26,13 @@ class Recorder {
     // FIT file but invisible in Connect's UI (laps show only as "1, 2, 3…").
     // Surfacing the activity names is the job of the (deferred) Strava-labelling
     // backend, not something a FitContributor field can achieve in Connect.
-    const SPORT = Activity.SPORT_TRAINING;
-    const SUB_SPORT = Activity.SUB_SPORT_CARDIO_TRAINING;
+    // Written as the raw FIT enum values, not Activity.SPORT_TRAINING /
+    // Activity.SUB_SPORT_CARDIO_TRAINING: those symbols were added in Connect IQ
+    // API 3.2.0 and are absent on 3.1.x devices (fenix 5 family, fr645, fr935,
+    // vívoactive 3, …), where resolving them at class-init crashes the app on
+    // launch. The numeric FIT codes are stable and resolve everywhere.
+    const SPORT = 10 as Activity.Sport;         // Activity.SPORT_TRAINING
+    const SUB_SPORT = 26 as Activity.SubSport;  // Activity.SUB_SPORT_CARDIO_TRAINING
     const FIELD_NAME = "activity";
     const FIELD_ID = 0;
     // Session-scope field carrying the end-of-session summary line, so the whole
