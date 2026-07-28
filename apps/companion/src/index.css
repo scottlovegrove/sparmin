@@ -113,7 +113,8 @@ label {
 }
 
 input[type='email'],
-input[type='text'] {
+input[type='text'],
+input[type='date'] {
     width: 100%;
     padding: 0.6rem 0.7rem;
     margin-bottom: 0.75rem;
@@ -402,7 +403,25 @@ button:disabled {
 
 .ranges {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.25rem;
+}
+
+.custom-range {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.custom-range label {
+    flex: 1 1 8rem;
+    margin-bottom: 0;
+}
+
+/* The shared input rule carries form spacing; here the row itself has it. */
+.custom-range input[type='date'] {
+    margin-bottom: 0;
 }
 
 .range {

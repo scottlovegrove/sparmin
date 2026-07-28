@@ -1,4 +1,12 @@
 import { useEffect, useState } from 'react'
+import {
+    DEFAULT_PERIOD,
+    isoDay,
+    isValidRange,
+    PRESETS,
+    type Period,
+    periodDates,
+} from '../lib/period'
 import { formatDuration } from './session-list'
 
 type StationTotal = {
@@ -22,32 +30,27 @@ type State =
     | { status: 'loading' }
     | { status: 'ready'; stats: Stats }
     | { status: 'error'; message: string }
-
-// Presets rather than a date picker: these are the questions anyone actually asks
-// of a habit, and picking two dates to ask them is work.
-const RANGES = [
-    { label: '30 days', days: 30 },
-    { label: '90 days', days: 90 },
-    { label: 'This year', days: 365 },
-] as const
-
-const isoDay = (t: number) => new Date(t * 1000).toISOString().slice(0, 10)
+    | { status: 'incomplete' }
 
 export function StatsPanel({ reloadKey }: { reloadKey: number }) {
-    const [days, setDays] = useState<number>(30)
+    const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD)
     const [state, setState] = useState<State>({ status: 'loading' })
 
+    const today = isoDay(Math.floor(Date.now() / 1000))
+    const { from, to } = periodDates(period, Math.floor(Date.now() / 1000))
+
     useEffect(() => {
+        if (!isValidRange(from, to)) {
+            setState({ status: 'incomplete' })
+            return
+        }
+        // A range just made whole again shouldn't still be asking for dates.
+        setState((current) => (current.status === 'incomplete' ? { status: 'loading' } : current))
         const aborter = new AbortController()
 
         async function load() {
-            const now = Math.floor(Date.now() / 1000)
-            // days - 1, because both ends are inclusive dates: today counts as one
-            // of them. Going back a full 30 from today asks for 31 days and quietly
-            // flatters every total under a button that says 30.
-            const from = isoDay(now - (days - 1) * 86400)
             try {
-                const res = await fetch(`/api/stats?from=${from}&to=${isoDay(now)}`, {
+                const res = await fetch(`/api/stats?from=${from}&to=${to}`, {
                     signal: aborter.signal,
                 })
                 if (!res.ok) {
@@ -64,27 +67,67 @@ export function StatsPanel({ reloadKey }: { reloadKey: number }) {
 
         void load()
         return () => aborter.abort()
-    }, [days, reloadKey])
+    }, [from, to, reloadKey])
 
     return (
         <section className="card">
             <header className="stats-head">
                 <h2>Your habit</h2>
                 <div className="ranges" role="group" aria-label="Period">
-                    {RANGES.map((range) => (
-                        <button
-                            key={range.days}
-                            type="button"
-                            className={`range ${days === range.days ? 'is-on' : ''}`}
-                            aria-pressed={days === range.days}
-                            onClick={() => setDays(range.days)}
-                        >
-                            {range.label}
-                        </button>
-                    ))}
+                    {PRESETS.map((preset) => {
+                        const isOn = period.kind === 'preset' && period.days === preset.days
+                        return (
+                            <button
+                                key={preset.label}
+                                type="button"
+                                className={`range ${isOn ? 'is-on' : ''}`}
+                                aria-pressed={isOn}
+                                onClick={() => setPeriod({ kind: 'preset', days: preset.days })}
+                            >
+                                {preset.label}
+                            </button>
+                        )
+                    })}
+                    <button
+                        type="button"
+                        className={`range ${period.kind === 'custom' ? 'is-on' : ''}`}
+                        aria-pressed={period.kind === 'custom'}
+                        // Seeded with the window already on screen, so the fields
+                        // open on what is being looked at rather than on nothing.
+                        onClick={() => setPeriod({ kind: 'custom', from, to })}
+                    >
+                        Custom
+                    </button>
                 </div>
             </header>
 
+            {period.kind === 'custom' && (
+                <div className="custom-range">
+                    <label>
+                        From
+                        <input
+                            type="date"
+                            value={period.from}
+                            max={period.to || today}
+                            onChange={(e) => setPeriod({ ...period, from: e.currentTarget.value })}
+                        />
+                    </label>
+                    <label>
+                        To
+                        <input
+                            type="date"
+                            value={period.to}
+                            min={period.from}
+                            max={today}
+                            onChange={(e) => setPeriod({ ...period, to: e.currentTarget.value })}
+                        />
+                    </label>
+                </div>
+            )}
+
+            {state.status === 'incomplete' && (
+                <p className="muted small">Pick a start and end date.</p>
+            )}
             {state.status === 'loading' && <p className="muted small">Loading…</p>}
             {state.status === 'error' && <p className="error small">{state.message}</p>}
 
