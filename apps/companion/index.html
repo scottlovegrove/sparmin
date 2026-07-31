@@ -11,6 +11,43 @@
         <meta name="theme-color" content="#101418" media="(prefers-color-scheme: dark)" />
         <meta name="description" content="Your thermal spa sessions, from your watch." />
         <title>Sparmin</title>
+
+        <!-- Link previews. These sit high in the head because WhatsApp's crawler
+             reads only the first few kilobytes of the document, and the URLs are
+             absolute because a relative og:image is dropped by every crawler.
+             This shell is the one document served for every route, so the tags
+             describe the product rather than the current view — and they should
+             stay that way: an unfurl is fetched and cached by the messaging
+             platform's servers, so nothing behind the sign-in belongs here. -->
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Sparmin" />
+        <meta property="og:locale" content="en_GB" />
+        <meta property="og:url" content="https://sparmin-app.scottlovegrove.co.uk/" />
+        <meta property="og:title" content="Sparmin — your thermal spa sessions, from your watch" />
+        <meta
+            property="og:description"
+            content="Every session synced from Garmin: streaks, time per station and heart rate, all in one place."
+        />
+        <meta
+            property="og:image"
+            content="https://sparmin-app.scottlovegrove.co.uk/images/og-default.png"
+        />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta
+            property="og:image:alt"
+            content="Sparmin — your thermal spa sessions, from your watch."
+        />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Sparmin — your thermal spa sessions, from your watch" />
+        <meta
+            name="twitter:description"
+            content="Every session synced from Garmin: streaks, time per station and heart rate, all in one place."
+        />
+        <meta
+            name="twitter:image"
+            content="https://sparmin-app.scottlovegrove.co.uk/images/og-default.png"
+        />
     </head>
     <body>
         <div id="root"></div>

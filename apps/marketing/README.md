@@ -45,6 +45,21 @@ src/
 └─ assets/screenshots/        Watch screenshots, optimised at build time by <Image>
 ```
 
+## Link previews
+
+`layouts/Base.astro` emits the `og:*` and `twitter:*` tags for every page, built
+from the `title` and `description` each page already passes it, so a new page
+gets a correct unfurl for free — give it a real description rather than leaning
+on a generic one. The tags sit high in the `<head>`: WhatsApp's crawler reads
+only the first few kilobytes of the document.
+
+The card is `public/images/og-default.png`, 1200×630 and committed rather than
+generated at build time, which keeps the build hermetic. A page can override it
+with the layout's optional `image` prop (a path relative to the site root); URLs
+are made absolute against `site` in `astro.config.mjs`, because a relative
+`og:image` is dropped by every crawler. Keep any replacement at 1200×630 and
+comfortably under ~300kB — WhatsApp gives up on larger images.
+
 The screenshots are copies of the Connect IQ Store set in
 `apps/watch/submission/screenshots/` — copies, not imports, so the two
 workspaces stay independent. Re-copy them when the store set is refreshed.
