@@ -18,6 +18,21 @@ worker/     Hono Worker: /api/* routes, serves the SPA assets.
 test/       Vitest tests, run in workerd via @cloudflare/vitest-pool-workers.
 ```
 
+## Link previews
+
+`index.html` carries the `og:*` and `twitter:*` tags, with the card at
+`public/images/og-default.png` (1200×630, committed rather than generated).
+`src/index-html.test.ts` pins them. Two constraints worth knowing before editing
+them: the URLs must stay absolute, because a relative `og:image` is dropped by
+every crawler, and the tags must stay above the module script, because
+WhatsApp's crawler reads only the first few kilobytes.
+
+The shell is the single document served for every route, so the tags describe
+the product, not the current view. Per-link previews (an invite naming the
+sender, say) would need the Worker to render tags per path — and shouldn't carry
+anything behind the sign-in regardless: an unfurl is fetched and cached by the
+messaging platform's servers, not the recipient's device.
+
 ## Commands
 
 ```bash
