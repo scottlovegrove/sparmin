@@ -22,6 +22,9 @@ module SpaActivity {
         "hot_tub"
     ];
 
+    // ASCII only. Names go into a FIT string field sized by maxNameLength(), and
+    // that field is a byte buffer written with one byte per character — a name
+    // carrying a multi-byte character (an accent, a fancy dash) overruns it.
     const NAMES = [
         "Outdoor cold plunge",
         "Indoor cold plunge",
