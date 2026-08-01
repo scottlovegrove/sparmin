@@ -2,10 +2,19 @@ import { asc } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { stations } from '../src/db/schema'
+import { formatUserCode } from '../src/lib/device-code'
 import { ingestPayloadSchema, replaceLapsSchema } from '../src/lib/session-payload'
 import { deleteAccount } from './account'
 import { createAuth, currentUserId } from './auth'
 import { createDb } from './db'
+import {
+    approveLink,
+    describePending,
+    listDevices,
+    openLinkRequest,
+    pollLink,
+    revokeDevice,
+} from './devices'
 import { ingestSession } from './session-ingest'
 import {
     DEFAULT_PAGE_SIZE,
@@ -22,10 +31,19 @@ import { getStats } from './stats'
 const app = new Hono<{ Bindings: Env; Variables: { userId: string } }>()
 
 // Everything under /api needs a session except these: the auth endpoints
-// themselves (you can't be signed in while signing in) and the liveness check,
-// which says nothing about anyone's data.
+// themselves (you can't be signed in while signing in), the liveness check, which
+// says nothing about anyone's data, and the two device-pairing routes.
+//
+// The pairing pair are anonymous by construction — a watch has no cookie yet, and
+// obtaining one is the entire point of the flow. Neither returns anything of
+// value until a signed-in human has approved the code: the poll answers
+// `authorization_pending` to anyone, and the code request only ever mints a
+// code that is useless on its own. Exact matches, not a `/api/device/` prefix,
+// so `approve` and `pending` stay behind the session.
+const PUBLIC_PATHS = new Set(['/api/health', '/api/device/code', '/api/device/token'])
+
 function isPublic(pathname: string) {
-    return pathname === '/api/health' || pathname.startsWith('/api/auth/')
+    return PUBLIC_PATHS.has(pathname) || pathname.startsWith('/api/auth/')
 }
 
 // Registered before any route, so a route added later is guarded by default
@@ -46,6 +64,8 @@ app.use('/api/*', async (c, next) => {
 // better-auth owns its own routes: sign-in, magic-link verification, sign-out,
 // session. It reads the raw request, so Hono just hands it over.
 app.on(['GET', 'POST'], '/api/auth/*', (c) => createAuth(c.env).handler(c.req.raw))
+
+const nowSeconds = () => Math.floor(Date.now() / 1000)
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 
@@ -98,6 +118,96 @@ const statsQuerySchema = z
     })
 
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
+
+const linkRequestSchema = z.object({
+    installId: z.string().min(1).max(128),
+    product: z.string().min(1).max(64).nullish(),
+})
+
+const pollSchema = z.object({ deviceCode: z.string().min(1).max(128) })
+
+const approveSchema = z.object({ userCode: z.string().min(1).max(32) })
+
+// A watch asking to be linked. Anonymous: it has no credential yet, and the code
+// it gets back is worthless until a signed-in human approves it (§2.1).
+app.post('/api/device/code', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = linkRequestSchema.safeParse(body)
+    if (!parsed.success) {
+        return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
+    }
+
+    const result = await openLinkRequest(
+        createDb(c.env.DB),
+        { installId: parsed.data.installId, product: parsed.data.product ?? null },
+        nowSeconds(),
+    )
+    return c.json({ ...result, userCode: formatUserCode(result.userCode) }, 201)
+})
+
+// The watch asking whether anyone has approved it yet. The polling states carry
+// RFC 8628's vocabulary but ride on a 200: this is the normal path, hit every
+// five seconds by every linking watch, and 400s would bury real errors.
+app.post('/api/device/token', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = pollSchema.safeParse(body)
+    if (!parsed.success) {
+        return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
+    }
+
+    const result = await pollLink(createDb(c.env.DB), parsed.data.deviceCode, nowSeconds())
+    return c.json(result, 200)
+})
+
+// What is asking, so the confirmation screen can name the watch before the user
+// commits. Never returns the device code.
+app.get('/api/device/pending/:code', async (c) => {
+    const pending = await describePending(createDb(c.env.DB), c.req.param('code'), nowSeconds())
+    if (pending == null) {
+        return c.json({ error: 'not_found' }, 404)
+    }
+    return c.json(pending)
+})
+
+// The one step that needs a human. Binds the pending code to this account.
+app.post('/api/device/approve', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = approveSchema.safeParse(body)
+    if (!parsed.success) {
+        return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
+    }
+
+    const approved = await approveLink(
+        createDb(c.env.DB),
+        parsed.data.userCode,
+        c.get('userId'),
+        nowSeconds(),
+    )
+    if (!approved) {
+        // Expired, already used, or never existed — all the same to the caller,
+        // so a wrong guess learns nothing about which.
+        return c.json({ error: 'not_found' }, 404)
+    }
+    return c.json({ status: 'approved' })
+})
+
+app.get('/api/devices', async (c) => {
+    const rows = await listDevices(createDb(c.env.DB), c.get('userId'))
+    return c.json({ devices: rows })
+})
+
+app.delete('/api/devices/:id', async (c) => {
+    const revoked = await revokeDevice(
+        createDb(c.env.DB),
+        c.get('userId'),
+        c.req.param('id'),
+        nowSeconds(),
+    )
+    if (!revoked) {
+        return c.json({ error: 'not_found' }, 404)
+    }
+    return c.body(null, 204)
+})
 
 // The station catalogue: the closed set of labels the watch can write, with the
 // thermal class each one counts towards. Seeded by migration, so this is a read.

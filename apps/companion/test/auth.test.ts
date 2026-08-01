@@ -22,6 +22,10 @@ describe('the /api guard', () => {
         ['GET', `/api/sessions/${SESSION_ID}`],
         ['DELETE', `/api/sessions/${SESSION_ID}`],
         ['GET', '/api/stations'],
+        ['POST', '/api/device/approve'],
+        ['GET', '/api/device/pending/K7QM42'],
+        ['GET', '/api/devices'],
+        ['DELETE', '/api/devices/some-device-id'],
     ]
 
     it.each(guarded)('refuses %s %s without a session', async (method, path) => {
@@ -53,6 +57,39 @@ describe('the /api guard', () => {
         const res = await app.request('/api/health', {}, env)
 
         expect(res.status).toBe(200)
+    })
+
+    it('leaves the two pairing routes open — a watch has no cookie to offer', async () => {
+        // Both are useless without a signed-in human approving the code, which
+        // is why they can be anonymous at all.
+        const code = await app.request(
+            '/api/device/code',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ installId: 'install-a', product: 'vivoactive5' }),
+            },
+            env,
+        )
+        expect(code.status).toBe(201)
+
+        const poll = await app.request(
+            '/api/device/token',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deviceCode: 'whatever' }),
+            },
+            env,
+        )
+        expect(poll.status).toBe(200)
+    })
+
+    it('keeps approving and listing behind the session', async () => {
+        // The prefix is deliberately not public — only the two exact paths are.
+        const res = await app.request('/api/device/pending/K7QM42', {}, env)
+
+        expect(res.status).toBe(401)
     })
 
     it('leaves the auth endpoints open — you cannot sign in while signed in', async () => {
