@@ -39,6 +39,12 @@ class Recorder {
     // visit is legible on the saved activity (the lap field is per-activity only).
     const SUMMARY_FIELD_NAME = "summary";
     const SUMMARY_FIELD_ID = 1;
+    // :count sizes the field in BYTES, while setData writes String.length() + 1
+    // bytes of UTF-8 — so a string whose characters outnumber its bytes is the
+    // only safe input. Callers keep their own, smaller character cap; the slack
+    // here is what stops a non-ASCII character overrunning the buffer, which
+    // kills the app mid-save and loses both the summary and the closing lap
+    // label. See SessionManager.summaryText().
     const SUMMARY_MAX = 240;
 
     private var _session;

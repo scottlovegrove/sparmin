@@ -209,6 +209,39 @@ function testSummaryText(logger) {
     return true;
 }
 
+//! The summary is measured here in characters and written into the FIT session
+//! field as bytes, one byte per character. A long visit must come out capped, and
+//! every character in it must be one byte wide — a multi-byte one overruns the
+//! field's buffer and kills the app as it saves.
+(:test)
+function testSummaryTextIsCappedAndAscii(logger) {
+    var rec = new FakeRecorder();
+    var sm = new SessionManager(rec);
+    var ids = SpaActivity.allIds();
+
+    // A visit to every station in the catalogue — far more than the cap holds.
+    var now = 1000;
+    sm.startSession(now);
+    for (var i = 0; i < ids.size(); i += 1) {
+        now += 600;
+        sm.selectActivity(ids[i], now);
+    }
+    now += 600;
+    sm.stopPress(now);
+    sm.stopPress(now);
+    sm.confirmEnd(now + 10);
+
+    var text = sm.summaryText();
+    Test.assertEqual(text.length(), sm.SUMMARY_MAX);
+    Test.assertEqual(rec.finishSummary, text);
+
+    var chars = text.toCharArray();
+    for (var i = 0; i < chars.size(); i += 1) {
+        Test.assert(chars[i].toNumber() < 128);
+    }
+    return true;
+}
+
 (:test)
 function testAutoSwitchIsZeroGap(logger) {
     var sm = new SessionManager(new FakeRecorder());

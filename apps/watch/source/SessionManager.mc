@@ -37,7 +37,15 @@ class SessionManager {
 
     //! Max length of the session-summary string written to the FIT session field.
     //! Bounds the FIT string buffer (see Recorder); longer summaries are truncated.
-    const SUMMARY_MAX = 240;
+    //!
+    //! Deliberately smaller than the buffer Recorder sizes for it. A FitContributor
+    //! string field is a byte buffer, but String.length() counts characters, and
+    //! setData writes length() + 1 bytes out of the UTF-8 encoding — so one
+    //! multi-byte character in the summary makes the write one byte longer than
+    //! the cap accounts for. summaryText() stays ASCII-only so the two agree, and
+    //! this headroom means a stray non-ASCII character truncates the tail rather
+    //! than overrunning the buffer.
+    const SUMMARY_MAX = 200;
 
     private var _recorder;
     private var _state;
@@ -344,18 +352,26 @@ class SessionManager {
     //! session field so it surfaces on the activity (§5). Mirrors the on-watch
     //! summary content. Capped at SUMMARY_MAX chars so it can't overflow the FIT
     //! string buffer.
+    //!
+    //! **ASCII only.** This string is measured in characters here and written as
+    //! bytes into a fixed buffer, so a multi-byte separator (a "·" costs two
+    //! bytes) silently eats a character off the tail, and enough of them push the
+    //! write past the buffer and take the app down mid-save — losing the closing
+    //! lap's label and the summary with it. The screen summary is free to use
+    //! nicer glyphs; this line is not. Station names come from the catalogue,
+    //! which is ASCII for the same reason.
     function summaryText() as Lang.String {
         var out = "Total " + Fmt.duration(totalSeconds());
         var aggs = activityAggregates();
         for (var i = 0; i < aggs.size(); i += 1) {
             var a = aggs[i];
-            out += " · " + a.displayName + " " + Fmt.duration(a.totalSeconds);
+            out += " - " + a.displayName + " " + Fmt.duration(a.totalSeconds);
             if (a.visits > 1) {
                 out += " x" + a.visits.format("%d");
             }
             out += " (HR " + Fmt.hr(a.hrAvg()) + "/" + Fmt.hr(a.hrMax) + ")";
         }
-        out += " · Trans " + Fmt.duration(transitionSeconds());
+        out += " - Trans " + Fmt.duration(transitionSeconds());
         if (out.length() > SUMMARY_MAX) {
             out = out.substring(0, SUMMARY_MAX) as Lang.String;
         }
