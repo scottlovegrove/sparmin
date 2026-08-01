@@ -54,6 +54,15 @@ class BackendClient {
             _enqueue(payload);
             return;
         }
+        if (queuedCount() > 0) {
+            // Something older is already waiting. Go behind it rather than
+            // jumping the queue: these are a diary, and posting the newest first
+            // would also put it at the front of the queue on a failure, where
+            // the trim takes the front.
+            _enqueue(payload);
+            flushQueue();
+            return;
+        }
         _post(payload);
     }
 
@@ -123,8 +132,13 @@ class BackendClient {
         }
 
         if (responseCode == 401) {
-            WatchLog.add("send: rejected, unlinking");
+            // Terminal: the token is gone or revoked. Drop the queue with it —
+            // it was recorded for an account this watch is no longer attached
+            // to, and linking to a different one later must not deliver someone
+            // else's visits into it. The FITs are all still in Garmin Connect.
+            WatchLog.add("send: rejected, unlinking and clearing " + queuedCount());
             LinkConfig.clearToken();
+            Application.Storage.deleteValue(QUEUE_KEY);
             return;
         }
 
