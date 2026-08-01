@@ -1,5 +1,6 @@
 import Toybox.Lang;
 import Toybox.Application;
+import Toybox.System;
 
 //! Session states (§5). These drive both the UI and the FIT recorder.
 enum {
@@ -404,6 +405,11 @@ class SessionManager {
             "endedAt" => Iso.fromEpoch(_sessionEnd),
             "totalSeconds" => totalSeconds(),
             "transitionSeconds" => transitionSeconds(),
+            // Iso.fromEpoch formats UTC, so without this the payload carries no
+            // local time at all and the companion cannot say when the visit was.
+            "utcOffsetS" => System.getClockTime().timeZoneOffset,
+            "installId" => LinkConfig.installId(),
+            "appVersion" => Version.APP,
             "activities" => activities,
             "segments" => segs
         };

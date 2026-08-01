@@ -82,6 +82,10 @@ class ConfirmEndDelegate extends WatchUi.InputDelegate {
     //! Save the FIT and show the summary.
     private function _save() as Void {
         _session.confirmEnd(now());   // stops + saves the FIT activity
+        // Only once the FIT is safely closed. The recording is the record; the
+        // upload is a convenience on top of it, and must never be able to
+        // affect it.
+        getApp().getBackend().send(_session.buildPayload());
         var sv = new SummaryView(_stripView);
         WatchUi.switchToView(sv, new SummaryDelegate(sv), WatchUi.SLIDE_UP);
     }

@@ -4,14 +4,27 @@ import Toybox.Communications;
 import Toybox.PersistedContent;
 import Toybox.System;
 
-//! Posts the session summary (§12) to the backend, with an offline queue that
-//! retries on the next launch when the phone is connected (§11). The backend
-//! itself is a separate deliverable; this only honours the POST contract.
+//! Posts a finished session to the companion, with an offline queue for the ones
+//! that couldn't go at the time.
+//!
+//! The FIT is the record; this is a convenience on top of it. Nothing here may
+//! ever affect the recording, and a session that never sends is recoverable by
+//! exporting its activity and importing that instead — which is why a failure
+//! costs a log line rather than anything on screen mid-session.
 class BackendClient {
 
-    // Point this at the real backend once it exists (§12 contract).
-    const URL = "https://spa-logger.example.com/sessions";
     const QUEUE_KEY = "pendingPayloads";
+
+    //! Sessions to keep when the phone has been away. Twenty is more than a
+    //! fortnight of daily visits; past that the oldest go, because an unbounded
+    //! array in Storage is a memory risk on a watch and anything this old is
+    //! still sitting in Garmin Connect as a FIT.
+    const MAX_QUEUED = 20;
+
+    //! How many times a payload may fail before it is dropped. Without this, one
+    //! payload the server will never accept — a validation bug, say — is retried
+    //! on every launch for ever, and blocks the queue behind it.
+    const MAX_ATTEMPTS = 5;
 
     private var _inFlight;   // payload currently being POSTed (for re-queue on failure)
 
@@ -19,19 +32,27 @@ class BackendClient {
         _inFlight = null;
     }
 
-    //! Send now if the phone is connected, otherwise queue for later.
+    //! Send now if there is a phone and a token, otherwise keep it for later.
     function send(payload) {
+        if (!LinkConfig.isLinked()) {
+            // Not linked, so there is nowhere to send it and no point hoarding
+            // it: the FIT is safe, and linking later does not retroactively make
+            // this session sendable.
+            WatchLog.add("send: not linked, skipping");
+            return;
+        }
         if (_isConnected()) {
             _post(payload);
         } else {
+            WatchLog.add("send: no phone, queued");
             _enqueue(payload);
         }
     }
 
-    //! Retry queued payloads. Call on app start (and when connectivity returns).
+    //! Retry queued payloads. Called on app start, and after each response.
     //! Posts one at a time; a failure re-queues via the response callback.
     function flushQueue() {
-        if (!_isConnected() || _inFlight != null) {
+        if (!_isConnected() || _inFlight != null || !LinkConfig.isLinked()) {
             return;
         }
         var queue = _queue();
@@ -45,45 +66,118 @@ class BackendClient {
             rest.add(queue[i]);
         }
         Application.Storage.setValue(QUEUE_KEY, rest);
+        WatchLog.add("send: retrying queued, " + rest.size() + " behind it");
         _post(next);
     }
 
+    function queuedCount() {
+        return _queue().size();
+    }
+
     private function _isConnected() {
-        var ds = System.getDeviceSettings();
-        return ds != null && ds.phoneConnected;
+        return System.getDeviceSettings().phoneConnected;
     }
 
     private function _post(payload) {
         _inFlight = payload;
         Communications.makeWebRequest(
-            URL,
+            Backend.URL + "/api/sessions/watch",
             payload,
             {
                 :method => Communications.HTTP_REQUEST_METHOD_POST,
                 :headers => {
-                    "Content-Type" => Communications.REQUEST_CONTENT_TYPE_JSON
+                    "Content-Type" => Communications.REQUEST_CONTENT_TYPE_JSON,
+                    "Authorization" => "Bearer " + LinkConfig.token()
                 },
                 :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
             },
-            method(:_onResponse)
+            method(:onResponse)
         );
     }
 
-    function _onResponse(responseCode as Lang.Number, data as Null or Lang.Dictionary or Lang.String or PersistedContent.Iterator) as Void {
-        if (responseCode != 200 && responseCode != 201) {
-            if (_inFlight != null) {
-                _enqueue(_inFlight);
-            }
-        }
+    //! Public so `method(:onResponse)` can reach it; not for callers.
+    //!
+    //! 200 and 201 are both success: the companion answers 200 when it already
+    //! had the session, which is the ordinary outcome of a retry rather than a
+    //! problem. 401 is the only terminal answer — the token is gone or revoked,
+    //! and queueing against a dead credential just hides that from the wearer.
+    function onResponse(
+        responseCode as Lang.Number,
+        data as Null or Lang.Dictionary or Lang.String or PersistedContent.Iterator
+    ) as Void {
+        var payload = _inFlight;
         _inFlight = null;
-        // Drain the rest of the queue opportunistically.
-        flushQueue();
+
+        if (responseCode == 200 || responseCode == 201) {
+            WatchLog.add("send: ok " + responseCode);
+            flushQueue();
+            return;
+        }
+
+        if (responseCode == 401) {
+            WatchLog.add("send: rejected, unlinking");
+            LinkConfig.clearToken();
+            return;
+        }
+
+        WatchLog.add("send: failed " + responseCode);
+        if (payload != null) {
+            _requeue(payload);
+        }
+        // Deliberately not draining the rest here. The previous version retried
+        // the whole queue on every failure, which turns one unreachable server
+        // into a tight loop; the next launch is soon enough.
+    }
+
+    //! Put a failed payload back at the *front*. Appending it would reorder the
+    //! queue, and these are a diary — they should reach the companion in the
+    //! order they happened.
+    private function _requeue(payload) {
+        var attempts = _attempts(payload) + 1;
+        if (attempts >= MAX_ATTEMPTS) {
+            WatchLog.add("send: giving up after " + attempts);
+            return;
+        }
+        (payload as Lang.Dictionary)["attempts"] = attempts;
+
+        var queue = _queue();
+        var restored = [payload];
+        for (var i = 0; i < queue.size(); i += 1) {
+            restored.add(queue[i]);
+        }
+        _store(restored);
+    }
+
+    private function _attempts(payload) {
+        var stored = (payload as Lang.Dictionary)["attempts"];
+        return (stored instanceof Lang.Number) ? stored : 0;
     }
 
     private function _enqueue(payload) {
         var queue = _queue();
         queue.add(payload);
-        Application.Storage.setValue(QUEUE_KEY, queue);
+        _store(queue);
+    }
+
+    //! Write the queue back, trimmed to the cap.
+    private function _store(queue as Lang.Array) as Void {
+        var trimmed = trimQueue(queue, MAX_QUEUED);
+        if (trimmed.size() < queue.size()) {
+            WatchLog.add("send: queue full, dropped " + (queue.size() - trimmed.size()));
+        }
+        Application.Storage.setValue(QUEUE_KEY, trimmed);
+    }
+
+    //! Drop from the front until the queue fits. Oldest first, deliberately: an
+    //! old session is the one most likely to have been exported and imported by
+    //! hand already, and the newest is the one the wearer just finished.
+    //! Pure, so it can be tested without a phone or a backend.
+    function trimQueue(queue as Lang.Array, max) as Lang.Array {
+        var trimmed = queue;
+        while (trimmed.size() > max) {
+            trimmed = trimmed.slice(1, trimmed.size()) as Lang.Array;
+        }
+        return trimmed;
     }
 
     private function _queue() as Lang.Array {
