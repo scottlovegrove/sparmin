@@ -67,7 +67,11 @@ export function LinkedWatches() {
     const [revoking, setRevoking] = useState<LinkedDevice | null>(null)
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [linked, setLinked] = useState(false)
+    // How many watches the list should show once the one just approved appears.
+    // Approving does not create the device row — the watch's next poll does — so
+    // for a few seconds after a successful link the list is legitimately still
+    // one short, and saying "no watches linked yet" then reads as a failure.
+    const [expectedCount, setExpectedCount] = useState<number | null>(null)
 
     useEffect(() => {
         const abort = new AbortController()
@@ -85,12 +89,39 @@ export function LinkedWatches() {
         return () => abort.abort()
     }, [reloadKey])
 
+    // Keep checking until the watch collects its token and appears. It polls
+    // every five seconds, so this is a handful of refreshes at most; if it never
+    // shows up — the watch went out of range, say — the wait stops rather than
+    // spinning for ever, and the list is simply accurate again.
+    const awaiting =
+        expectedCount != null && state.status === 'ready' && state.devices.length < expectedCount
+    useEffect(() => {
+        if (expectedCount != null && state.status === 'ready' && !awaiting) {
+            setExpectedCount(null)
+            return
+        }
+        if (!awaiting) {
+            return
+        }
+        const timer = setTimeout(() => setReloadKey((key) => key + 1), 2000)
+        return () => clearTimeout(timer)
+    }, [awaiting, expectedCount, state.status])
+
+    useEffect(() => {
+        if (expectedCount == null) {
+            return
+        }
+        // Stop waiting after a while whatever happens, so a watch that never
+        // arrives leaves a truthful list rather than a permanent "waiting".
+        const giveUp = setTimeout(() => setExpectedCount(null), 30_000)
+        return () => clearTimeout(giveUp)
+    }, [expectedCount])
+
     // Look up what is asking before committing to it, so the confirmation can
     // name the watch rather than asking the user to trust a code they typed.
     async function handleCheck(event: FormEvent) {
         event.preventDefault()
         setError(null)
-        setLinked(false)
         setChecking(true)
         try {
             const res = await fetch(`/api/device/pending/${normaliseUserCode(code)}`)
@@ -125,7 +156,7 @@ export function LinkedWatches() {
             }
             setPending(null)
             setCode('')
-            setLinked(true)
+            setExpectedCount((state.status === 'ready' ? state.devices.length : 0) + 1)
             setReloadKey((key) => key + 1)
         } catch {
             setError("Couldn't reach the server — try again")
@@ -169,7 +200,7 @@ export function LinkedWatches() {
                 <p className="muted small">Loading…</p>
             ) : state.status === 'error' ? (
                 <p className="error small">Couldn’t load your watches — reload to try again.</p>
-            ) : state.devices.length > 0 ? (
+            ) : state.devices.length > 0 || awaiting ? (
                 <ul className="watches">
                     {state.devices.map((device) => (
                         <li key={device.id}>
@@ -216,7 +247,9 @@ export function LinkedWatches() {
                     {checking ? 'Checking…' : 'Link a watch'}
                 </button>
             </form>
-            {linked && <p className="muted small">Linked — your watch should say so too.</p>}
+            {awaiting && (
+                <p className="muted small">Approved — waiting for your watch to pick it up…</p>
+            )}
             {error && <p className="error small">{error}</p>}
 
             {pending && (
