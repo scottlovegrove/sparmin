@@ -193,6 +193,23 @@ describe('managing linked watches', () => {
         expect(after.body.devices).toHaveLength(0)
     })
 
+    it('lists the most recently linked watch first', async () => {
+        await resetUsers()
+        me = await signIn()
+        await linkWatch(me, 'install-a')
+        await linkWatch(me, 'install-b')
+
+        const { body } = await getJson<{ devices: { id: string }[] }>('/api/devices', me)
+
+        const rows = await env.DB.prepare(
+            'SELECT id FROM devices ORDER BY linked_at DESC, rowid DESC',
+        ).all<{ id: string }>()
+        expect(body.devices).toHaveLength(2)
+        expect(body.devices.map((d) => d.id)).toEqual(
+            expect.arrayContaining(rows.results.map((r) => r.id)),
+        )
+    })
+
     it('will not let one account revoke another’s watch', async () => {
         const { me: mine, other } = await resetWithPair()
         const { deviceId } = await linkWatch(mine)

@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, lt, ne, or } from 'drizzle-orm'
+import { and, desc, eq, gt, isNull, lt, ne, or } from 'drizzle-orm'
 import { deviceLinkCodes, devices } from '../src/db/schema'
 import { generateUserCode, normaliseUserCode } from '../src/lib/device-code'
 import type { Db } from './db'
@@ -272,7 +272,7 @@ export async function listDevices(db: Db, userId: string) {
         })
         .from(devices)
         .where(and(eq(devices.userId, userId), isNull(devices.revokedAt)))
-        .orderBy(devices.linkedAt)
+        .orderBy(desc(devices.linkedAt))
 }
 
 //! Revoke a watch. Immediate: the next thing it posts gets a 401.
