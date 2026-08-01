@@ -23,32 +23,44 @@ export const watchActivitySchema = z.object({
     hrMin: heartRate,
 })
 
-export const watchSegmentSchema = z.object({
-    activityId: z.string().min(1).max(64),
-    startedAt: z.iso.datetime(),
-    endedAt: z.iso.datetime(),
-    hrAvg: heartRate,
-    hrMax: heartRate,
-    hrMin: heartRate,
-})
+export const watchSegmentSchema = z
+    .object({
+        activityId: z.string().min(1).max(64),
+        startedAt: z.iso.datetime(),
+        endedAt: z.iso.datetime(),
+        hrAvg: heartRate,
+        hrMax: heartRate,
+        hrMin: heartRate,
+    })
+    // A stay that ends before it starts would be stored with a negative
+    // duration and silently poison every total derived from it.
+    .refine((segment) => Date.parse(segment.endedAt) >= Date.parse(segment.startedAt), {
+        message: '`endedAt` must not be before `startedAt`',
+        path: ['endedAt'],
+    })
 
-export const watchPayloadSchema = z.object({
-    // The watch mints this, and it is what makes a re-send from the offline
-    // queue idempotent rather than a duplicate.
-    sessionId: z.uuid(),
-    startedAt: z.iso.datetime(),
-    endedAt: z.iso.datetime(),
-    totalSeconds: z.number().nonnegative(),
-    transitionSeconds: z.number().nonnegative(),
-    // Added alongside the watch-side wiring; defaulted so this endpoint can land
-    // and be exercised before the watch app ships them.
-    utcOffsetS: z.number().int().nullish().default(null),
-    installId: z.string().min(1).max(128).nullish().default(null),
-    appVersion: z.string().min(1).max(32).nullish().default(null),
-    activities: z.array(watchActivitySchema),
-    // Stays only — the watch does not send the walks between them.
-    segments: z.array(watchSegmentSchema).min(1),
-})
+export const watchPayloadSchema = z
+    .object({
+        // The watch mints this, and it is what makes a re-send from the offline
+        // queue idempotent rather than a duplicate.
+        sessionId: z.uuid(),
+        startedAt: z.iso.datetime(),
+        endedAt: z.iso.datetime(),
+        totalSeconds: z.number().nonnegative(),
+        transitionSeconds: z.number().nonnegative(),
+        // Added alongside the watch-side wiring; defaulted so this endpoint can land
+        // and be exercised before the watch app ships them.
+        utcOffsetS: z.number().int().nullish().default(null),
+        installId: z.string().min(1).max(128).nullish().default(null),
+        appVersion: z.string().min(1).max(32).nullish().default(null),
+        activities: z.array(watchActivitySchema),
+        // Stays only — the watch does not send the walks between them.
+        segments: z.array(watchSegmentSchema).min(1),
+    })
+    .refine((payload) => Date.parse(payload.endedAt) >= Date.parse(payload.startedAt), {
+        message: '`endedAt` must not be before `startedAt`',
+        path: ['endedAt'],
+    })
 
 export type WatchActivity = z.infer<typeof watchActivitySchema>
 export type WatchSegment = z.infer<typeof watchSegmentSchema>

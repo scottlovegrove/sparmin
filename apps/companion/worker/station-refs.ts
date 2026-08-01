@@ -1,4 +1,4 @@
-import { eq, inArray, or } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 import { stations } from '../src/db/schema'
 import type { Db } from './db'
 
@@ -46,7 +46,7 @@ export async function resolveStations(
                 ? or(inArray(stations.name, names), inArray(stations.slug, slugs))
                 : inArray(stations.name, names),
         )
-    const byName = new Map(known.map((row) => [row.name, row.id]))
+    const byName = new Map(known.map((row) => [row.name, row]))
     const bySlug = new Map(
         known.filter((row) => row.slug != null).map((row) => [row.slug as string, row.id]),
     )
@@ -56,18 +56,26 @@ export async function resolveStations(
     const missing: StationRef[] = []
 
     for (const [key, ref] of unique) {
-        const id = ref.kind === 'name' ? byName.get(ref.name) : bySlug.get(ref.slug)
+        const id = ref.kind === 'name' ? byName.get(ref.name)?.id : bySlug.get(ref.slug)
         if (id != null) {
             resolved.set(key, id)
             continue
         }
-        // A slug the catalogue lacks, but whose display name it has: the row a
-        // FIT import created before the watch was ever linked. Claim it.
         if (ref.kind === 'slug') {
-            const adopted = byName.get(label(ref))
-            if (adopted != null) {
-                resolved.set(key, adopted)
-                adoptions.push({ id: adopted, slug: ref.slug })
+            const named = byName.get(label(ref))
+            // A slug the catalogue lacks, but whose display name it has: the row
+            // a FIT import created before the watch was ever linked. Claim it —
+            // but only while it is unclaimed. `stations` is shared by every
+            // account, so a stale or wrong payload must not be able to repoint a
+            // slug and break resolution for everyone.
+            if (named != null && named.slug == null) {
+                resolved.set(key, named.id)
+                adoptions.push({ id: named.id, slug: ref.slug })
+                continue
+            }
+            // Already spoken for by a different id: use the row, change nothing.
+            if (named != null) {
+                resolved.set(key, named.id)
                 continue
             }
         }
@@ -75,7 +83,11 @@ export async function resolveStations(
     }
 
     for (const adoption of adoptions) {
-        await db.update(stations).set({ slug: adoption.slug }).where(eq(stations.id, adoption.id))
+        await db
+            .update(stations)
+            .set({ slug: adoption.slug })
+            // Still unclaimed at write time, not merely when it was read.
+            .where(and(eq(stations.id, adoption.id), isNull(stations.slug)))
     }
 
     if (missing.length === 0) {

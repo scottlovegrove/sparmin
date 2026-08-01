@@ -137,6 +137,50 @@ describe('a session the watch posts', () => {
         expect(station).toMatchObject({ slug: 'cryo_chamber', thermal_class: 'unclassified' })
     })
 
+    it('rejects a stay that ends before it starts', async () => {
+        // Stored as a negative duration it would silently poison every total
+        // derived from it.
+        const res = await postWatchSession(
+            token,
+            watchPayload({
+                stays: [
+                    {
+                        activityId: 'salt_sauna',
+                        displayName: 'Himalayan salt sauna',
+                        startedAt: '2026-07-03T15:56:01Z',
+                        endedAt: '2026-07-03T15:41:01Z',
+                    },
+                ],
+            }),
+        )
+
+        expect(res.status).toBe(400)
+        expect(await countRows('sessions')).toBe(0)
+    })
+
+    it('does not move a slug another station already owns', async () => {
+        // `stations` is shared by every account, so a stale payload naming a
+        // seeded station under a different id must not repoint it.
+        await postWatchSession(
+            token,
+            watchPayload({
+                stays: [
+                    {
+                        activityId: 'wrong_id_for_salt_sauna',
+                        displayName: 'Himalayan salt sauna',
+                        startedAt: '2026-07-03T15:41:01Z',
+                        endedAt: '2026-07-03T15:56:01Z',
+                    },
+                ],
+            }),
+        )
+
+        const row = await env.DB.prepare(
+            `SELECT slug FROM stations WHERE name = 'Himalayan salt sauna'`,
+        ).first<{ slug: string }>()
+        expect(row?.slug).toBe('salt_sauna')
+    })
+
     it('rejects a payload that fails validation', async () => {
         const res = await postWatchSession(token, { ...watchPayload(), sessionId: 'not-a-uuid' })
 
