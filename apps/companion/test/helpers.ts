@@ -154,3 +154,63 @@ export async function getJson<T>(
     const res = await app.request(path, { headers: who.headers }, env)
     return { status: res.status, body: (await res.json()) as T }
 }
+
+// ---- Device linking ----
+
+// Ask for a pairing code the way a watch does: no cookie, because it has none.
+export async function requestCode(
+    installId = 'install-a',
+    product: string | null = 'vivoactive5',
+): Promise<{ userCode: string; deviceCode: string; interval: number; expiresIn: number }> {
+    const res = await app.request(
+        '/api/device/code',
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ installId, product }),
+        },
+        env,
+    )
+    expect(res.status).toBe(201)
+    return res.json()
+}
+
+// Poll for the token, again unauthenticated.
+export async function pollToken(deviceCode: string): Promise<Response> {
+    return app.request(
+        '/api/device/token',
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceCode }),
+        },
+        env,
+    )
+}
+
+// Approve a pending code as a signed-in user.
+export async function approveCode(who: SignedIn, userCode: string): Promise<Response> {
+    return app.request(
+        '/api/device/approve',
+        {
+            method: 'POST',
+            headers: { ...who.headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userCode }),
+        },
+        env,
+    )
+}
+
+// The whole link flow end to end, for suites that need a linked watch rather
+// than the linking itself. Returns the bearer token and the device row's id.
+export async function linkWatch(
+    who: SignedIn,
+    installId = 'install-a',
+): Promise<{ token: string; deviceId: string }> {
+    const { userCode, deviceCode } = await requestCode(installId)
+    expect((await approveCode(who, userCode)).status).toBe(200)
+    const res = await pollToken(deviceCode)
+    const body = (await res.json()) as { status: string; token: string; deviceId: string }
+    expect(body.status).toBe('linked')
+    return { token: body.token, deviceId: body.deviceId }
+}
