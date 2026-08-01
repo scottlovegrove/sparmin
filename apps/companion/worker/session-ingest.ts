@@ -343,13 +343,9 @@ export async function ingestWatchSession(
     device: { id: string; product: string | null },
     payload: WatchPayload,
 ): Promise<IngestResult> {
-    const [already] = await db
-        .select({ id: sessions.id })
-        .from(sessions)
-        .where(and(eq(sessions.userId, userId), eq(sessions.watchSessionId, payload.sessionId)))
-        .limit(1)
+    const already = await findByWatchSessionId(db, userId, payload.sessionId)
     if (already != null) {
-        return { status: 'duplicate', id: already.id }
+        return { status: 'duplicate', id: already }
     }
 
     const arriving = watchToArriving(payload, device)
@@ -414,8 +410,35 @@ export async function ingestWatchSession(
         db,
         arriving.intervals.map((interval) => interval.station),
     )
-    return {
-        status: 'created',
-        id: await insertSession(db, userId, crypto.randomUUID(), arriving, stationIds),
+    try {
+        return {
+            status: 'created',
+            id: await insertSession(db, userId, crypto.randomUUID(), arriving, stationIds),
+        }
+    } catch (err) {
+        // Two re-sends of the same session can both clear the check above before
+        // either insert lands; the unique index on watch_session_id then rejects
+        // the loser. That is still a duplicate, not a failure — the watch is
+        // retrying, which is what it is supposed to do.
+        const raced = await findByWatchSessionId(db, userId, payload.sessionId)
+        if (raced != null) {
+            return { status: 'duplicate', id: raced }
+        }
+        throw err
     }
+}
+
+//! The session this watch id already wrote, if any. Scoped to the user: the id
+//! is the watch's own, so it is only unique in the context of an account.
+async function findByWatchSessionId(
+    db: Db,
+    userId: string,
+    watchSessionId: string,
+): Promise<string | null> {
+    const [row] = await db
+        .select({ id: sessions.id })
+        .from(sessions)
+        .where(and(eq(sessions.userId, userId), eq(sessions.watchSessionId, watchSessionId)))
+        .limit(1)
+    return row?.id ?? null
 }

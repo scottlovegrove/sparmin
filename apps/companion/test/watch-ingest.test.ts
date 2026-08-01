@@ -95,6 +95,18 @@ describe('a session the watch posts', () => {
         expect(await countRows('sessions')).toBe(1)
     })
 
+    it('reports a re-send as a duplicate even when both land at once', async () => {
+        // The offline queue can fire twice before either insert commits; the
+        // unique index catches the loser, and it is still a duplicate.
+        const [first, second] = await Promise.all([
+            postWatchSession(token, watchPayload()),
+            postWatchSession(token, watchPayload()),
+        ])
+
+        expect([first.status, second.status].sort()).toEqual([200, 201])
+        expect(await countRows('sessions')).toBe(1)
+    })
+
     it('notes that the watch is still talking to us', async () => {
         await postWatchSession(token, watchPayload())
 
