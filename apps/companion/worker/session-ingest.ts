@@ -3,6 +3,7 @@ import { sessions, stationIntervals, stations } from '../src/db/schema'
 import {
     type ArrivingSession,
     SESSION_MATCH_WINDOW_S,
+    alignWatchSegments,
     alreadyContributed,
     mergeSession,
 } from '../src/lib/session-merge'
@@ -76,6 +77,19 @@ async function resolveStationIds(db: Db, labels: string[]): Promise<Map<string, 
         }
     }
     return byName
+}
+
+//! Which of these station ids are transitions — the walk between two stays, which
+//! the FIT records as a lap of its own and the watch never sends at all.
+async function transitionStationIds(db: Db, ids: readonly number[]): Promise<Set<number>> {
+    if (ids.length === 0) {
+        return new Set()
+    }
+    const rows = await db
+        .select({ id: stations.id, isTransition: stations.isTransition })
+        .from(stations)
+        .where(inArray(stations.id, [...new Set(ids)]))
+    return new Set(rows.filter((row) => row.isTransition).map((row) => row.id))
 }
 
 //! The session this one is another recording of, if there is one.
@@ -167,16 +181,8 @@ export async function ingestSession(
     const arriving = fitToArriving(payload)
     const match = await findMatch(db, userId, arriving.startedAt)
 
-    if (match != null) {
-        if (alreadyContributed(match.source, arriving.session.source)) {
-            return { status: 'duplicate', id: match.id }
-        }
-        // The other source recorded this visit first. Fill in what it lacked;
-        // the interval work belongs to whichever source owns the spine, and only
-        // the watch path has a second list to reconcile — see §3.4.
-        const patch = mergeSession(match, arriving.session)
-        await db.update(sessions).set(patch).where(eq(sessions.id, match.id))
-        return { status: 'merged', id: match.id }
+    if (match != null && alreadyContributed(match.source, arriving.session.source)) {
+        return { status: 'duplicate', id: match.id }
     }
 
     const stationIds = await resolveStationIds(
@@ -184,6 +190,72 @@ export async function ingestSession(
         arriving.intervals.map((interval) => interval.station),
     )
     const now = Math.floor(Date.now() / 1000)
+
+    if (match != null) {
+        // The watch recorded this visit first. Its rows are its stays; the FIT
+        // has a lap for every transition too, and per-lap timings and calories
+        // the watch never had — so the FIT becomes the spine and the stored rows
+        // are replaced, carrying across the one thing only the watch knew (§3.4).
+        const stored = await db
+            .select({
+                lapIndex: stationIntervals.lapIndex,
+                stationId: stationIntervals.stationId,
+                minHr: stationIntervals.minHr,
+            })
+            .from(stationIntervals)
+            .where(eq(stationIntervals.sessionId, match.id))
+            .orderBy(stationIntervals.lapIndex)
+
+        const spine = arriving.intervals.map((interval) => ({
+            lapIndex: interval.lapIndex,
+            stationId: stationIds.get(interval.station) as number,
+            isTransition: false,
+        }))
+        const transitions = await transitionStationIds(
+            db,
+            spine.map((interval) => interval.stationId),
+        )
+        const aligned = alignWatchSegments(
+            spine.map((interval) => ({
+                ...interval,
+                isTransition: transitions.has(interval.stationId),
+            })),
+            stored.map((row) => ({ stationId: row.stationId, minHr: row.minHr })),
+        )
+        // A disagreement means an assumption behind the match already failed.
+        // Take the FIT's laps and drop the minimums rather than risk pinning one
+        // to the wrong station.
+        const minHrByLapIndex =
+            aligned.status === 'aligned'
+                ? aligned.minHrByLapIndex
+                : new Map<number, number | null>()
+
+        await db.batch([
+            db
+                .update(sessions)
+                .set(mergeSession(match, arriving.session))
+                .where(eq(sessions.id, match.id)),
+            db.delete(stationIntervals).where(eq(stationIntervals.sessionId, match.id)),
+            ...arriving.intervals.map((interval) =>
+                db.insert(stationIntervals).values({
+                    sessionId: match.id,
+                    userId,
+                    stationId: stationIds.get(interval.station) as number,
+                    lapIndex: interval.lapIndex,
+                    startedAt: interval.startedAt,
+                    endedAt: Math.round(interval.startedAt + interval.elapsedS),
+                    elapsedS: interval.elapsedS,
+                    timerS: interval.timerS,
+                    avgHr: interval.avgHr,
+                    maxHr: interval.maxHr,
+                    minHr: minHrByLapIndex.get(interval.lapIndex) ?? null,
+                    calories: interval.calories,
+                    cycles: interval.cycles,
+                }),
+            ),
+        ])
+        return { status: 'merged', id: match.id }
+    }
 
     const sessionRow = db.insert(sessions).values({
         id: payload.id,

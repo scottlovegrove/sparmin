@@ -183,3 +183,92 @@ describe('POST /api/sessions', () => {
         expect(await countRows('station_intervals')).toBe(0)
     })
 })
+
+// A visit the watch sent live, seeded directly: the watch cannot post one until
+// PR4, but the merge path it will use exists now and would otherwise ship
+// untested. Its rows are stays only — the watch never records a transition.
+describe('a FIT completing a session the watch sent first', () => {
+    beforeEach(async () => {
+        await resetUsers()
+        me = await signIn()
+    })
+
+    async function seedWatchSession(minHr: number): Promise<void> {
+        const station = await env.DB.prepare(
+            `SELECT id FROM stations WHERE name = 'Himalayan salt sauna'`,
+        ).first<{ id: number }>()
+
+        await env.DB.batch([
+            env.DB.prepare(
+                `INSERT INTO sessions
+                    (id, user_id, started_at, ended_at, total_elapsed_s, created_at,
+                     source, watch_session_id, device_serial, total_calories, avg_hr)
+                 VALUES (?, ?, 1783496460, 1783498773, 2313, 1783498800,
+                         'watch', 'watch-session-a', NULL, NULL, 95)`,
+            ).bind(uuid(7), me.userId),
+            env.DB.prepare(
+                `INSERT INTO station_intervals
+                    (session_id, user_id, station_id, lap_index, started_at, ended_at,
+                     elapsed_s, avg_hr, max_hr, min_hr)
+                 VALUES (?, ?, ?, 0, 1783496461, 1783497361, 899.945, 98, 119, ?)`,
+            ).bind(uuid(7), me.userId, station?.id, minHr),
+        ])
+    }
+
+    it('merges rather than creating a second session', async () => {
+        await seedWatchSession(71)
+
+        const res = await post(payload())
+
+        expect(res.status).toBe(200)
+        expect(await res.json()).toMatchObject({ status: 'merged', id: uuid(7) })
+        expect(await countRows('sessions')).toBe(1)
+    })
+
+    it('fills in what only Garmin measured, and marks the session as both', async () => {
+        await seedWatchSession(71)
+
+        await post(payload())
+
+        const row = await env.DB.prepare('SELECT * FROM sessions').first<Record<string, unknown>>()
+        expect(row).toMatchObject({
+            source: 'both',
+            device_serial: '1234567890',
+            total_calories: 267,
+            // The watch's id survives — the FIT has no way to know it.
+            watch_session_id: 'watch-session-a',
+            // Garmin's heart rates span the whole visit, the watch's only the stays.
+            avg_hr: 99,
+        })
+    })
+
+    it('takes the FIT laps as the spine, transitions and all', async () => {
+        await seedWatchSession(71)
+
+        await post(payload())
+
+        const rows = await env.DB.prepare(
+            `SELECT si.lap_index, si.min_hr, si.timer_s, s.name
+             FROM station_intervals si JOIN stations s ON s.id = si.station_id
+             ORDER BY si.lap_index`,
+        ).all<{ lap_index: number; min_hr: number | null; timer_s: number | null; name: string }>()
+
+        // The watch had one row; the FIT's two replace it.
+        expect(rows.results.map((r) => r.name)).toEqual(['transition', 'Himalayan salt sauna'])
+        // Per-lap timings the watch never had.
+        expect(rows.results[1].timer_s).toBe(899.945)
+        // And the one thing only the watch knew, on the right lap.
+        expect(rows.results[0].min_hr).toBeNull()
+        expect(rows.results[1].min_hr).toBe(71)
+    })
+
+    it('is a duplicate the second time, not another merge', async () => {
+        await seedWatchSession(71)
+        await post(payload())
+
+        const res = await post(payload({ id: uuid(3) }))
+
+        expect(res.status).toBe(409)
+        expect(await countRows('sessions')).toBe(1)
+    })
+})
