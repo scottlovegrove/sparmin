@@ -151,10 +151,31 @@ in the manifest, signed with your developer key.
 - **VS Code:** run **"Monkey C: Export Project"** — it produces the `.iq`.
 - **CLI:** roughly
   ```sh
-  monkeyc -e -f monkey.jungle -o Sparmin.iq -y ~/.Garmin/ConnectIQ/developer_key -r
+  JAVA_TOOL_OPTIONS="-Djava.awt.headless=true" \
+    monkeyc -e -f monkey.jungle -o bin/Sparmin-<version>.iq \
+      -y ~/.Garmin/ConnectIQ/developer_key -r -w
   ```
   (`-e` export/package, `-r` release. Check `monkeyc --help` for the current
   flags on your SDK.)
+
+**The headless flag is not optional on WSL** — or anywhere else without a
+reachable X server. Unlike a per-device `monkeyc -d` build, the packaging tool
+scales the launcher icon through AWT, so it wants a graphics environment and dies
+without one:
+
+```
+0 OUT OF 174 DEVICES BUILT
+java.awt.AWTError: Can't connect to X11 window server using ':0'
+```
+
+It is worth knowing what that failure looks like when it isn't in front of you:
+run detached, the same command **exits 0, prints nothing, and writes no file**.
+An export that appears to have succeeded but left the previous `.iq` in place is
+this, every time — check the file's timestamp, not the exit code.
+
+Name the output for its version. The `.iq` is 7 MB of nothing you can eyeball,
+`bin/` accumulates them, and the only thing distinguishing last release's package
+from this one in a file picker is the name.
 
 **Critical:** the `.iq` is signed with your developer key, and every future
 update must use the **same key** or the Store treats it as a different app. Keep
