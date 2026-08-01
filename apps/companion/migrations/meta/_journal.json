@@ -22,6 +22,13 @@
       "when": 1784301137244,
       "tag": "0003_wonderful_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785600000000,
+      "tag": "0005_watch_sync_schema",
+      "breakpoints": true
     }
   ]
 }
