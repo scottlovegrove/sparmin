@@ -24,7 +24,7 @@ That was the right call then. Three things have changed since:
   `testBuildPayloadShape`.
 - **Going via Garmin was investigated and rejected.** The unofficial Connect API
   does work — station labels survive into it, and a full session reconstructs
-  exactly — but it needs a stored credential that can *write* to a user's Garmin
+  exactly — but it needs a stored credential that can _write_ to a user's Garmin
   account, has no MFA support in any current Node library, and rests on private
   endpoints. The official Developer Program was already ruled out in `SL§8`.
   Pushing from the watch needs no Garmin relationship at all.
@@ -37,16 +37,16 @@ That was the right call then. Three things have changed since:
 This is the crux of the design, and the reason ingest becomes a merge rather
 than a race.
 
-| Field                              | FIT import | Watch push | Notes                                            |
-| ---------------------------------- | ---------- | ---------- | ------------------------------------------------ |
-| Device serial / product            | ✅         | ❌         | No Connect IQ API exposes `file_id.serial_number` |
-| Session + per-lap calories         | ✅         | ❌         | Garmin computes these; the app never reads them  |
-| `total_timer_s`, per-lap `timer_s` | ✅         | ❌         | Garmin's own timing                              |
-| Per-lap `cycles` (steps)           | ✅         | ❌         | Sparse even in the FIT                           |
-| `utc_offset_s`                     | ✅         | ❌         | See §4.3 — the watch can supply it, but doesn't  |
-| Station identity                   | Display name | **Canonical id** | The FIT carries `Himalayan salt sauna`; the app knows `salt_sauna` |
-| Per-station **minimum** HR         | ❌         | ✅         | FIT laps carry avg/max only; `Segment` tracks min |
-| Availability                       | Minutes to days later, manual | Seconds later, automatic | |
+| Field                              | FIT import                    | Watch push               | Notes                                                              |
+| ---------------------------------- | ----------------------------- | ------------------------ | ------------------------------------------------------------------ |
+| Device serial / product            | ✅                            | ❌                       | No Connect IQ API exposes `file_id.serial_number`                  |
+| Session + per-lap calories         | ✅                            | ❌                       | Garmin computes these; the app never reads them                    |
+| `total_timer_s`, per-lap `timer_s` | ✅                            | ❌                       | Garmin's own timing                                                |
+| Per-lap `cycles` (steps)           | ✅                            | ❌                       | Sparse even in the FIT                                             |
+| `utc_offset_s`                     | ✅                            | ❌                       | See §4.3 — the watch can supply it, but doesn't                    |
+| Station identity                   | Display name                  | **Canonical id**         | The FIT carries `Himalayan salt sauna`; the app knows `salt_sauna` |
+| Per-station **minimum** HR         | ❌                            | ✅                       | FIT laps carry avg/max only; `Segment` tracks min                  |
+| Availability                       | Minutes to days later, manual | Seconds later, automatic |                                                                    |
 
 So neither source dominates. A session that arrives both ways should end up
 richer than either alone.
@@ -105,14 +105,14 @@ useless without the device code, which never leaves the watch.
 
 ### 2.3 Endpoints
 
-| Method | Route                       | Auth           | Notes                                                                 |
-| ------ | --------------------------- | -------------- | --------------------------------------------------------------------- |
-| `POST` | `/api/device/code`          | none           | Body: `{ product, installId }`. Returns `{ userCode, deviceCode, interval, expiresIn }` |
-| `POST` | `/api/device/token`         | none           | Body: `{ deviceCode }`. `authorization_pending` \| `slow_down` \| `expired_token` \| `{ token, deviceId }` |
-| `POST` | `/api/device/approve`       | session cookie | Body: `{ userCode }`. Binds the pending code to the current user      |
-| `GET`  | `/api/device/pending/:code` | session cookie | What is asking, so the confirm screen can describe it before approval |
-| `GET`  | `/api/devices`              | session cookie | Linked devices, with `lastSeenAt`                                     |
-| `DELETE` | `/api/devices/:id`        | session cookie | Revoke. The watch's next POST gets `401` and it clears its token      |
+| Method   | Route                       | Auth           | Notes                                                                                                      |
+| -------- | --------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------- |
+| `POST`   | `/api/device/code`          | none           | Body: `{ product, installId }`. Returns `{ userCode, deviceCode, interval, expiresIn }`                    |
+| `POST`   | `/api/device/token`         | none           | Body: `{ deviceCode }`. `authorization_pending` \| `slow_down` \| `expired_token` \| `{ token, deviceId }` |
+| `POST`   | `/api/device/approve`       | session cookie | Body: `{ userCode }`. Binds the pending code to the current user                                           |
+| `GET`    | `/api/device/pending/:code` | session cookie | What is asking, so the confirm screen can describe it before approval                                      |
+| `GET`    | `/api/devices`              | session cookie | Linked devices, with `lastSeenAt`                                                                          |
+| `DELETE` | `/api/devices/:id`          | session cookie | Revoke. The watch's next POST gets `401` and it clears its token                                           |
 
 Unauthenticated routes are rate-limited: `/api/device/code` per IP,
 `/api/device/token` per device code, `/api/device/approve` per user session with
@@ -177,7 +177,7 @@ concern: `SELECT` inside the ingest transaction, then insert or merge.
 
 ### 3.3 What actually deduplicates a retry
 
-The window handles *cross-source* matching. It is the wrong tool for the same
+The window handles _cross-source_ matching. It is the wrong tool for the same
 source arriving twice, which is a real case — `BackendClient`'s offline queue
 re-POSTs after a failure, and a response lost on the way back looks identical to
 a failure.
@@ -191,11 +191,11 @@ not `409` — a queue flush that re-sends is normal operation, not an error.
 
 Ingest resolves to one of three outcomes:
 
-| Situation                                              | Outcome                                    |
-| ------------------------------------------------------ | ------------------------------------------ |
-| No session within the window                           | Insert. `source` = the arriving source     |
-| Match, and the arriving source already contributed     | No-op, return the existing session         |
-| Match from the other source                            | **Merge**, `source` → `both`               |
+| Situation                                          | Outcome                                |
+| -------------------------------------------------- | -------------------------------------- |
+| No session within the window                       | Insert. `source` = the arriving source |
+| Match, and the arriving source already contributed | No-op, return the existing session     |
+| Match from the other source                        | **Merge**, `source` → `both`           |
 
 Merging fills gaps; it does not overwrite. Concretely:
 
@@ -272,12 +272,12 @@ grows by one row per link attempt.
 `POST /api/sessions/watch` (separate from `SL§5`'s FIT ingest — different payload
 shape, different auth):
 
-| Code  | Meaning                                                            |
-| ----- | ------------------------------------------------------------------ |
-| `201` | Created                                                            |
-| `200` | Already had it — same `watch_session_id`, or merged into a match   |
+| Code  | Meaning                                                                                       |
+| ----- | --------------------------------------------------------------------------------------------- |
+| `201` | Created                                                                                       |
+| `200` | Already had it — same `watch_session_id`, or merged into a match                              |
 | `401` | Unknown, revoked or malformed device token. The watch clears its token and shows "Link again" |
-| `400` | Payload failed validation                                          |
+| `400` | Payload failed validation                                                                     |
 
 `401` is the only response the watch treats as terminal. Everything else it
 either accepts or re-queues.
@@ -297,7 +297,7 @@ before relying on it.** If it does not hold up, generate a UUID on first run and
 persist it in `Application.Storage`; that is stable across restarts and lost on
 reinstall, which is acceptable — a reinstall then needs a re-link.
 
-Note this id is *not* the FIT serial number and cannot substitute for it. The
+Note this id is _not_ the FIT serial number and cannot substitute for it. The
 `devices.serial` column is left nullable and populated opportunistically: when a
 FIT import merges into a session already owned by a device, that FIT's serial can
 be written back. It is a convenience for display, never a key.
@@ -368,15 +368,15 @@ it — that is exactly what §3.4 is for.
 
 ## 6. Build order — PR plan
 
-| PR    | Scope                                                                                                                     | Testable by         | Depends on |
-| ----- | ------------------------------------------------------------------------------------------------------------------------- | ------------------- | ---------- |
+| PR    | Scope                                                                                                                                                                                           | Testable by           | Depends on |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ---------- |
 | **1** | **Schema + migration** — `devices`, `device_link_codes`, the `sessions` rebuild (nullable `device_serial`, drop old key, `source`, `watch_session_id`, `device_id`), `station_intervals.min_hr` | `wrangler d1`, Vitest | —          |
-| **2** | **Reconciliation in the existing FIT ingest** — window match, merge rules (§3.4), `source` tracking. No new source yet; behaviour under FIT-only import is unchanged | Vitest              | 1          |
-| **3** | **Device link endpoints** — `/api/device/*`, `/api/devices`, hashing, rate limits, code sweep                             | Vitest + curl       | 1          |
-| **4** | **Watch ingest** `POST /api/sessions/watch` — Zod schema shared with the watch payload, bearer auth, merge via PR2         | Vitest + curl       | 2, 3       |
-| **5** | **Companion UI** — "Link a watch" confirm screen, linked-device list, revoke                                               | manual              | 3          |
-| **6** | **Watch: link screen + install id** — settings entry, code display, polling, token storage                                 | simulator + device  | 3          |
-| **7** | **Watch: wire `BackendClient`** — payload additions (§4.3), send on `confirmEnd`, flush on start, queue cap                | simulator + device  | 4, 6       |
+| **2** | **Reconciliation in the existing FIT ingest** — window match, merge rules (§3.4), `source` tracking. No new source yet; behaviour under FIT-only import is unchanged                            | Vitest                | 1          |
+| **3** | **Device link endpoints** — `/api/device/*`, `/api/devices`, hashing, rate limits, code sweep                                                                                                   | Vitest + curl         | 1          |
+| **4** | **Watch ingest** `POST /api/sessions/watch` — Zod schema shared with the watch payload, bearer auth, merge via PR2                                                                              | Vitest + curl         | 2, 3       |
+| **5** | **Companion UI** — "Link a watch" confirm screen, linked-device list, revoke                                                                                                                    | manual                | 3          |
+| **6** | **Watch: link screen + install id** — settings entry, code display, polling, token storage                                                                                                      | simulator + device    | 3          |
+| **7** | **Watch: wire `BackendClient`** — payload additions (§4.3), send on `confirmEnd`, flush on start, queue cap                                                                                     | simulator + device    | 4, 6       |
 
 PR2 before any of the device work is deliberate: reconciliation is the part that
 can corrupt existing data, and it is fully testable against FIT imports alone

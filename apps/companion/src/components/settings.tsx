@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react'
 import { Link } from 'wouter'
 import { authClient, signOut, useListPasskeys } from '../lib/auth-client'
 import { ConfirmDialog } from './confirm-dialog'
+import { LinkedWatches } from './linked-watches'
 
 // Passkeys that live on a synced provider (iCloud Keychain, a password manager)
 // survive losing the device; ones bound to a single device don't. Worth saying,
@@ -121,6 +122,8 @@ export function Settings() {
                 </form>
                 {error && <p className="error small">{error}</p>}
             </section>
+
+            <LinkedWatches />
 
             <DangerZone />
         </main>
