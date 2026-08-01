@@ -58,6 +58,12 @@ CREATE INDEX `verification_identifier_idx` ON `verification` (`identifier`);--> 
 --> row that has no real owner. Runs while foreign keys are still on, so the
 --> intervals go with them.
 DELETE FROM `sessions` WHERE `user_id` NOT IN (SELECT `id` FROM `user`);--> statement-breakpoint
+--> Hand-fixed: the PRAGMA below is a no-op inside the transaction D1 wraps this
+--> file in, so the DROP of `sessions` cascades and empties `station_intervals` —
+--> which this migration then "rebuilds" by copying from the emptied table. Carry
+--> the rows across instead, refilled once that rebuild has finished. (Applied
+--> everywhere already; this is so a replay against real data is not destructive.)
+CREATE TABLE `__carry_station_intervals` AS SELECT * FROM `station_intervals`;--> statement-breakpoint
 PRAGMA foreign_keys=OFF;--> statement-breakpoint
 CREATE TABLE `__new_sessions` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -107,5 +113,7 @@ CREATE TABLE `__new_station_intervals` (
 INSERT INTO `__new_station_intervals`("id", "session_id", "user_id", "station_id", "lap_index", "started_at", "ended_at", "elapsed_s", "timer_s", "avg_hr", "max_hr", "calories", "cycles") SELECT "id", "session_id", "user_id", "station_id", "lap_index", "started_at", "ended_at", "elapsed_s", "timer_s", "avg_hr", "max_hr", "calories", "cycles" FROM `station_intervals`;--> statement-breakpoint
 DROP TABLE `station_intervals`;--> statement-breakpoint
 ALTER TABLE `__new_station_intervals` RENAME TO `station_intervals`;--> statement-breakpoint
+INSERT INTO `station_intervals` SELECT * FROM `__carry_station_intervals`;--> statement-breakpoint
+DROP TABLE `__carry_station_intervals`;--> statement-breakpoint
 CREATE INDEX `idx_intervals_user_station` ON `station_intervals` (`user_id`,`station_id`,`started_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `intervals_session_lap` ON `station_intervals` (`session_id`,`lap_index`);
