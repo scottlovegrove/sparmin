@@ -1,6 +1,9 @@
 export type ImportOutcome =
     | { status: 'imported' }
     | { status: 'duplicate' }
+    // The visit was already here from the watch; the export filled in what only
+    // Garmin computes — calories, timer times, the device serial.
+    | { status: 'merged' }
     | { status: 'rejected'; reason: string }
 
 // A real spa export is tens of kilobytes; the longest imaginable activity is a
@@ -53,6 +56,11 @@ export async function importFit(file: File): Promise<ImportOutcome> {
     // Already imported: the same visit exported twice. Not an error — say so.
     if (res.status === 409) {
         return { status: 'duplicate' }
+    }
+    // 200 rather than 201: the visit already existed, sent live by the watch,
+    // and this export completed it rather than creating anything.
+    if (res.status === 200) {
+        return { status: 'merged' }
     }
     if (res.status === 401) {
         return { status: 'rejected', reason: 'Your session expired — sign in again' }

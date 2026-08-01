@@ -6,12 +6,12 @@ import { ingestPayloadSchema, replaceLapsSchema } from '../src/lib/session-paylo
 import { deleteAccount } from './account'
 import { createAuth, currentUserId } from './auth'
 import { createDb } from './db'
+import { ingestSession } from './session-ingest'
 import {
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
     deleteSession,
     getSession,
-    ingestSession,
     listSessions,
     replaceLaps,
 } from './sessions'
@@ -127,9 +127,14 @@ app.post('/api/sessions', async (c) => {
     const result = await ingestSession(createDb(c.env.DB), c.get('userId'), parsed.data)
     if (result.status === 'duplicate') {
         // Not a failure: the user re-dropped a file they already imported.
-        return c.json({ status: 'duplicate', id: parsed.data.id }, 409)
+        return c.json({ status: 'duplicate', id: result.id }, 409)
     }
-    return c.json({ status: 'created', id: parsed.data.id }, 201)
+    if (result.status === 'merged') {
+        // The visit was already here from the watch; this filled in what only
+        // the FIT carries. Not a new session, so not a 201.
+        return c.json({ status: 'merged', id: result.id }, 200)
+    }
+    return c.json({ status: 'created', id: result.id }, 201)
 })
 
 // The user's sessions, newest first, optionally bounded by an ISO date range.

@@ -8,6 +8,8 @@ const LABELS: Record<Row['status'], string> = {
     working: 'Importing…',
     imported: 'Imported',
     duplicate: 'Already imported',
+    // The watch had already sent this visit; the export completed it.
+    merged: 'Added to your watch session',
     rejected: 'Not imported',
 }
 

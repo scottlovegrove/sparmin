@@ -70,7 +70,10 @@ describe('POST /api/sessions', () => {
         expect(await countRows('station_intervals')).toBe(2)
     })
 
-    it('accepts the same visit recorded on a different watch', async () => {
+    it('treats the same visit recorded on a different watch as one visit', async () => {
+        // Deliberate change of behaviour: matching is on start time now, not on
+        // the device serial, because a session pushed from the watch has no
+        // serial to key on. Two recordings that start together are one visit.
         await post(payload())
         const res = await post(
             payload({
@@ -78,6 +81,39 @@ describe('POST /api/sessions', () => {
                 device: { serial: '9999999999', product: 'fr745' },
             }),
         )
+
+        expect(res.status).toBe(409)
+        expect(await countRows('sessions')).toBe(1)
+    })
+
+    it('folds in a re-import whose start time drifted by a minute', async () => {
+        // The two sources round the same instant slightly differently, which is
+        // the whole reason matching is a window rather than an exact key.
+        await post(payload())
+        const res = await post(
+            payload({ id: '99999999-2222-4333-8444-555555555555', startedAt: 1783496460 + 60 }),
+        )
+
+        expect(res.status).toBe(409)
+        expect(await countRows('sessions')).toBe(1)
+    })
+
+    it('keeps a second visit that starts outside the match window', async () => {
+        await post(payload())
+        const res = await post(
+            payload({ id: '99999999-2222-4333-8444-555555555555', startedAt: 1783496460 + 301 }),
+        )
+
+        expect(res.status).toBe(201)
+        expect(await countRows('sessions')).toBe(2)
+    })
+
+    it('never matches across users', async () => {
+        // The window is a write-side convenience, never a way for one account's
+        // timing to reach another's data.
+        await post(payload())
+        const other = await signIn('other@example.com')
+        const res = await postSession(other, payload({ id: uuid(2) }))
 
         expect(res.status).toBe(201)
         expect(await countRows('sessions')).toBe(2)
