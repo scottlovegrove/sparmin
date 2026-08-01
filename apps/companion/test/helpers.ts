@@ -11,8 +11,11 @@ import { type SignedIn, signIn } from './auth-helper'
 
 // Wipe the per-user data between tests. `sessions` and `user` cascade to
 // everything a test creates; `stations` is seed data and must survive.
+// `device_link_codes` needs clearing by hand: an unapproved code has no user yet,
+// so it survives the cascade and would leak into the next test.
 export async function resetUsers(): Promise<void> {
     await env.DB.prepare('DELETE FROM sessions').run()
+    await env.DB.prepare('DELETE FROM device_link_codes').run()
     await env.DB.prepare('DELETE FROM user').run()
 }
 

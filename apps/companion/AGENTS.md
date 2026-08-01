@@ -29,8 +29,10 @@ exists to stop.
 - **`signIn(email?)`** (`auth-helper.ts`) — sign in through the real magic-link
   flow and get back `{ headers, userId }`. Use its cookie in requests so tests go
   through the actual guard, never around it.
-- **`resetUsers()`** — wipe `sessions` + `user` between tests (cascades clean;
-  `stations` seed data survives). Use as `beforeEach(resetUsers)`.
+- **`resetUsers()`** — wipe `sessions`, `device_link_codes` and `user` between
+  tests (cascades clean; `stations` seed data survives — link codes don't, since
+  an unapproved one has no user to cascade from). Use as
+  `beforeEach(resetUsers)`.
 - **`resetWithPair()`** — `resetUsers()` plus two real sign-ins, `me` and `other`,
   for ownership/isolation tests. A made-up id can't stand in for a second user —
   the `user_id` foreign key means `other` must be a genuine account.

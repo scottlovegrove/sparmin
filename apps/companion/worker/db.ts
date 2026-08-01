@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { sessions, stationIntervals, stations } from '../src/db/schema'
+import { deviceLinkCodes, devices, sessions, stationIntervals, stations } from '../src/db/schema'
 
-const schema = { stations, sessions, stationIntervals }
+const schema = { stations, sessions, stationIntervals, devices, deviceLinkCodes }
 
 export type Db = ReturnType<typeof createDb>
 
