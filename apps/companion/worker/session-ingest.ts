@@ -1,5 +1,5 @@
-import { and, eq, gte, inArray, lte, sql } from 'drizzle-orm'
-import { sessions, stationIntervals, stations } from '../src/db/schema'
+import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { devices, sessions, stationIntervals, stations } from '../src/db/schema'
 import {
     type ArrivingSession,
     SESSION_MATCH_WINDOW_S,
@@ -230,11 +230,25 @@ export async function ingestSession(
                 ? aligned.minHrByLapIndex
                 : new Map<number, number | null>()
 
+        // The device that sent this visit has no way to read its own FIT serial
+        // number, so this import is the only chance to learn it. Display only —
+        // never a key — and only ever filled in once (§4.1).
+        const learnSerial =
+            match.deviceId != null && arriving.session.deviceSerial != null
+                ? [
+                      db
+                          .update(devices)
+                          .set({ serial: arriving.session.deviceSerial })
+                          .where(and(eq(devices.id, match.deviceId), isNull(devices.serial))),
+                  ]
+                : []
+
         await db.batch([
             db
                 .update(sessions)
                 .set(mergeSession(match, arriving.session))
                 .where(eq(sessions.id, match.id)),
+            ...learnSerial,
             db.delete(stationIntervals).where(eq(stationIntervals.sessionId, match.id)),
             ...arriving.intervals.map((interval) =>
                 db.insert(stationIntervals).values({
