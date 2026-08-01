@@ -301,3 +301,9 @@ export async function deviceForToken(db: Db, token: string) {
         .limit(1)
     return row ?? null
 }
+
+//! Note that a device is still talking to us, so the settings screen can show a
+//! watch that has quietly stopped.
+export function markDeviceSeen(db: Db, deviceId: string, now: number) {
+    return db.update(devices).set({ lastSeenAt: now }).where(eq(devices.id, deviceId))
+}

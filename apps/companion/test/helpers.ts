@@ -214,3 +214,64 @@ export async function linkWatch(
     expect(body.status).toBe('linked')
     return { token: body.token, deviceId: body.deviceId }
 }
+
+// A payload shaped the way the watch builds one: ISO timestamps, canonical
+// station ids, a per-station minimum heart rate, and none of the calories,
+// timer times or serial the FIT carries. Mirrors sessionPayload's defaults so
+// the two sources can be compared side by side in a test.
+export function watchPayload(
+    options: {
+        sessionId?: string
+        startedAt?: string
+        stays?: { activityId: string; displayName: string; startedAt: string; endedAt: string }[]
+    } = {},
+) {
+    const stays = options.stays ?? [
+        {
+            activityId: 'salt_sauna',
+            displayName: 'Himalayan salt sauna',
+            startedAt: '2026-07-03T15:41:01Z',
+            endedAt: '2026-07-03T15:56:01Z',
+        },
+    ]
+    return {
+        sessionId: options.sessionId ?? '77777777-2222-4333-8444-555555555555',
+        startedAt: options.startedAt ?? '2026-07-03T15:41:00Z',
+        endedAt: '2026-07-03T16:19:34Z',
+        totalSeconds: 2314,
+        transitionSeconds: 240,
+        utcOffsetS: 3600,
+        installId: 'install-a',
+        appVersion: '0.6.0',
+        activities: stays.map((stay) => ({
+            activityId: stay.activityId,
+            displayName: stay.displayName,
+            totalSeconds: 900,
+            visits: 1,
+            hrAvg: 98,
+            hrMax: 119,
+            hrMin: 71,
+        })),
+        segments: stays.map((stay) => ({
+            activityId: stay.activityId,
+            startedAt: stay.startedAt,
+            endedAt: stay.endedAt,
+            hrAvg: 98,
+            hrMax: 119,
+            hrMin: 71,
+        })),
+    }
+}
+
+// POST a session the way a linked watch does: a bearer token, no cookie.
+export async function postWatchSession(token: string, body: unknown): Promise<Response> {
+    return app.request(
+        '/api/sessions/watch',
+        {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        },
+        env,
+    )
+}
