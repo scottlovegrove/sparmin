@@ -28,6 +28,10 @@ class LinkView extends WatchUi.View {
 
     private var _state;
     private var _code;
+    //! Ticks to sit out before the next poll. The backend answers `slow_down`
+    //! when a watch asks again too soon, and answering that by asking again at
+    //! the same rate is how a client gets itself throttled indefinitely.
+    private var _waitTicks;
     private var _client;
     private var _timer;
     private var _isTouch;
@@ -36,6 +40,7 @@ class LinkView extends WatchUi.View {
         View.initialize();
         _state = STATE_ASKING;
         _code = null;
+        _waitTicks = 0;
         _timer = null;
         var settings = System.getDeviceSettings();
         _isTouch = settings != null && settings.isTouchScreen;
@@ -62,9 +67,14 @@ class LinkView extends WatchUi.View {
     }
 
     function onTick() as Void {
-        if (_state == STATE_WAITING) {
-            _client.poll();
+        if (_state != STATE_WAITING) {
+            return;
         }
+        if (_waitTicks > 0) {
+            _waitTicks -= 1;
+            return;
+        }
+        _client.poll();
     }
 
     //! Public so `method(:onLinkResult)` can reach it. Every state the client can
@@ -74,6 +84,14 @@ class LinkView extends WatchUi.View {
         if (state.equals("code")) {
             _code = (data as Lang.Dictionary)["userCode"];
             _state = STATE_WAITING;
+            _waitTicks = 0;
+        } else if (state.equals(LinkClient.SLOW_DOWN)) {
+            // Asked to ease off: sit out a tick, so the next attempt is twice as
+            // far away as the one that was too soon.
+            _waitTicks += 1;
+        } else if (state.equals(LinkClient.PENDING)) {
+            // Answered properly, so whatever backoff was in place has served.
+            _waitTicks = 0;
         } else if (state.equals(LinkClient.LINKED)) {
             _state = STATE_LINKED;
         } else if (state.equals(LinkClient.EXPIRED)) {
@@ -83,7 +101,8 @@ class LinkView extends WatchUi.View {
         } else if (state.equals(LinkClient.FAILED)) {
             _state = STATE_FAILED;
         }
-        // authorization_pending and slow_down are the normal wait; nothing to say.
+        // Neither of the waiting states changes what is on screen: the code is
+        // still the code, and the wearer has nothing to do but wait.
         WatchUi.requestUpdate();
     }
 
@@ -91,6 +110,7 @@ class LinkView extends WatchUi.View {
     function retry() as Void {
         _state = STATE_ASKING;
         _code = null;
+        _waitTicks = 0;
         WatchUi.requestUpdate();
         _client.requestCode();
     }
