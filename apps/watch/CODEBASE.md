@@ -90,12 +90,23 @@ source/
 ├─ HrSampler.mc           # module: live-vs-display HR, invalid-sample rejection.
 ├─ ActivityIcons.mc       # module: activityId -> drawable + lazy bitmap cache,
 │                         # shared by the strip and the summary.
-├─ BackendClient.mc       # PARKED: POST + offline queue. Unwired (backend deferred).
+├─ BackendClient.mc       # PARKED: POST + offline queue. Unwired (session upload
+│                         # is the next step; linking landed first).
+├─ Backend.mc             # module: the companion's URL. One constant, so the
+│                         # pairing flow and the upload cannot disagree.
+├─ LinkConfig.mc          # module: the device token + this watch's install id in
+│                         # Storage. isLinked()/clearToken() — clear on a 401.
+├─ LinkClient.mc          # the pairing calls: request a code, then poll for
+│                         # approval. Separate from BackendClient, which owns a
+│                         # queue with one in-flight slot.
+├─ WatchLog.mc            # module: rolling diagnostic log in Storage, read on the
+│                         # watch via Settings -> Diagnostics. Connect IQ gives an
+│                         # app no way to write a file USB can read.
 ├─ Fmt.mc                 # module: duration ("m:ss") + hr formatting.
 ├─ Uuid.mc / Iso.mc       # module: session id (v4) + ISO-8601 UTC.
 ├─ Version.mc             # module: the app version string, shown on the About
 │                         # page. Hand-bumped at each release.
-├─ Tests.mc               # 20 (:test) cases + FakeRecorder. Run in the simulator.
+├─ Tests.mc               # 30 (:test) cases + FakeRecorder. Run in the simulator.
 └─ views/
    ├─ StripView.mc        # home screen (IDLE/TRANSITION/IN_ACTIVITY): strip,
    │  StripDelegate.mc    # timers, HR, icons, drag-scroll animation, focus label
