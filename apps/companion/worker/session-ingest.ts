@@ -8,7 +8,9 @@ import {
     mergeSession,
 } from '../src/lib/session-merge'
 import type { IngestPayload } from '../src/lib/session-payload'
+import { type WatchPayload, deriveSessionHeartRate, toUnixSeconds } from '../src/lib/watch-payload'
 import type { Db } from './db'
+import { type StationRef, resolveStations, stationKey } from './station-refs'
 
 export type IngestResult =
     | { status: 'created'; id: string }
@@ -17,9 +19,17 @@ export type IngestResult =
     // The other source had it; this one filled in what it was missing.
     | { status: 'merged'; id: string }
 
+// A whole recording as it arrives, from either source.
+export type ArrivingRecording = {
+    readonly session: ArrivingSession
+    readonly startedAt: number
+    readonly endedAt: number
+    readonly intervals: ArrivingInterval[]
+}
+
 // One stay at one station, as it arrives, before its station is resolved to a row.
 export type ArrivingInterval = {
-    readonly station: string
+    readonly station: StationRef
     readonly lapIndex: number
     readonly startedAt: number
     readonly elapsedS: number
@@ -29,54 +39,6 @@ export type ArrivingInterval = {
     readonly minHr: number | null
     readonly calories: number | null
     readonly cycles: number | null
-}
-
-//! Resolve every station label to a stations.id, inserting any label the
-//! catalogue doesn't know as `unclassified` rather than rejecting the import
-//! (§4.4). A watch that ships a new station must never cost the user a session;
-//! the unknown label surfaces for tagging later.
-async function resolveStationIds(db: Db, labels: string[]): Promise<Map<string, number>> {
-    const unique = [...new Set(labels)]
-    const known = await db
-        .select({ id: stations.id, name: stations.name })
-        .from(stations)
-        .where(inArray(stations.name, unique))
-    const byName = new Map(known.map((s) => [s.name, s.id]))
-
-    const missing = unique.filter((label) => !byName.has(label))
-    if (missing.length === 0) {
-        return byName
-    }
-
-    const now = Math.floor(Date.now() / 1000)
-    const inserted = await db
-        .insert(stations)
-        .values(
-            missing.map((name) => ({
-                name,
-                thermalClass: 'unclassified' as const,
-                createdAt: now,
-            })),
-        )
-        .onConflictDoNothing()
-        .returning({ id: stations.id, name: stations.name })
-    for (const station of inserted) {
-        byName.set(station.name, station.id)
-    }
-
-    // A concurrent import may have inserted the same label first, in which case
-    // onConflictDoNothing returned nothing for it — read those back.
-    const stillMissing = missing.filter((label) => !byName.has(label))
-    if (stillMissing.length > 0) {
-        const raced = await db
-            .select({ id: stations.id, name: stations.name })
-            .from(stations)
-            .where(inArray(stations.name, stillMissing))
-        for (const station of raced) {
-            byName.set(station.name, station.id)
-        }
-    }
-    return byName
 }
 
 //! Which of these station ids are transitions — the walk between two stays, which
@@ -130,12 +92,7 @@ async function findMatch(db: Db, userId: string, startedAt: number) {
 //! Map a parsed FIT export onto the shape ingest understands. Everything a FIT
 //! cannot know — which device on the account sent it, the watch's own id for the
 //! session — stays null so a watch push can fill it later (§3.4).
-export function fitToArriving(payload: IngestPayload): {
-    session: ArrivingSession
-    startedAt: number
-    endedAt: number
-    intervals: ArrivingInterval[]
-} {
+export function fitToArriving(payload: IngestPayload): ArrivingRecording {
     return {
         startedAt: payload.session.startedAt,
         endedAt: payload.session.endedAt,
@@ -153,7 +110,7 @@ export function fitToArriving(payload: IngestPayload): {
             deviceId: null,
         },
         intervals: payload.laps.map((lap) => ({
-            station: lap.station,
+            station: { kind: 'name' as const, name: lap.station },
             lapIndex: lap.lapIndex,
             startedAt: lap.startedAt,
             elapsedS: lap.elapsedS,
@@ -185,11 +142,10 @@ export async function ingestSession(
         return { status: 'duplicate', id: match.id }
     }
 
-    const stationIds = await resolveStationIds(
+    const stationIds = await resolveStations(
         db,
         arriving.intervals.map((interval) => interval.station),
     )
-    const now = Math.floor(Date.now() / 1000)
 
     if (match != null) {
         // The watch recorded this visit first. Its rows are its stays; the FIT
@@ -208,7 +164,7 @@ export async function ingestSession(
 
         const spine = arriving.intervals.map((interval) => ({
             lapIndex: interval.lapIndex,
-            stationId: stationIds.get(interval.station) as number,
+            stationId: stationIds.get(stationKey(interval.station)) as number,
             isTransition: false,
         }))
         const transitions = await transitionStationIds(
@@ -254,7 +210,7 @@ export async function ingestSession(
                 db.insert(stationIntervals).values({
                     sessionId: match.id,
                     userId,
-                    stationId: stationIds.get(interval.station) as number,
+                    stationId: stationIds.get(stationKey(interval.station)) as number,
                     lapIndex: interval.lapIndex,
                     startedAt: interval.startedAt,
                     endedAt: Math.round(interval.startedAt + interval.elapsedS),
@@ -271,21 +227,37 @@ export async function ingestSession(
         return { status: 'merged', id: match.id }
     }
 
+    return {
+        status: 'created',
+        id: await insertSession(db, userId, payload.id, arriving, stationIds),
+    }
+}
+
+//! Insert a session and its stays in one batch, so a half-written visit can
+//! never land. Shared by both sources — they differ in what they know, not in
+//! how a new session is stored.
+async function insertSession(
+    db: Db,
+    userId: string,
+    id: string,
+    arriving: ArrivingRecording,
+    stationIds: ReadonlyMap<string, number>,
+): Promise<string> {
     const sessionRow = db.insert(sessions).values({
-        id: payload.id,
+        id,
         userId,
         startedAt: arriving.startedAt,
         endedAt: arriving.endedAt,
-        createdAt: now,
+        createdAt: Math.floor(Date.now() / 1000),
         ...arriving.session,
     })
 
     const intervalRows = arriving.intervals.map((interval) =>
         db.insert(stationIntervals).values({
-            sessionId: payload.id,
+            sessionId: id,
             userId,
-            // Every label resolved above, inserting any the catalogue lacked.
-            stationId: stationIds.get(interval.station) as number,
+            // Every station resolved above, inserting any the catalogue lacked.
+            stationId: stationIds.get(stationKey(interval.station)) as number,
             lapIndex: interval.lapIndex,
             startedAt: interval.startedAt,
             endedAt: Math.round(interval.startedAt + interval.elapsedS),
@@ -299,7 +271,151 @@ export async function ingestSession(
         }),
     )
 
-    // One batch, so a half-imported session can never land.
     await db.batch([sessionRow, ...intervalRows])
-    return { status: 'created', id: payload.id }
+    return id
+}
+
+//! Map a watch's payload onto the same shape the FIT path uses, so both sources
+//! reach one reconciliation.
+//!
+//! Everything the watch cannot know stays null — the device serial, calories,
+//! timer times, per-lap step counts — so a later FIT import fills them rather
+//! than finding them already occupied (§3.4). The stays arrive in order and
+//! become lap indices; the watch has no lap numbering of its own, and does not
+//! record the walks between stations at all.
+export function watchToArriving(
+    payload: WatchPayload,
+    device: { id: string; product: string | null },
+): ArrivingRecording {
+    const displayNames = new Map(
+        payload.activities.map((activity) => [activity.activityId, activity.displayName ?? null]),
+    )
+    const { avgHr, maxHr } = deriveSessionHeartRate(payload.segments)
+
+    return {
+        startedAt: toUnixSeconds(payload.startedAt),
+        endedAt: toUnixSeconds(payload.endedAt),
+        session: {
+            source: 'watch',
+            utcOffsetS: payload.utcOffsetS ?? null,
+            deviceSerial: null,
+            // From the linked device rather than the payload, so the list still
+            // names the watch. A FIT import overwrites it with Garmin's own.
+            deviceProduct: device.product,
+            totalElapsedS: payload.totalSeconds,
+            totalTimerS: null,
+            totalCalories: null,
+            avgHr,
+            maxHr,
+            watchSessionId: payload.sessionId,
+            deviceId: device.id,
+        },
+        intervals: payload.segments.map((segment, index) => {
+            const startedAt = toUnixSeconds(segment.startedAt)
+            return {
+                station: {
+                    kind: 'slug' as const,
+                    slug: segment.activityId,
+                    displayName: displayNames.get(segment.activityId) ?? null,
+                },
+                lapIndex: index,
+                startedAt,
+                elapsedS: toUnixSeconds(segment.endedAt) - startedAt,
+                timerS: null,
+                avgHr: segment.hrAvg,
+                maxHr: segment.hrMax,
+                minHr: segment.hrMin,
+                calories: null,
+                cycles: null,
+            }
+        }),
+    }
+}
+
+//! Write a session the watch pushed.
+//!
+//! A re-send is the normal case, not an error: the watch's offline queue retries
+//! after any failure, and a response lost on the way back is indistinguishable
+//! from one. The watch's own session id is what makes that idempotent (§3.3).
+export async function ingestWatchSession(
+    db: Db,
+    userId: string,
+    device: { id: string; product: string | null },
+    payload: WatchPayload,
+): Promise<IngestResult> {
+    const [already] = await db
+        .select({ id: sessions.id })
+        .from(sessions)
+        .where(and(eq(sessions.userId, userId), eq(sessions.watchSessionId, payload.sessionId)))
+        .limit(1)
+    if (already != null) {
+        return { status: 'duplicate', id: already.id }
+    }
+
+    const arriving = watchToArriving(payload, device)
+    const match = await findMatch(db, userId, arriving.startedAt)
+
+    if (match != null) {
+        if (alreadyContributed(match.source, 'watch')) {
+            return { status: 'duplicate', id: match.id }
+        }
+        // The FIT got here first — its laps are already the spine, and they are
+        // the better record of everything except the minimums. Fold those onto
+        // the stays they belong to and leave the rows otherwise alone.
+        const stored = await db
+            .select({
+                lapIndex: stationIntervals.lapIndex,
+                stationId: stationIntervals.stationId,
+                isTransition: stations.isTransition,
+            })
+            .from(stationIntervals)
+            .innerJoin(stations, eq(stations.id, stationIntervals.stationId))
+            .where(eq(stationIntervals.sessionId, match.id))
+            .orderBy(stationIntervals.lapIndex)
+
+        const stationIds = await resolveStations(
+            db,
+            arriving.intervals.map((interval) => interval.station),
+        )
+        const aligned = alignWatchSegments(
+            stored,
+            arriving.intervals.map((interval) => ({
+                stationId: stationIds.get(stationKey(interval.station)) as number,
+                minHr: interval.minHr,
+            })),
+        )
+
+        // A disagreement means an assumption behind the match already failed —
+        // take nothing rather than pin a minimum to the wrong station.
+        const minimums = aligned.status === 'aligned' ? [...aligned.minHrByLapIndex] : []
+        const intervalWrites = minimums.map(([lapIndex, minHr]) =>
+            db
+                .update(stationIntervals)
+                .set({ minHr })
+                .where(
+                    and(
+                        eq(stationIntervals.sessionId, match.id),
+                        eq(stationIntervals.lapIndex, lapIndex),
+                    ),
+                ),
+        )
+
+        await db.batch([
+            db
+                .update(sessions)
+                .set(mergeSession(match, arriving.session))
+                .where(eq(sessions.id, match.id)),
+            ...intervalWrites,
+        ])
+        return { status: 'merged', id: match.id }
+    }
+
+    const stationIds = await resolveStations(
+        db,
+        arriving.intervals.map((interval) => interval.station),
+    )
+    return {
+        status: 'created',
+        id: await insertSession(db, userId, crypto.randomUUID(), arriving, stationIds),
+    }
 }

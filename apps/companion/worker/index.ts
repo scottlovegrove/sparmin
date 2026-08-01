@@ -4,18 +4,21 @@ import { z } from 'zod'
 import { stations } from '../src/db/schema'
 import { formatUserCode } from '../src/lib/device-code'
 import { ingestPayloadSchema, replaceLapsSchema } from '../src/lib/session-payload'
+import { watchPayloadSchema } from '../src/lib/watch-payload'
 import { deleteAccount } from './account'
 import { createAuth, currentUserId } from './auth'
 import { createDb } from './db'
 import {
     approveLink,
     describePending,
+    deviceForToken,
     listDevices,
+    markDeviceSeen,
     openLinkRequest,
     pollLink,
     revokeDevice,
 } from './devices'
-import { ingestSession } from './session-ingest'
+import { ingestSession, ingestWatchSession } from './session-ingest'
 import {
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
@@ -28,7 +31,12 @@ import { getStats } from './stats'
 
 // `Env` is generated from wrangler.jsonc by `npm run cf-typegen`
 // (worker-configuration.d.ts) and carries the bindings.
-const app = new Hono<{ Bindings: Env; Variables: { userId: string } }>()
+type LinkedDevice = { id: string; userId: string; product: string | null }
+
+const app = new Hono<{
+    Bindings: Env
+    Variables: { userId: string; device: LinkedDevice }
+}>()
 
 // Everything under /api needs a session except these: the auth endpoints
 // themselves (you can't be signed in while signing in), the liveness check, which
@@ -46,13 +54,35 @@ function isPublic(pathname: string) {
     return PUBLIC_PATHS.has(pathname) || pathname.startsWith('/api/auth/')
 }
 
+// The one route a device token can reach. A token grants exactly one capability
+// — ingest, for its owner — so bearer auth is scoped to this path rather than
+// accepted anywhere a cookie would be. There is no fallback in either direction:
+// a cookie is not a substitute for a linked watch, and a token is not a
+// substitute for a session.
+const DEVICE_INGEST_PATH = '/api/sessions/watch'
+
 // Registered before any route, so a route added later is guarded by default
 // rather than by remembering to guard it. The session is resolved once here and
 // handed to handlers, rather than each one re-reading it.
 app.use('/api/*', async (c, next) => {
-    if (isPublic(new URL(c.req.url).pathname)) {
+    const { pathname } = new URL(c.req.url)
+    if (isPublic(pathname)) {
         return next()
     }
+
+    if (pathname === DEVICE_INGEST_PATH) {
+        const bearer = c.req.header('authorization')?.match(/^Bearer (.+)$/)?.[1]
+        const device = bearer == null ? null : await deviceForToken(createDb(c.env.DB), bearer)
+        if (device == null) {
+            // Unknown, revoked and malformed all answer the same. This is the
+            // one status the watch treats as terminal (§3.6).
+            return c.json({ error: 'unauthorized' }, 401)
+        }
+        c.set('userId', device.userId)
+        c.set('device', device)
+        return next()
+    }
+
     const userId = await currentUserId(c.env, c.req.raw.headers)
     if (userId == null) {
         return c.json({ error: 'unauthorized' }, 401)
@@ -245,6 +275,27 @@ app.post('/api/sessions', async (c) => {
         return c.json({ status: 'merged', id: result.id }, 200)
     }
     return c.json({ status: 'created', id: result.id }, 201)
+})
+
+// A session the watch posts as you end it. Authenticated by the device token
+// rather than a cookie, and answering §3.6's contract: a re-send from the
+// watch's offline queue is a 200, not a duplicate error, because retrying is
+// normal operation.
+app.post('/api/sessions/watch', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = watchPayloadSchema.safeParse(body)
+    if (!parsed.success) {
+        return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
+    }
+
+    const db = createDb(c.env.DB)
+    const device = c.get('device')
+    const result = await ingestWatchSession(db, c.get('userId'), device, parsed.data)
+
+    // Only on an accepted payload, so a rejected request costs no write.
+    await markDeviceSeen(db, device.id, nowSeconds())
+
+    return c.json(result, result.status === 'created' ? 201 : 200)
 })
 
 // The user's sessions, newest first, optionally bounded by an ISO date range.
