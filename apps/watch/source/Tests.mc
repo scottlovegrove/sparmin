@@ -529,7 +529,13 @@ function testBuildPayloadShape(logger) {
     sm.stopPress(1130);
     sm.confirmEnd(1140);
 
-    var p = sm.buildPayload();
+    // Fixed values: the real ones come from the device, which is the point of
+    // passing them in rather than reading them here.
+    var p = sm.buildPayload({
+        "utcOffsetS" => 3600,
+        "installId" => "install-test",
+        "appVersion" => Version.APP
+    });
     Test.assert(p["sessionId"] != null);
     Test.assertEqual(p["totalSeconds"], 140);
     Test.assertEqual(p["transitionSeconds"], 20); // [1000,1010]=10 + [1130,1140]=10
@@ -541,6 +547,40 @@ function testBuildPayloadShape(logger) {
     Test.assertEqual(firstSeg["activityId"], "finnish_sauna");
     Test.assert(p["startedAt"] != null);
     Test.assert(p["endedAt"] != null);
+    // The companion has no other way to know when the visit was in local terms:
+    // the timestamps above are UTC.
+    Test.assertEqual(p["utcOffsetS"], 3600);
+    // Attribution, so a session can be traced to a watch even after its token
+    // has been rotated, and to a build when a payload turns out to be wrong.
+    Test.assertEqual(p["installId"], "install-test");
+    Test.assertEqual(p["appVersion"], Version.APP);
+    return true;
+}
+
+(:test)
+function testQueueTrimDropsOldestFirst(logger) {
+    // An unbounded queue in Storage is a memory risk on a watch. When it has to
+    // give, the oldest goes: that session is the one most likely to have been
+    // exported and imported by hand already.
+    var client = new BackendClient();
+    var queue = ["a", "b", "c", "d"];
+
+    var trimmed = client.trimQueue(queue, 2);
+
+    Test.assertEqual(trimmed.size(), 2);
+    Test.assertEqual(trimmed[0], "c");
+    Test.assertEqual(trimmed[1], "d");
+    return true;
+}
+
+(:test)
+function testQueueTrimLeavesAShortQueueAlone(logger) {
+    var client = new BackendClient();
+
+    var trimmed = client.trimQueue(["a", "b"], 20);
+
+    Test.assertEqual(trimmed.size(), 2);
+    Test.assertEqual(trimmed[0], "a");
     return true;
 }
 

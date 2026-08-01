@@ -378,8 +378,13 @@ class SessionManager {
         return out;
     }
 
-    //! Build the §12 backend payload as a JSON-serialisable Dictionary.
-    function buildPayload() as Lang.Dictionary {
+    //! Build the backend payload as a JSON-serialisable Dictionary.
+    //!
+    //! `device` carries the things only the device can answer — the UTC offset,
+    //! this watch's install id, the app version. They are passed in rather than
+    //! read here so this class stays free of Toybox device APIs and testable
+    //! with fixed values (AGENTS.md).
+    function buildPayload(device as Lang.Dictionary) as Lang.Dictionary {
         var activities = [];
         var aggs = activityAggregates();
         for (var i = 0; i < aggs.size(); i += 1) {
@@ -404,6 +409,11 @@ class SessionManager {
             "endedAt" => Iso.fromEpoch(_sessionEnd),
             "totalSeconds" => totalSeconds(),
             "transitionSeconds" => transitionSeconds(),
+            // Iso.fromEpoch formats UTC, so without these the payload carries no
+            // local time at all and the companion cannot say when the visit was.
+            "utcOffsetS" => device["utcOffsetS"],
+            "installId" => device["installId"],
+            "appVersion" => device["appVersion"],
             "activities" => activities,
             "segments" => segs
         };
