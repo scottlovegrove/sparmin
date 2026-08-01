@@ -1,5 +1,6 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
+import Toybox.System;
 import Toybox.Time;
 
 //! Input for the confirm-end screen (raw InputDelegate).
@@ -85,7 +86,11 @@ class ConfirmEndDelegate extends WatchUi.InputDelegate {
         // Only once the FIT is safely closed. The recording is the record; the
         // upload is a convenience on top of it, and must never be able to
         // affect it.
-        getApp().getBackend().send(_session.buildPayload());
+        getApp().getBackend().send(_session.buildPayload({
+            "utcOffsetS" => System.getClockTime().timeZoneOffset,
+            "installId" => LinkConfig.installId(),
+            "appVersion" => Version.APP
+        }));
         var sv = new SummaryView(_stripView);
         WatchUi.switchToView(sv, new SummaryDelegate(sv), WatchUi.SLIDE_UP);
     }

@@ -41,12 +41,20 @@ class BackendClient {
             WatchLog.add("send: not linked, skipping");
             return;
         }
-        if (_isConnected()) {
-            _post(payload);
-        } else {
+        if (!_isConnected()) {
             WatchLog.add("send: no phone, queued");
             _enqueue(payload);
+            return;
         }
+        if (_inFlight != null) {
+            // One request at a time: there is a single in-flight slot, and
+            // overwriting it would make the next response settle the wrong
+            // payload — marking one sent while quietly losing the other.
+            WatchLog.add("send: another in flight, queued");
+            _enqueue(payload);
+            return;
+        }
+        _post(payload);
     }
 
     //! Retry queued payloads. Called on app start, and after each response.

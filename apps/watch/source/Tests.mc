@@ -529,7 +529,13 @@ function testBuildPayloadShape(logger) {
     sm.stopPress(1130);
     sm.confirmEnd(1140);
 
-    var p = sm.buildPayload();
+    // Fixed values: the real ones come from the device, which is the point of
+    // passing them in rather than reading them here.
+    var p = sm.buildPayload({
+        "utcOffsetS" => 3600,
+        "installId" => "install-test",
+        "appVersion" => Version.APP
+    });
     Test.assert(p["sessionId"] != null);
     Test.assertEqual(p["totalSeconds"], 140);
     Test.assertEqual(p["transitionSeconds"], 20); // [1000,1010]=10 + [1130,1140]=10
@@ -543,10 +549,10 @@ function testBuildPayloadShape(logger) {
     Test.assert(p["endedAt"] != null);
     // The companion has no other way to know when the visit was in local terms:
     // the timestamps above are UTC.
-    Test.assert(p["utcOffsetS"] != null);
+    Test.assertEqual(p["utcOffsetS"], 3600);
     // Attribution, so a session can be traced to a watch even after its token
     // has been rotated, and to a build when a payload turns out to be wrong.
-    Test.assert(p["installId"] != null);
+    Test.assertEqual(p["installId"], "install-test");
     Test.assertEqual(p["appVersion"], Version.APP);
     return true;
 }
