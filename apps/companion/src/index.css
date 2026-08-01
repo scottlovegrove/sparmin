@@ -290,6 +290,11 @@ button:disabled {
     color: var(--warn);
 }
 
+/* Something did land, so this reads as a success rather than a near-miss. */
+.results .merged .outcome {
+    color: var(--ok);
+}
+
 .results .rejected .outcome {
     color: var(--bad);
 }

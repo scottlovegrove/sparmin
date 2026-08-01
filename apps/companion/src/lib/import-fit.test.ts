@@ -46,6 +46,14 @@ describe('importFit', () => {
         expect(await importFit(fitFile())).toEqual({ status: 'duplicate' })
     })
 
+    it('reports a file that completed a watch session as merged, not rejected', async () => {
+        // 200 rather than 201: the visit was already here from the watch, and
+        // this export filled in what only Garmin computes.
+        mockFetch(200)
+
+        expect(await importFit(fitFile())).toEqual({ status: 'merged' })
+    })
+
     it('rejects a file that is not a spa session without calling the API', async () => {
         const fetchMock = mockFetch(201)
 

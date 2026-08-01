@@ -8,6 +8,8 @@ const LABELS: Record<Row['status'], string> = {
     working: 'Importing…',
     imported: 'Imported',
     duplicate: 'Already imported',
+    // The watch had already sent this visit; the export completed it.
+    merged: 'Added to your watch session',
     rejected: 'Not imported',
 }
 
@@ -67,7 +69,9 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
             if (batch.current !== mine) {
                 return
             }
-            anyImported ||= outcome.status === 'imported'
+            // A merge changed a session too — it filled in what the watch could
+            // not measure — so the list behind this panel is just as stale.
+            anyImported ||= outcome.status === 'imported' || outcome.status === 'merged'
             setRows((current) =>
                 current.map((row, i) => (i === index ? { name: item.name, ...outcome } : row)),
             )
