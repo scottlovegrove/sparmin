@@ -28,7 +28,17 @@ CREATE TABLE `devices` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `devices_user_install` ON `devices` (`user_id`,`install_id`);--> statement-breakpoint
+--> Hand-fixed: this PRAGMA does nothing here, and relying on it cost real data.
+--> `PRAGMA foreign_keys` is a documented no-op inside a transaction, and D1 runs
+--> each migration file in one — so foreign keys stay enforced no matter what this
+--> line says. `station_intervals` cascades on `sessions`, so the DROP below fires
+--> ON DELETE CASCADE and deletes every stay in the database while the sessions
+--> themselves survive, having already been copied out. `PRAGMA defer_foreign_keys`
+--> is not a fix either: it defers violation *checking*, not the cascade action.
+--> The children are therefore carried across by hand, below and after the rename.
+--> Anything that rebuilds a table with dependants must do the same.
 PRAGMA foreign_keys=OFF;--> statement-breakpoint
+CREATE TABLE `__carry_station_intervals` AS SELECT * FROM `station_intervals`;--> statement-breakpoint
 CREATE TABLE `__new_sessions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -60,6 +70,11 @@ CREATE TABLE `__new_sessions` (
 INSERT INTO `__new_sessions`("id", "user_id", "started_at", "ended_at", "utc_offset_s", "device_serial", "device_product", "total_elapsed_s", "total_timer_s", "total_calories", "avg_hr", "max_hr", "created_at") SELECT "id", "user_id", "started_at", "ended_at", "utc_offset_s", "device_serial", "device_product", "total_elapsed_s", "total_timer_s", "total_calories", "avg_hr", "max_hr", "created_at" FROM `sessions`;--> statement-breakpoint
 DROP TABLE `sessions`;--> statement-breakpoint
 ALTER TABLE `__new_sessions` RENAME TO `sessions`;--> statement-breakpoint
+--> Hand-added: put the stays back. The DROP above took them with it, because the
+--> cascade fires whatever the PRAGMA claims. Their parent rows are unchanged, so
+--> every foreign key still resolves.
+INSERT INTO `station_intervals` SELECT * FROM `__carry_station_intervals`;--> statement-breakpoint
+DROP TABLE `__carry_station_intervals`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
 CREATE UNIQUE INDEX `idx_sessions_watch_uuid` ON `sessions` (`watch_session_id`) WHERE "sessions"."watch_session_id" IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX `idx_sessions_fit_dedupe` ON `sessions` (`user_id`,`device_serial`,`started_at`) WHERE "sessions"."device_serial" IS NOT NULL;--> statement-breakpoint
