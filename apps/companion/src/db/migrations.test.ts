@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 
 // A migration that rebuilds a table silently deletes every row that references
@@ -8,66 +9,114 @@ import { describe, expect, it } from 'vitest'
 // station_intervals in production (see AGENTS.md, Migrations).
 //
 // No test that starts from an empty database can catch this, and every test
-// database here starts empty. So this reads the SQL instead.
+// database here starts empty. So this one seeds a parent and a child part-way
+// through the migration history and counts the children at the end.
 
 const MIGRATIONS_DIR = join(import.meta.dirname, '../../migrations')
 
-function migrationFiles(): { name: string; sql: string }[] {
+function migrations(): { name: string; sql: string }[] {
     return readdirSync(MIGRATIONS_DIR)
         .filter((name) => name.endsWith('.sql'))
         .sort()
         .map((name) => ({ name, sql: readFileSync(join(MIGRATIONS_DIR, name), 'utf8') }))
 }
 
-// Drizzle's rebuild works through a `__new_`-prefixed copy; anything else
-// beginning with `__` is a temp table a migration made for itself. Neither is a
-// real table with dependants.
-function isScratchTable(table: string): boolean {
-    return table.startsWith('__')
+//! Apply one migration the way D1 does: every statement in the file inside a
+//! single transaction, with foreign keys enforced.
+//!
+//! Both halves matter. Foreign keys are on because D1 has them on, and a
+//! `PRAGMA foreign_keys=OFF` in the file cannot change that — the pragma is a
+//! no-op inside a transaction, which is the whole reason this test exists.
+function applyMigration(db: DatabaseSync, sql: string): void {
+    db.exec('BEGIN')
+    try {
+        for (const statement of sql.split('--> statement-breakpoint')) {
+            if (statement.trim().length > 0) {
+                db.exec(statement)
+            }
+        }
+        db.exec('COMMIT')
+    } catch (err) {
+        db.exec('ROLLBACK')
+        throw err
+    }
 }
 
-function droppedTables(sql: string): string[] {
-    return [...sql.matchAll(/DROP TABLE (?:IF EXISTS )?[`"]?(\w+)[`"]?/gi)]
-        .map((match) => match[1])
-        .filter((table) => !isScratchTable(table))
+function tableExists(db: DatabaseSync, name: string): boolean {
+    return (
+        (
+            db
+                .prepare(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name=?`)
+                .get(name) as { n: number }
+        ).n > 0
+    )
 }
 
-function tablesReferencing(target: string, files: { sql: string }[]): boolean {
-    const reference = new RegExp(`REFERENCES\\s+[\`"]?${target}[\`"]?`, 'i')
-    return files.some((file) => reference.test(file.sql))
+function count(db: DatabaseSync, table: string): number {
+    return (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n
 }
 
-describe('migrations that rebuild a table', () => {
-    it('carry the dependent rows across the drop', () => {
-        const files = migrationFiles()
-        const unsafe: string[] = []
+// The seed needs a user to hang a session off, so it goes in as soon as the
+// auth tables exist. Everything after that point is what this guards.
+//
+// That leaves 0002 itself uncovered — it is the migration that creates `user`,
+// and before it there is nothing to satisfy the foreign key, while its own
+// orphan-cleanup would legitimately delete any session seeded without one. It
+// had the same flaw and was fixed by hand; every migration after it, and every
+// migration added from here, is covered.
+function seed(db: DatabaseSync): void {
+    db.exec(`
+        INSERT INTO user (id, name, email, email_verified, created_at, updated_at)
+            VALUES ('seed-user', 'Seed', 'seed@example.com', 1, 1, 1);
+        INSERT INTO sessions
+            (id, user_id, started_at, ended_at, device_serial, total_elapsed_s, created_at)
+            VALUES ('seed-session', 'seed-user', 1000, 2000, '1234567890', 1000, 1);
+        INSERT INTO station_intervals
+            (session_id, user_id, station_id, lap_index, started_at, ended_at, elapsed_s)
+            VALUES ('seed-session', 'seed-user', 1, 0, 1000, 1500, 500),
+                   ('seed-session', 'seed-user', 2, 1, 1500, 2000, 500);
+    `)
+}
 
-        for (const file of files) {
-            for (const table of droppedTables(file.sql)) {
-                if (!tablesReferencing(table, files)) {
-                    // Nothing points at it, so nothing can be cascaded away.
-                    continue
-                }
-                // The carry is the only thing that survives the cascade —
-                // `PRAGMA foreign_keys=OFF` does not, being a no-op inside the
-                // transaction D1 wraps every migration in.
-                if (!file.sql.includes('__carry_')) {
-                    unsafe.push(`${file.name} drops \`${table}\`, which other tables reference`)
-                }
+describe('applying every migration to a database with rows in it', () => {
+    it('keeps the sessions and their stays', () => {
+        const db = new DatabaseSync(':memory:')
+        db.exec('PRAGMA foreign_keys = ON')
+
+        let seeded = false
+        for (const migration of migrations()) {
+            applyMigration(db, migration.sql)
+            // As soon as there is somewhere to put it, put it there — so every
+            // migration from that point on has to carry it.
+            if (
+                !seeded &&
+                ['user', 'sessions', 'station_intervals'].every((t) => tableExists(db, t))
+            ) {
+                seed(db)
+                seeded = true
+                expect(count(db, 'station_intervals')).toBe(2)
             }
         }
 
-        expect(unsafe).toEqual([])
+        expect(seeded).toBe(true)
+        expect(count(db, 'sessions')).toBe(1)
+        // The assertion this whole file exists for. It was 0 in production.
+        expect(count(db, 'station_intervals')).toBe(2)
     })
 
-    it('recognises a rebuild of a referenced table as needing one', () => {
-        // Guards the guard: if the detection ever stops matching, the test above
-        // passes for the wrong reason and the next rebuild goes through unnoticed.
-        const files = migrationFiles()
-        const rebuilds = files.filter((file) =>
-            droppedTables(file.sql).some((table) => tablesReferencing(table, files)),
-        )
+    it('leaves no scratch tables behind', () => {
+        const db = new DatabaseSync(':memory:')
+        db.exec('PRAGMA foreign_keys = ON')
+        for (const migration of migrations()) {
+            applyMigration(db, migration.sql)
+        }
 
-        expect(rebuilds.length).toBeGreaterThan(0)
+        const scratch = db
+            .prepare(
+                `SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '\\_\\_%' ESCAPE '\\'`,
+            )
+            .all() as { name: string }[]
+
+        expect(scratch.map((row) => row.name)).toEqual([])
     })
 })
