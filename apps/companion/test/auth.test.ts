@@ -23,7 +23,7 @@ describe('the /api guard', () => {
         ['DELETE', `/api/sessions/${SESSION_ID}`],
         ['GET', '/api/stations'],
         ['POST', '/api/device/approve'],
-        ['GET', '/api/device/pending/K7QM42'],
+        ['GET', '/api/device/pending/K7QM4XB9'],
         ['GET', '/api/devices'],
         ['DELETE', '/api/devices/some-device-id'],
     ]
@@ -87,7 +87,7 @@ describe('the /api guard', () => {
 
     it('keeps approving and listing behind the session', async () => {
         // The prefix is deliberately not public — only the two exact paths are.
-        const res = await app.request('/api/device/pending/K7QM42', {}, env)
+        const res = await app.request('/api/device/pending/K7QM4XB9', {}, env)
 
         expect(res.status).toBe(401)
     })

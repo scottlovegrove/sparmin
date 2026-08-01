@@ -47,7 +47,7 @@ describe('linking a watch', () => {
     it('hands the code back in the form a human reads off a watch', async () => {
         const { userCode } = await requestCode()
 
-        expect(userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{2}$/)
+        expect(userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)
     })
 
     it('accepts the code however the user types it', async () => {
@@ -99,7 +99,7 @@ describe('linking a watch', () => {
     })
 
     it('refuses an unknown user code without saying it is unknown', async () => {
-        const res = await approveCode(me, 'ZZZZ-99')
+        const res = await approveCode(me, 'ZZZZ-9999')
 
         expect(res.status).toBe(404)
     })

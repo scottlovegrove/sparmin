@@ -39,25 +39,25 @@ describe('generateUserCode', () => {
 
 describe('normaliseUserCode', () => {
     it('accepts the form the user sees, hyphen and all', () => {
-        expect(normaliseUserCode('K7QM-42')).toBe('K7QM42')
+        expect(normaliseUserCode('K7QM-4XB9')).toBe('K7QM4XB9')
     })
 
     it('accepts lower case', () => {
-        expect(normaliseUserCode('k7qm42')).toBe('K7QM42')
+        expect(normaliseUserCode('k7qm4xb9')).toBe('K7QM4XB9')
     })
 
     it('survives a stray space from selecting the text', () => {
-        expect(normaliseUserCode('  K7QM 42 ')).toBe('K7QM42')
+        expect(normaliseUserCode('  K7QM 4XB9 ')).toBe('K7QM4XB9')
     })
 })
 
 describe('formatUserCode', () => {
     it('groups the code so it reads back reliably', () => {
-        expect(formatUserCode('K7QM42')).toBe('K7QM-42')
+        expect(formatUserCode('K7QM4XB9')).toBe('K7QM-4XB9')
     })
 
     it('is idempotent, so it can format as the user types', () => {
-        expect(formatUserCode(formatUserCode('K7QM42'))).toBe('K7QM-42')
+        expect(formatUserCode(formatUserCode('K7QM4XB9'))).toBe('K7QM-4XB9')
     })
 
     it('leaves a part-typed code alone until there is something to group', () => {
@@ -67,17 +67,17 @@ describe('formatUserCode', () => {
 
 describe('isUserCodeShaped', () => {
     it('accepts a full code in either form', () => {
-        expect(isUserCodeShaped('K7QM42')).toBe(true)
-        expect(isUserCodeShaped('k7qm-42')).toBe(true)
+        expect(isUserCodeShaped('K7QM4XB9')).toBe(true)
+        expect(isUserCodeShaped('k7qm-4xb9')).toBe(true)
     })
 
     it('rejects a code that is still being typed', () => {
-        expect(isUserCodeShaped('K7QM4')).toBe(false)
+        expect(isUserCodeShaped('K7QM4XB')).toBe(false)
     })
 
     it('rejects characters the alphabet deliberately excludes', () => {
         // A user reading `0` for `O` should be told before the round trip.
-        expect(isUserCodeShaped('K7QM40')).toBe(false)
-        expect(isUserCodeShaped('K7QM4I')).toBe(false)
+        expect(isUserCodeShaped('K7QM4XB0')).toBe(false)
+        expect(isUserCodeShaped('K7QM4XBI')).toBe(false)
     })
 })
