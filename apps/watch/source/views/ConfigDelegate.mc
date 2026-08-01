@@ -1,8 +1,10 @@
 import Toybox.Lang;
+import Toybox.System;
 import Toybox.WatchUi;
 
-//! Hub for the activity-config screens (§4a), reached from the idle strip. Routes
-//! to the show/hide checkbox menu, the reorder move-mode view and the About page.
+//! Hub for the settings screens, reached from the idle strip. Routes to the
+//! show/hide checkbox menu, the reorder move-mode view, account linking, the
+//! diagnostic log and the About page.
 class ConfigDelegate extends WatchUi.Menu2InputDelegate {
 
     function initialize() {
@@ -27,6 +29,16 @@ class ConfigDelegate extends WatchUi.Menu2InputDelegate {
         } else if (id.equals("waterSafe")) {
             // Menu2 has already flipped the toggle; persist its new state.
             TouchConfig.setWaterSafe((item as WatchUi.ToggleMenuItem).isEnabled());
+        } else if (id.equals("link")) {
+            var link = new LinkView();
+            WatchUi.pushView(link, new LinkDelegate(link), WatchUi.SLIDE_LEFT);
+        } else if (id.equals("diagnostics")) {
+            var settings = System.getDeviceSettings();
+            var diagnostics = new DiagnosticsView();
+            WatchUi.pushView(
+                diagnostics,
+                new DiagnosticsDelegate(diagnostics, settings != null && settings.isTouchScreen),
+                WatchUi.SLIDE_LEFT);
         } else if (id.equals("about")) {
             WatchUi.pushView(new AboutView(), new AboutDelegate(), WatchUi.SLIDE_LEFT);
         }
