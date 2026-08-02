@@ -17,6 +17,11 @@ class LinkView extends WatchUi.View {
     //! Matches the interval the backend hands back, and its `slow_down` guard.
     const POLL_MS = 5000;
 
+    //! Consecutive failed polls before the attempt is abandoned. Three is about
+    //! fifteen seconds of nothing working, which is long enough to ride out a
+    //! blip and short enough not to leave a dead code on screen.
+    const MAX_POLL_FAILURES = 3;
+
     enum {
         STATE_ASKING,     // waiting for a code to show
         STATE_WAITING,    // code on screen, waiting for approval
@@ -32,6 +37,11 @@ class LinkView extends WatchUi.View {
     //! when a watch asks again too soon, and answering that by asking again at
     //! the same rate is how a client gets itself throttled indefinitely.
     private var _waitTicks;
+    //! Consecutive failed polls. A request over Bluetooth to a phone that is in
+    //! someone's locker will fail now and then, and abandoning a ten-minute code
+    //! over one blip means retyping it for no reason. Give up only once it is
+    //! clearly not working.
+    private var _failures;
     private var _client;
     private var _timer;
     private var _isTouch;
@@ -41,6 +51,7 @@ class LinkView extends WatchUi.View {
         _state = STATE_ASKING;
         _code = null;
         _waitTicks = 0;
+        _failures = 0;
         _timer = null;
         var settings = System.getDeviceSettings();
         _isTouch = settings != null && settings.isTouchScreen;
@@ -90,8 +101,10 @@ class LinkView extends WatchUi.View {
             // far away as the one that was too soon.
             _waitTicks += 1;
         } else if (state.equals(LinkClient.PENDING)) {
-            // Answered properly, so whatever backoff was in place has served.
+            // Answered properly, so whatever backoff was in place has served,
+            // and whatever went wrong before has evidently passed.
             _waitTicks = 0;
+            _failures = 0;
         } else if (state.equals(LinkClient.LINKED)) {
             _state = STATE_LINKED;
         } else if (state.equals(LinkClient.EXPIRED)) {
@@ -99,7 +112,13 @@ class LinkView extends WatchUi.View {
         } else if (state.equals(LinkClient.OFFLINE)) {
             _state = STATE_OFFLINE;
         } else if (state.equals(LinkClient.FAILED)) {
-            _state = STATE_FAILED;
+            _failures += 1;
+            // The code is still valid on the server and the wearer is still
+            // looking at it — keep asking. Only a run of failures means the
+            // attempt is actually dead.
+            if (_state != STATE_WAITING || _failures >= MAX_POLL_FAILURES) {
+                _state = STATE_FAILED;
+            }
         }
         // Neither of the waiting states changes what is on screen: the code is
         // still the code, and the wearer has nothing to do but wait.
@@ -111,6 +130,7 @@ class LinkView extends WatchUi.View {
         _state = STATE_ASKING;
         _code = null;
         _waitTicks = 0;
+        _failures = 0;
         WatchUi.requestUpdate();
         _client.requestCode();
     }
