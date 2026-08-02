@@ -30,8 +30,18 @@ class ConfigDelegate extends WatchUi.Menu2InputDelegate {
             // Menu2 has already flipped the toggle; persist its new state.
             TouchConfig.setWaterSafe((item as WatchUi.ToggleMenuItem).isEnabled());
         } else if (id.equals("link")) {
-            var link = new LinkView();
-            WatchUi.pushView(link, new LinkDelegate(link), WatchUi.SLIDE_LEFT);
+            if (LinkConfig.isLinked()) {
+                // Already linked: show which account, rather than silently
+                // starting a fresh pairing attempt behind a menu entry that
+                // reads as a status line.
+                WatchUi.pushView(
+                    AccountMenu.build(),
+                    new AccountDelegate(getApp().getBackend()),
+                    WatchUi.SLIDE_LEFT);
+            } else {
+                var link = new LinkView();
+                WatchUi.pushView(link, new LinkDelegate(link), WatchUi.SLIDE_LEFT);
+            }
         } else if (id.equals("diagnostics")) {
             var settings = System.getDeviceSettings();
             var diagnostics = new DiagnosticsView();

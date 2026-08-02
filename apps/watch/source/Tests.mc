@@ -584,6 +584,31 @@ function testQueueTrimLeavesAShortQueueAlone(logger) {
     return true;
 }
 
+//! Forgetting an account must leave nothing behind that could reach the next
+//! one: not the token, not the queue, and not the payload already on the wire —
+//! whose callback would otherwise re-queue it after the unlink.
+(:test)
+function testForgetLeavesNothingForTheNextAccount(logger) {
+    var client = new BackendClient();
+    LinkConfig.setToken("a-token");
+    LinkConfig.setAccount("someone@example.com", 1000);
+    Application.Storage.setValue(client.QUEUE_KEY, ["a", "b"]);
+    client.setInFlight({ "watchSessionId" => "already-posting" });
+
+    client.forget();
+    // The response to a POST that was in flight when the account was forgotten.
+    // Non-401, so the old code would have put its payload back.
+    client.onResponse(500, null);
+
+    // `assertEqual` invokes `equals` on its first argument, so a null one is an
+    // error rather than a failure — compare these directly.
+    Test.assert(!LinkConfig.isLinked());
+    Test.assert(LinkConfig.account() == null);
+    Test.assert(LinkConfig.linkedAt() == null);
+    Test.assertEqual(client.queuedCount(), 0);
+    return true;
+}
+
 // ---- Clock formatting ----
 
 (:test)
@@ -591,6 +616,24 @@ function testClock24Hour(logger) {
     Test.assertEqual(Fmt.clock(9, 5, true), "09:05");
     Test.assertEqual(Fmt.clock(14, 32, true), "14:32");
     Test.assertEqual(Fmt.clock(0, 0, true), "00:00");
+    return true;
+}
+
+(:test)
+function testShortDate(logger) {
+    Test.assertEqual(Fmt.date(2, 8, 2026), "2 Aug 2026");
+    Test.assertEqual(Fmt.date(31, 12, 2025), "31 Dec 2025");
+    Test.assertEqual(Fmt.date(1, 1, 2026), "1 Jan 2026");
+    return true;
+}
+
+//! A date the account screen cannot render is shown as nothing at all — an
+//! empty string the caller drops — rather than as a guess or a crash.
+(:test)
+function testShortDateRejectsNonsense(logger) {
+    Test.assertEqual(Fmt.date(null, 8, 2026), "");
+    Test.assertEqual(Fmt.date(2, 0, 2026), "");
+    Test.assertEqual(Fmt.date(2, 13, 2026), "");
     return true;
 }
 
