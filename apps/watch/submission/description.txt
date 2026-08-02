@@ -32,7 +32,9 @@ Features
 - End-of-session summary on the watch with a per-activity breakdown.
 - Discard a session you didn't mean to start, on touchscreen and button watches alike.
 - Customise your list: show, hide and reorder the activities you actually use, so the ones you visit are front and centre.
-- Optional companion web app: link once, and your sessions send themselves.
+- Optional companion web app: 
+  - Upload your exported sessions from Garmin for stats about your activities, or
+  - link once, and your sessions send themselves.
 - Adapts to your watch — round or rectangular, touchscreen or buttons.
 
 Water-safe touch (touchscreen watches)
