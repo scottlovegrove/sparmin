@@ -18,6 +18,7 @@ publishing.
 - [ ] Confirm every listed device compiles (`./build.sh fleet`), and check memory on the smallest one (fr55, 208px).
 - [ ] Replace the placeholder launcher icon with real app-icon art.
 - [ ] Prepare store listing assets: icon, screenshots, description, "what's new".
+- [ ] Supply the privacy policy URL (https://sparmin.scottlovegrove.co.uk/privacy) — required now the app transmits session data.
 - [ ] Review the requested permissions and drop any you don't use.
 - [ ] Export a signed `.iq` package (all devices) with your developer key.
 - [ ] Test on a real device end-to-end (a full session syncing to Garmin Connect).
@@ -135,6 +136,27 @@ it, and add the manifest entry.
   `submission/description.txt` and the short one in `submission/tagline.txt`, so
   they are versioned rather than living only in the portal. Keep them current as
   features land (`AGENTS.md`) — paste them in at submission time.
+
+## 3.1 Privacy policy
+
+As of 0.6.0 the app can transmit session data — including heart rate, which is
+health data — to the companion, so the listing needs a privacy policy URL. The
+policy lives on the marketing site at `/privacy`
+(`apps/marketing/src/pages/privacy.astro`), so it is version-controlled and
+deploys with the site.
+
+Two things to keep true, because a wrong privacy policy is worse than a missing
+one:
+
+- **The contact address must be a mailbox that exists.** It is a `const` at the
+  top of the page.
+- **It must describe what the app actually sends.** If the payload in
+  `SessionManager.buildPayload()` gains a field, the policy needs the same edit
+  in the same PR.
+
+The store listing also carries a short plain-language version of this in
+`submission/description.txt`, so someone deciding whether to install sees it
+without opening a policy.
 
 ## 4. Permissions
 

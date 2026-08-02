@@ -1,0 +1,169 @@
+---
+import Base from '../layouts/Base.astro';
+
+// The address the Connect IQ Store listing points at, and the one people will
+// actually write to. It has to be a mailbox that exists — a privacy contact
+// that bounces is worse than none at all.
+const CONTACT = 'privacy@scottlovegrove.co.uk';
+const COMPANION_URL = 'https://sparmin-app.scottlovegrove.co.uk';
+
+const updated = '2 August 2026';
+---
+
+<Base
+    title="Sparmin — privacy"
+    description="What Sparmin collects, when, and how to delete it. The watch app sends nothing until you link it to an account."
+>
+    <section class="intro">
+        <h1>Privacy</h1>
+        <p class="lede">
+            The watch app sends nothing anywhere until you deliberately link it to an account. If
+            you never link it, nothing on this page applies to you.
+        </p>
+        <p class="updated">Last updated {updated}</p>
+    </section>
+
+    <section class="policy">
+        <h2>The short version</h2>
+        <p>
+            Sparmin records your spa visit on your watch and saves it to Garmin Connect, exactly
+            like any other activity. That much involves nobody but you and Garmin.
+        </p>
+        <p>
+            There is also an optional companion web app. If you choose to link your watch to it,
+            each finished session is sent there so you can look at your history in a browser.
+            That is the only thing that leaves your watch, it only happens after you link, and you
+            can stop it at any time.
+        </p>
+
+        <h2>What is sent, if you link</h2>
+        <ul>
+            <li>When each session started and ended, and your time zone offset.</li>
+            <li>
+                How long you spent at each station, how many times you visited it, and its name —
+                “Finnish sauna”, “Ice cave”, and so on.
+            </li>
+            <li>
+                Your average, maximum and minimum heart rate for each station. This is health
+                data, which is why linking is a deliberate opt-in rather than something switched
+                on for you.
+            </li>
+            <li>
+                An identifier for the watch, and the app version — so a session can be attributed
+                to the right device, and a problem traced to the right release.
+            </li>
+        </ul>
+
+        <h2>What is never sent</h2>
+        <ul>
+            <li>
+                <strong>Your location.</strong> Sparmin does not record GPS at all, so there is none
+                to send.
+            </li>
+            <li>
+                <strong>Your name or email address.</strong> The watch has no access to them.
+            </li>
+            <li><strong>The activity file itself.</strong> That stays on your watch and in Garmin Connect.</li>
+            <li><strong>Your watch's serial number.</strong></li>
+        </ul>
+
+        <h2>Signing in to the companion</h2>
+        <p>
+            The companion needs an email address so it can sign you in, by magic link or passkey.
+            That address is used for signing in and nothing else: no marketing, no newsletters, and
+            it is not shared with anyone.
+        </p>
+
+        <h2>Where it is kept</h2>
+        <p>
+            On Cloudflare's platform, in a database used only by Sparmin. Email delivery for sign-in
+            links goes through <a href="https://resend.com">Resend</a>. Nothing is sold, shared or
+            handed to advertisers, and there is no analytics or tracking in the watch app or the
+            companion.
+        </p>
+        <p>
+            Sparmin is run by Scott Lovegrove as a personal project, not a company. It is
+            <a href="https://github.com/scottlovegrove/sparmin">open source</a>, so you can read
+            exactly what it does with your data rather than take this page's word for it.
+        </p>
+
+        <h2>How long it is kept</h2>
+        <p>
+            Your sessions are kept until you delete them. There is no automatic expiry — a spa
+            history is only useful over years, so deleting it on your behalf would defeat the point.
+        </p>
+
+        <h2>Deleting it</h2>
+        <ul>
+            <li>
+                <strong>One session:</strong> delete it from the session list in the
+                <a href={COMPANION_URL}>companion</a>.
+            </li>
+            <li>
+                <strong>Everything:</strong> Settings → Delete account. This removes your account
+                and every session with it, immediately and permanently.
+            </li>
+            <li>
+                <strong>Stop sending, keep your history:</strong> Settings → Watches → Remove. The
+                watch notices, forgets the account and stops sending. What it already sent stays
+                until you delete it.
+            </li>
+        </ul>
+        <p>
+            Deleting your account does not touch Garmin Connect. Your activities live there
+            independently, and Sparmin has never had access to that account.
+        </p>
+
+        <h2>Your rights</h2>
+        <p>
+            Under UK and EU data protection law you can ask for a copy of your data, ask for it to
+            be corrected, or ask for it to be deleted. The delete route above does the last one
+            immediately and without asking anybody. For the others, write to
+            <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+        </p>
+        <p>
+            The lawful basis for handling heart-rate data is your explicit consent, given by
+            linking a watch, and withdrawn by removing it or deleting your account.
+        </p>
+
+        <h2>Changes</h2>
+        <p>
+            If this policy changes in a way that affects what is collected, the change will appear
+            in the <a href="/changelog">changelog</a> alongside the release that caused it.
+        </p>
+    </section>
+</Base>
+
+<style>
+    .intro {
+        border-top: 0;
+        padding-block: clamp(2.5rem, 7vw, 4rem) 0;
+    }
+
+    .updated {
+        color: var(--muted, #6b7280);
+        font-size: 0.9rem;
+        margin-block-start: 0.75rem;
+    }
+
+    .policy {
+        padding-block: clamp(1.5rem, 4vw, 2.5rem) clamp(3rem, 8vw, 5rem);
+        max-width: 46rem;
+    }
+
+    .policy h2 {
+        margin-block: 2rem 0.75rem;
+    }
+
+    .policy h2:first-of-type {
+        margin-block-start: 0;
+    }
+
+    .policy ul {
+        padding-inline-start: 1.25rem;
+    }
+
+    .policy li {
+        margin-block: 0.4rem;
+    }
+</style>
