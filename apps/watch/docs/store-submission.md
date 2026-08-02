@@ -18,6 +18,7 @@ publishing.
 - [ ] Confirm every listed device compiles (`./build.sh fleet`), and check memory on the smallest one (fr55, 208px).
 - [ ] Replace the placeholder launcher icon with real app-icon art.
 - [ ] Prepare store listing assets: icon, screenshots, description, "what's new".
+- [ ] Supply the privacy policy URL (https://sparmin.scottlovegrove.co.uk/privacy) — required now the app transmits session data.
 - [ ] Review the requested permissions and drop any you don't use.
 - [ ] Export a signed `.iq` package (all devices) with your developer key.
 - [ ] Test on a real device end-to-end (a full session syncing to Garmin Connect).
@@ -131,7 +132,31 @@ it, and add the manifest entry.
   enough — see [screenshots.md](screenshots.md). The portal states the required
   dimensions.
 - **Text** — app name, short + long description, category, keywords, and a
-  "what's new" note per release.
+  "what's new" note per release. The long description lives in
+  `submission/description.txt` and the short one in `submission/tagline.txt`, so
+  they are versioned rather than living only in the portal. Keep them current as
+  features land (`AGENTS.md`) — paste them in at submission time.
+
+## 3.1 Privacy policy
+
+As of 0.6.0 the app can transmit session data — including heart rate, which is
+health data — to the companion, so the listing needs a privacy policy URL. The
+policy lives on the marketing site at `/privacy`
+(`apps/marketing/src/pages/privacy.astro`), so it is version-controlled and
+deploys with the site.
+
+Two things to keep true, because a wrong privacy policy is worse than a missing
+one:
+
+- **The contact address must be a mailbox that exists.** It is a `const` at the
+  top of the page.
+- **It must describe what the app actually sends.** If the payload in
+  `SessionManager.buildPayload()` gains a field, the policy needs the same edit
+  in the same PR.
+
+The store listing also carries a short plain-language version of this in
+`submission/description.txt`, so someone deciding whether to install sees it
+without opening a policy.
 
 ## 4. Permissions
 
@@ -139,8 +164,12 @@ We currently request: `Fit`, `FitContributor`, `Sensor`, `SensorHistory`,
 `Communications`. The Store surfaces these to users at install time, so:
 
 - Drop any you don't actually use — fewer permissions = less install friction.
-- `Communications` is only needed once the backend sync (Strava labels) is
-  wired; until then it can be removed. Re-add it when that lands.
+- `Communications` is **required** as of 0.6.0 — it is what links the watch to
+  the companion and sends each finished session. It can no longer be dropped.
+- `Sensor` and `SensorHistory` appear unused: nothing under `source/` references
+  either, and `HrSampler` reads heart rate through `Toybox.Activity` /
+  `ActivityMonitor`. Confirm on a device before removing them, since the Store
+  shows every permission at install time and fewer means less friction.
 - Be ready to explain each in the listing (why a spa logger needs them).
 
 ## 5. Build the store package (`.iq`)

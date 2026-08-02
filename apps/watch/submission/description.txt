@@ -1,18 +1,40 @@
 Sparmin — Spa & Thermal Session Logger
 
-Turn a sauna, bathhouse or thermal spa visit into a proper Garmin activity. Sparmin records your whole session as a FIT activity and times every place you spend time separately — each sauna, steam room, cold plunge, hydro pool or lounger — so you finish with a clear per-activity breakdown instead of one shapeless block of time.
+Turn a sauna, bathhouse or thermal spa visit into a proper Garmin activity. Sparmin records your whole session as a FIT activity and times every place you spend time separately — each sauna, steam room, cold plunge, hydro pool, hot tub or lounger — so you finish with a clear per-activity breakdown instead of one shapeless block of time.
 
 How it works
 
-Open the app when you arrive and tap the activity you're starting. Sparmin begins timing it and shows your live heart rate. Move to the next spot and tap it — the app switches automatically, with no gap. Step out between activities and it tracks that as transition time too. When you're done, stop the session to see a summary: total time, plus the time, visit count and heart rate for each activity, and your total transition time. The whole visit is saved to Garmin Connect as an activity.
+Open the app when you arrive and tap the activity you're starting. Sparmin begins timing it and shows your live heart rate, with the time of day on screen so you can keep track without leaving the app. Move to the next spot and tap it — the app switches automatically, with no gap. Step out between activities and it tracks that as transition time too. When you're done, stop the session to see a summary: total time, plus the time, visit count and heart rate for each activity, and your total transition time. The whole visit is saved to Garmin Connect as an activity. Started something by mistake? Discard the session instead of saving it.
+
+Your sessions in a browser (optional)
+
+Sparmin has a companion web app. Link your watch to it once — Settings, then Link account, then type the short code it shows into the website — and from then on every session sends itself as you finish it. Nothing to export, no files to move around.
+
+- Sessions recorded away from your phone are kept on the watch and sent the next time you open the app with your phone nearby.
+- Remove the watch from your account and it notices, forgets the account and stops sending.
+- Sending never affects the recording. The activity is saved to your watch and to Garmin Connect first, and always — the companion is somewhere to look at your history, not where it lives.
+
+This is entirely optional. Ignore it and Sparmin works exactly as it did before, saving to Garmin Connect like any other activity.
+
+What gets sent, and when
+
+Nothing leaves your watch until you link it to an account. After that, each finished session sends the times you spent at each station, how often you visited it, and your average, maximum and minimum heart rate for each one.
+
+Your location is never sent — Sparmin doesn't record GPS at all. Neither is your name, your email address, your watch's serial number, or the activity file itself, which stays on your watch and in Garmin Connect as usual.
+
+You can stop it at any time by removing the watch from your account, and you can delete your sessions, or your whole account, whenever you like. Full details: https://sparmin.scottlovegrove.co.uk/privacy
 
 Features
 
-- Records your whole visit as a Garmin activity, timing each spot separately (sauna, cold plunge, steam room, hydro pool, loungers and more).
+- Records your whole visit as a Garmin activity, timing each spot separately (sauna, cold plunge, steam room, hydro pool, hot tub, loungers and more).
 - Live heart rate during the session, plus average and maximum heart rate for every activity in the summary.
 - Automatic, zero-gap switching when you move from one activity to the next, with separate transition timing in between.
 - End-of-session summary on the watch with a per-activity breakdown.
+- Discard a session you didn't mean to start, on touchscreen and button watches alike.
 - Customise your list: show, hide and reorder the activities you actually use, so the ones you visit are front and centre.
+- Optional companion web app: 
+  - Upload your exported sessions from Garmin for stats about your activities, or
+  - link once, and your sessions send themselves.
 - Adapts to your watch — round or rectangular, touchscreen or buttons.
 
 Water-safe touch (touchscreen watches)
@@ -22,4 +44,4 @@ Spa screens get wet, and warm droplets on a touchscreen can fire off taps you ne
 - Selecting an activity (or confirming the end of a session) needs a deliberate double tap of the same tile, so a stray droplet tap is ignored.
 - A touch-lock lets you disable the screen entirely for a full soak; the app shows a padlock while locked, and the physical Stop button still works, so you can always end the session even with the touchscreen off.
 
-It's off by default, so nothing changes unless you want it. On button watches there's nothing to enable — the buttons are already splash-proof.
+It's off by default, so nothing changes unless you want it. You can also move through the activity list with the physical buttons on a touchscreen watch — the thing you want when your hands and the screen are both wet. On button watches there's nothing to enable; the buttons are already splash-proof.
