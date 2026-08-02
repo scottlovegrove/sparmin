@@ -201,6 +201,18 @@ describe('the pending-code description', () => {
     })
 })
 
+function rename(deviceId: string, name: string, who: SignedIn) {
+    return app.request(
+        `/api/devices/${deviceId}`,
+        {
+            method: 'PATCH',
+            headers: { ...who.headers, 'content-type': 'application/json' },
+            body: JSON.stringify({ name }),
+        },
+        env,
+    )
+}
+
 describe('managing linked watches', () => {
     it('lists what is linked, and drops it on revoke', async () => {
         await resetUsers()
@@ -223,6 +235,52 @@ describe('managing linked watches', () => {
 
         const after = await getJson<{ devices: unknown[] }>('/api/devices', me)
         expect(after.body.devices).toHaveLength(0)
+    })
+
+    it('renames a watch, so two of the same model can be told apart', async () => {
+        await resetUsers()
+        me = await signIn()
+        const { deviceId } = await linkWatch(me)
+
+        const res = await rename(deviceId, 'Pool watch', me)
+        expect(res.status).toBe(204)
+
+        const { body } = await getJson<{ devices: { name: string }[] }>('/api/devices', me)
+        expect(body.devices[0].name).toBe('Pool watch')
+    })
+
+    // Someone clearing the box means "go back to the model name", not "store an
+    // empty string" — the list would then have a row labelled nothing at all.
+    it('clears the name when it is emptied', async () => {
+        await resetUsers()
+        me = await signIn()
+        const { deviceId } = await linkWatch(me)
+        await rename(deviceId, 'Pool watch', me)
+
+        expect((await rename(deviceId, '   ', me)).status).toBe(204)
+
+        const { body } = await getJson<{ devices: { name: string | null }[] }>('/api/devices', me)
+        expect(body.devices[0].name).toBeNull()
+    })
+
+    it('will not rename someone else’s watch', async () => {
+        await resetUsers()
+        me = await signIn()
+        const { deviceId } = await linkWatch(me)
+        const other = await signIn('other@example.com')
+
+        expect((await rename(deviceId, 'Mine now', other)).status).toBe(404)
+
+        const { body } = await getJson<{ devices: { name: string | null }[] }>('/api/devices', me)
+        expect(body.devices[0].name).toBeNull()
+    })
+
+    it('refuses a name too long for the list to stay a list', async () => {
+        await resetUsers()
+        me = await signIn()
+        const { deviceId } = await linkWatch(me)
+
+        expect((await rename(deviceId, 'x'.repeat(61), me)).status).toBe(400)
     })
 
     it('lists the most recently linked watch first', async () => {

@@ -25,6 +25,7 @@ describe('the /api guard', () => {
         ['POST', '/api/device/approve'],
         ['GET', '/api/device/pending/K7QM4XB9'],
         ['GET', '/api/devices'],
+        ['PATCH', '/api/devices/some-device-id'],
         ['DELETE', '/api/devices/some-device-id'],
     ]
 

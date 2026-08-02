@@ -16,6 +16,7 @@ import {
     markDeviceSeen,
     openLinkRequest,
     pollLink,
+    renameDevice,
     revokeDevice,
 } from './devices'
 import { ingestSession, ingestWatchSession } from './session-ingest'
@@ -157,6 +158,9 @@ const linkRequestSchema = z.object({
 const pollSchema = z.object({ deviceCode: z.string().min(1).max(128) })
 
 const approveSchema = z.object({ userCode: z.string().min(1).max(32) })
+// Long enough for "Sarah's vívoactive in the blue case", short enough that the
+// list stays a list.
+const renameSchema = z.object({ name: z.string().max(60) })
 
 // A watch asking to be linked. Anonymous: it has no credential yet, and the code
 // it gets back is worthless until a signed-in human approves it (§2.1).
@@ -224,6 +228,25 @@ app.post('/api/device/approve', async (c) => {
 app.get('/api/devices', async (c) => {
     const rows = await listDevices(createDb(c.env.DB), c.get('userId'))
     return c.json({ devices: rows })
+})
+
+app.patch('/api/devices/:id', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = renameSchema.safeParse(body)
+    if (!parsed.success) {
+        return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
+    }
+
+    const renamed = await renameDevice(
+        createDb(c.env.DB),
+        c.get('userId'),
+        c.req.param('id'),
+        parsed.data.name,
+    )
+    if (!renamed) {
+        return c.json({ error: 'not_found' }, 404)
+    }
+    return c.body(null, 204)
 })
 
 app.delete('/api/devices/:id', async (c) => {
