@@ -131,7 +131,10 @@ it, and add the manifest entry.
   enough — see [screenshots.md](screenshots.md). The portal states the required
   dimensions.
 - **Text** — app name, short + long description, category, keywords, and a
-  "what's new" note per release.
+  "what's new" note per release. The long description lives in
+  `submission/description.txt` and the short one in `submission/tagline.txt`, so
+  they are versioned rather than living only in the portal. Keep them current as
+  features land (`AGENTS.md`) — paste them in at submission time.
 
 ## 4. Permissions
 
@@ -139,8 +142,12 @@ We currently request: `Fit`, `FitContributor`, `Sensor`, `SensorHistory`,
 `Communications`. The Store surfaces these to users at install time, so:
 
 - Drop any you don't actually use — fewer permissions = less install friction.
-- `Communications` is only needed once the backend sync (Strava labels) is
-  wired; until then it can be removed. Re-add it when that lands.
+- `Communications` is **required** as of 0.6.0 — it is what links the watch to
+  the companion and sends each finished session. It can no longer be dropped.
+- `Sensor` and `SensorHistory` appear unused: nothing under `source/` references
+  either, and `HrSampler` reads heart rate through `Toybox.Activity` /
+  `ActivityMonitor`. Confirm on a device before removing them, since the Store
+  shows every permission at install time and fewer means less friction.
 - Be ready to explain each in the listing (why a spa logger needs them).
 
 ## 5. Build the store package (`.iq`)

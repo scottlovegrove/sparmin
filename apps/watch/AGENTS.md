@@ -64,6 +64,19 @@ to the watch's `GARMIN/APPS/`.
   2. Add the matching note in the `apps/marketing` workspace: a new
      `apps/marketing/src/content/changelog/<version>.md` (frontmatter `version` +
      `summary`, then user-facing bullets — copy the newest file).
+  3. **If the feature changes what the app does or offers, update
+     `submission/description.txt`** — the Connect IQ Store listing. A changelog
+     says what changed for someone who already has the app; the description is
+     what a stranger reads before installing it, and it is the only one of the
+     two that goes stale silently. It had drifted four releases behind before
+     anyone noticed. Fixes and internal work don't touch it; anything that adds
+     or changes a capability does.
+
+     Beware the fix dressed as a feature. "A stray swipe can't cut your
+     recording short" is not something to sell — it advertises a flaw the reader
+     had no idea existed, and invites them to wonder what else bites. If the
+     bullet only makes sense to someone who hit the bug, it belongs in the
+     changelog and nowhere near this file.
 
   Either half without the other is a bug: an un-bumped version means nobody can
   tell what's on the watch, and a missing changelog entry means nobody knows what
