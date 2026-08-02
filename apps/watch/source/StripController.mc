@@ -1,59 +1,82 @@
 import Toybox.Lang;
 
+//! What the virtual slot past the last station means, if it exists at all.
+enum {
+    TRAILING_NONE,
+    TRAILING_END,
+    TRAILING_SETTINGS
+}
+
 //! Pure strip navigation: the focus cursor and the visible window over the
 //! configured activity list. No drawing, no device APIs — the edge-sliding rule
 //! (§4) is unit-testable here.
 //!
-//! When `endSlot` is set (the touch wet-fallback: cycle with one button, commit
-//! with the other), the cursor also reaches one virtual trailing slot past the
-//! last station — the "End / Exit" target. It carries no activityId; the view
-//! draws it and the delegate interprets it by session state (End mid-session,
+//! Past the last station the cursor can reach one virtual trailing slot, whose
+//! meaning is `trailingSlot`. It carries no activityId; the view draws it and
+//! the delegate interprets it. Touch devices put End/Exit there (the wet
+//! fallback: cycle with one button, commit with the other — End mid-session,
 //! Exit at idle, which is how you leave the app once the cursor has claimed the
-//! Back button).
+//! Back button). Button devices put Settings there instead, because they have
+//! no other on-screen way into it.
 class StripController {
     public var visibleIds as Lang.Array;  // configured, ordered visible activityIds
     public var focusedIndex as Lang.Number;
     public var windowStart as Lang.Number;
     public var visibleCount as Lang.Number;
-    public var endSlot as Lang.Boolean;   // trailing End/Exit target enabled?
+    public var trailingSlot as Lang.Number;   // TRAILING_NONE / _END / _SETTINGS
 
-    function initialize(visibleIds as Lang.Array, visibleCount as Lang.Number, endSlot as Lang.Boolean) {
+    function initialize(visibleIds as Lang.Array, visibleCount as Lang.Number, trailingSlot as Lang.Number) {
         me.visibleIds = visibleIds;
         me.visibleCount = (visibleCount < visibleIds.size()) ? visibleCount : visibleIds.size();
         me.focusedIndex = 0;
         me.windowStart = 0;
-        me.endSlot = endSlot;
+        me.trailingSlot = trailingSlot;
     }
 
-    //! Number of stations (the End/Exit slot is not one).
+    //! Number of stations (the trailing slot is not one).
     function count() as Lang.Number {
         return visibleIds.size();
     }
 
-    //! Total selectable slots, including the trailing End/Exit tile when enabled.
+    //! Total selectable slots, including the trailing tile when there is one.
     function slotCount() as Lang.Number {
-        return visibleIds.size() + (endSlot ? 1 : 0);
+        return visibleIds.size() + (trailingSlot == TRAILING_NONE ? 0 : 1);
     }
 
-    //! True when the cursor sits on the trailing End/Exit tile.
-    function isOnEndSlot() as Lang.Boolean {
-        return endSlot && focusedIndex == visibleIds.size();
+    //! True when the cursor sits on the trailing tile.
+    function isOnTrailingSlot() as Lang.Boolean {
+        return trailingSlot != TRAILING_NONE && focusedIndex == visibleIds.size();
     }
 
-    //! True when absolute slot index `i` is the End/Exit tile.
-    function isEndIndex(i as Lang.Number) as Lang.Boolean {
-        return endSlot && i == visibleIds.size();
+    //! True when absolute slot index `i` is the trailing tile.
+    function isTrailingIndex(i as Lang.Number) as Lang.Boolean {
+        return trailingSlot != TRAILING_NONE && i == visibleIds.size();
+    }
+
+    //! Change what the trailing slot means (it comes and goes with the session
+    //! state on button devices), keeping the cursor and window in range.
+    function setTrailingSlot(kind as Lang.Number) as Void {
+        if (kind == trailingSlot) {
+            return;
+        }
+        trailingSlot = kind;
+        var maxFocus = slotCount() - 1;
+        if (focusedIndex > maxFocus) {
+            focusedIndex = (maxFocus < 0) ? 0 : maxFocus;
+        }
+        windowStart = _clampStart(windowStart);
+        _reveal();
     }
 
     function focusedId() {
-        if (visibleIds.size() == 0 || isOnEndSlot()) {
+        if (visibleIds.size() == 0 || isOnTrailingSlot()) {
             return null;
         }
         return visibleIds[focusedIndex];
     }
 
     //! Move the focus cursor by delta, wrapping over all slots (stations + the
-    //! End/Exit tile), sliding the window to keep the cursor visible.
+    //! trailing tile), sliding the window to keep the cursor visible.
     function moveFocus(delta as Lang.Number) as Void {
         var n = slotCount();
         if (n == 0) {
@@ -88,7 +111,7 @@ class StripController {
     }
 
     //! activityId at an absolute index in the visible list, or null (also null for
-    //! the End/Exit tile, which has no id — test it with isEndIndex).
+    //! the trailing tile, which has no id — test it with isTrailingIndex).
     function idAtIndex(i as Lang.Number) {
         return (i >= 0 && i < visibleIds.size()) ? visibleIds[i] : null;
     }

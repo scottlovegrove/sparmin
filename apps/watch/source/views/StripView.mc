@@ -35,7 +35,10 @@ class StripView extends WatchUi.View {
         _isTouch = settings.isTouchScreen;
         _is24Hour = settings.is24Hour;
         var tiles = _isTouch ? 4 : 3;      // roomy tiles: VA5 4, FR745 3 (§2)
-        _ctrl = new StripController(ActivityConfig.load(), tiles, _isTouch);
+        // Touch trails End/Exit (the wet fallback); buttons trail Settings, their
+        // only on-screen way in. _syncTrailingSlot keeps the latter to idle.
+        _ctrl = new StripController(ActivityConfig.load(), tiles,
+                                    _isTouch ? TRAILING_END : TRAILING_SETTINGS);
     }
 
     function getController() as StripController { return _ctrl; }
@@ -184,6 +187,7 @@ class StripView extends WatchUi.View {
         dc.clear();
 
         var state = _session.getState();
+        _syncTrailingSlot(state);
         _drawClock(dc);
         _drawStrip(dc, state);
         _drawTimers(dc, state);
@@ -193,6 +197,17 @@ class StripView extends WatchUi.View {
         } else if (_backNoteShowing()) {
             _drawBackNote(dc);
         }
+    }
+
+    //! On a button device the Settings tile is the way into the config screen, and
+    //! that screen only opens at idle (it edits the strip you'd be recording
+    //! against), so the tile exists only there. Touch keeps its End/Exit tile in
+    //! every state — mid-session it's how a wet finger stops the recording.
+    private function _syncTrailingSlot(state) as Void {
+        if (_isTouch) {
+            return;
+        }
+        _ctrl.setTrailingSlot((state == STATE_IDLE) ? TRAILING_SETTINGS : TRAILING_NONE);
     }
 
     //! Time of day, in the strip's top margin. It's here because leaving the app
@@ -251,7 +266,7 @@ class StripView extends WatchUi.View {
 
     //! True when a tap lands on the trailing End/Exit tile.
     function isEndTileAtPoint(coords as Lang.Array) as Lang.Boolean {
-        return _ctrl.isEndIndex(_slotIndexAtPoint(coords));
+        return _ctrl.trailingSlot == TRAILING_END && _ctrl.isTrailingIndex(_slotIndexAtPoint(coords));
     }
 
     //! Absolute slot index under a tapped point, or -1. Uses the same eased
@@ -297,8 +312,12 @@ class StripView extends WatchUi.View {
             if (x + tileW < 0 || x > _w) { continue; }   // fully off-screen
             var isFocused = (showCursor && i == _ctrl.focusedIndex);
 
-            if (_ctrl.isEndIndex(i)) {
-                _drawEndTile(dc, x, top, tileW, tileH, isFocused, state);
+            if (_ctrl.isTrailingIndex(i)) {
+                if (_ctrl.trailingSlot == TRAILING_SETTINGS) {
+                    _drawSettingsTile(dc, x, top, tileW, tileH, isFocused);
+                } else {
+                    _drawEndTile(dc, x, top, tileW, tileH, isFocused, state);
+                }
                 continue;
             }
 
@@ -355,6 +374,28 @@ class StripView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(x + tileW / 2, top + tileH / 2, Graphics.FONT_XTINY,
                     (state == STATE_IDLE) ? "Exit" : "End",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    //! The trailing Settings tile (button devices): a neutral grey tile at the end
+    //! of the cycle, so the config screen is reachable with the same Up/Down/Start
+    //! the stations use. The label is measured rather than assumed — the tile is a
+    //! third of a 240px screen, and a word that overruns it looks like damage.
+    private function _drawSettingsTile(dc as Graphics.Dc, x, top, tileW, tileH, isFocused as Lang.Boolean) as Void {
+        dc.setColor(0x22303A, Graphics.COLOR_TRANSPARENT);
+        dc.fillRoundedRectangle(x, top, tileW, tileH, 8);
+        if (isFocused) {
+            dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(3);
+            dc.drawRoundedRectangle(x, top, tileW, tileH, 8);
+            dc.setPenWidth(1);
+        }
+        var label = "Settings";
+        if (dc.getTextWidthInPixels(label, Graphics.FONT_XTINY) > tileW - 6) {
+            label = "Set-up";
+        }
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(x + tileW / 2, top + tileH / 2, Graphics.FONT_XTINY, label,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -449,7 +490,12 @@ class StripView extends WatchUi.View {
         dc.drawText(_w / 2, hintY, Graphics.FONT_XTINY, msg,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Footer: settings affordance (tap target on touch; Menu on buttons).
+        // Footer: the settings tap target. Touch only — a button device reaches
+        // settings through the tile at the end of the strip, so a pill here would
+        // be a control it cannot put a cursor on.
+        if (!_isTouch) {
+            return;
+        }
         var fy = (_h * 0.82).toNumber();
         dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(_w * 0.24, fy - _h * 0.055, _w * 0.52, _h * 0.11, 6);
