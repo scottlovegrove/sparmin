@@ -116,6 +116,14 @@ to the watch's `GARMIN/APPS/`.
   carries its own activity.
 - **No device hardcoding.** Adapt from `System.getDeviceSettings()` (touch vs
   buttons, width) — never `if (device == …)`.
+- **`FONT_NUMBER_*` draws digits, not text.** Those tiers are a different
+  typeface from `FONT_XTINY`…`FONT_LARGE` (Yantramanav against Roboto on the
+  vívoactive 5) and carry digits, a few symbols and almost no letters. A letter
+  with no glyph is not a fallback or a box — it is drawn as **empty space**, so
+  the string silently loses characters and still looks deliberate. Reserve them
+  for durations and clock times; anything with letters in it uses a text font.
+  Where the string's length varies, pick the tier by measuring with
+  `dc.getTextWidthInPixels` rather than by screen width.
 - **Per-family resources.** Drawables resolve by **screen family**, not device:
   `resources-<deviceFamily>/` (e.g. `resources-round-390x390/`) covers every
   device in that family. There is no shared drawable fallback, so a device in a
