@@ -98,8 +98,11 @@ class LinkView extends WatchUi.View {
             _waitTicks = 0;
         } else if (state.equals(LinkClient.SLOW_DOWN)) {
             // Asked to ease off: sit out a tick, so the next attempt is twice as
-            // far away as the one that was too soon.
+            // far away as the one that was too soon. Still a proper answer from
+            // the backend, so it breaks any run of failures — the count is of
+            // consecutive ones.
             _waitTicks += 1;
+            _failures = 0;
         } else if (state.equals(LinkClient.PENDING)) {
             // Answered properly, so whatever backoff was in place has served,
             // and whatever went wrong before has evidently passed.
