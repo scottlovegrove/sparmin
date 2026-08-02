@@ -157,7 +157,7 @@ class LinkView extends WatchUi.View {
         if (_state == STATE_WAITING && _code != null) {
             // The code is the whole point of the screen: biggest type that fits.
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(width / 2, middle - _lineHeight(dc), _codeFont(width),
+            dc.drawText(width / 2, middle - _lineHeight(dc), _codeFont(dc, width),
                 _code, Graphics.TEXT_JUSTIFY_CENTER);
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(width / 2, middle + _lineHeight(dc), Graphics.FONT_XTINY,
@@ -183,13 +183,40 @@ class LinkView extends WatchUi.View {
         return "Couldn't link";
     }
 
-    //! The widest font the code fits in. A 9-character code on a 208px screen
-    //! needs a smaller one than the same code on a 454px screen, and a code that
-    //! runs off the edge is worse than a small one.
-    private function _codeFont(width) {
-        if (width >= 360) { return Graphics.FONT_NUMBER_MEDIUM; }
-        if (width >= 260) { return Graphics.FONT_LARGE; }
-        return Graphics.FONT_MEDIUM;
+    //! Candidate fonts for the code, largest first.
+    //!
+    //! **Text fonts only.** The `FONT_NUMBER_*` tiers are a separate typeface
+    //! (Yantramanav on the vívoactive 5, against Roboto for the text tiers) that
+    //! carries digits and a couple of stray letters and nothing else. A code is
+    //! alphanumeric, so most of its letters have no glyph and are drawn as empty
+    //! space: a code beginning `VRYV` reached the watch intact and rendered as
+    //! `R -9 F`. Unreadable, and worse, it still looks like a plausible code, so
+    //! the wearer types it in and blames the companion.
+    private function _codeFonts() as Lang.Array {
+        return [
+            Graphics.FONT_LARGE,
+            Graphics.FONT_MEDIUM,
+            Graphics.FONT_SMALL,
+            Graphics.FONT_TINY,
+            Graphics.FONT_XTINY
+        ];
+    }
+
+    //! The largest of those the code actually fits inside. Measured rather than
+    //! guessed from the screen width: the code is a fixed nine characters, but
+    //! glyph widths vary by device, and a code running off the edge is worse than
+    //! a small one.
+    private function _codeFont(dc as Graphics.Dc, width) {
+        // Round screens narrow towards the top, and the code sits a line above
+        // the middle — leave a margin rather than measure the chord.
+        var room = width * 4 / 5;
+        var fonts = _codeFonts();
+        for (var i = 0; i < fonts.size() - 1; i += 1) {
+            if (dc.getTextWidthInPixels(_code, fonts[i]) <= room) {
+                return fonts[i];
+            }
+        }
+        return fonts[fonts.size() - 1];
     }
 
     private function _lineHeight(dc as Graphics.Dc) {
