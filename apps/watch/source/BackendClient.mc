@@ -45,6 +45,23 @@ class BackendClient {
         WatchLog.add("link: forgetting account, dropping " + queuedCount());
         LinkConfig.clearToken();
         Application.Storage.deleteValue(QUEUE_KEY);
+        // A POST already on the wire outlives this call, and its callback would
+        // otherwise re-queue the payload it was carrying — putting a session
+        // belonging to the account just left back into a queue the next account
+        // will flush. Dropping the reference is what makes the unlink complete:
+        // the response still arrives, finds nothing to re-queue, and stops.
+        _inFlight = null;
+    }
+
+    //! Stand a payload in the in-flight slot without making a request, so the
+    //! late-callback paths can be tested.
+    //!
+    //! `(:debug)` rather than `(:test)`: the latter registers a function as a
+    //! test case in its own right, and this is a seam for one, not one itself.
+    //! Either way it is compiled out of the released `.iq`, which is built `-r`.
+    (:debug)
+    function setInFlight(payload) as Void {
+        _inFlight = payload;
     }
 
     //! Send now if there is a phone and a token, otherwise keep it for later.

@@ -584,6 +584,31 @@ function testQueueTrimLeavesAShortQueueAlone(logger) {
     return true;
 }
 
+//! Forgetting an account must leave nothing behind that could reach the next
+//! one: not the token, not the queue, and not the payload already on the wire —
+//! whose callback would otherwise re-queue it after the unlink.
+(:test)
+function testForgetLeavesNothingForTheNextAccount(logger) {
+    var client = new BackendClient();
+    LinkConfig.setToken("a-token");
+    LinkConfig.setAccount("someone@example.com", 1000);
+    Application.Storage.setValue(client.QUEUE_KEY, ["a", "b"]);
+    client.setInFlight({ "watchSessionId" => "already-posting" });
+
+    client.forget();
+    // The response to a POST that was in flight when the account was forgotten.
+    // Non-401, so the old code would have put its payload back.
+    client.onResponse(500, null);
+
+    // `assertEqual` invokes `equals` on its first argument, so a null one is an
+    // error rather than a failure — compare these directly.
+    Test.assert(!LinkConfig.isLinked());
+    Test.assert(LinkConfig.account() == null);
+    Test.assert(LinkConfig.linkedAt() == null);
+    Test.assertEqual(client.queuedCount(), 0);
+    return true;
+}
+
 // ---- Clock formatting ----
 
 (:test)
