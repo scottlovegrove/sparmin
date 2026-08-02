@@ -70,6 +70,19 @@ to the watch's `GARMIN/APPS/`.
   changed. This is the one change that deliberately spans both workspaces.
   Internal-only work (refactors, tests, docs, tooling) is not a release — leave
   the version alone.
+
+  **A release is a feature, not a pull request.** A feature built across several
+  PRs is one version and one changelog entry, however many times it lands on
+  main. Bump on the *first* PR of the feature and keep adding to that entry as
+  the rest arrives — the store only ever sees the finished thing, and a user
+  cannot tell what 0.7.0 meant as against 0.7.1 when neither was ever installable.
+  A fix to code that has not shipped is not a release at all: amend the pending
+  entry if it changes what the entry claims, otherwise leave it out entirely,
+  because nobody experienced the bug.
+
+  The version that matters is whatever is in `Version.APP` when the `.iq` is
+  packaged. Check `bin/` for the last package before assuming a version is
+  spent.
 - **Canonical activity ids.** `activityId`s in `SpaActivity.mc` are permanent.
   Hiding/reordering (`ActivityConfig`) is a pure display layer — it must never
   remap or drop an id. The id written to the FIT lap field and the backend
