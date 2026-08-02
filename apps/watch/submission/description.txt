@@ -8,21 +8,15 @@ Open the app when you arrive and tap the activity you're starting. Sparmin begin
 
 Your sessions in a browser (optional)
 
-Sparmin has a companion web app. Link your watch to it once — Settings, then Link account, then type the short code it shows into the website — and from then on every session sends itself as you finish it. Nothing to export, no files to move around.
+Sparmin has a companion web app. Link your watch to it once — Settings, then Link account, then type the short code it shows into the website — and every session sends itself as you finish it. Nothing to export, no files to move around.
 
-- Sessions recorded away from your phone are kept on the watch and sent the next time you open the app with your phone nearby.
+- Sessions recorded away from your phone are kept and sent next time you open the app with your phone nearby.
 - Remove the watch from your account and it notices, forgets the account and stops sending.
-- Sending never affects the recording. The activity is saved to your watch and to Garmin Connect first, and always — the companion is somewhere to look at your history, not where it lives.
+- Sending never affects the recording. The activity is saved to your watch and to Garmin Connect first, and always.
 
-This is entirely optional. Ignore it and Sparmin works exactly as it did before, saving to Garmin Connect like any other activity.
+Entirely optional — ignore it and Sparmin works exactly as it did before.
 
-What gets sent, and when
-
-Nothing leaves your watch until you link it to an account. After that, each finished session sends the times you spent at each station, how often you visited it, and your average, maximum and minimum heart rate for each one.
-
-Your location is never sent — Sparmin doesn't record GPS at all. Neither is your name, your email address, your watch's serial number, or the activity file itself, which stays on your watch and in Garmin Connect as usual.
-
-You can stop it at any time by removing the watch from your account, and you can delete your sessions, or your whole account, whenever you like. Full details: https://sparmin.scottlovegrove.co.uk/privacy
+Nothing leaves your watch until you link it. After that, each session sends its times, stations and heart-rate figures. Your location is never sent (Sparmin doesn't record GPS at all), nor your name, nor the activity file itself. Full details: https://sparmin.scottlovegrove.co.uk/privacy
 
 Features
 
@@ -32,16 +26,16 @@ Features
 - End-of-session summary on the watch with a per-activity breakdown.
 - Discard a session you didn't mean to start, on touchscreen and button watches alike.
 - Customise your list: show, hide and reorder the activities you actually use, so the ones you visit are front and centre.
-- Optional companion web app: 
+- Optional companion web app:
   - Upload your exported sessions from Garmin for stats about your activities, or
   - link once, and your sessions send themselves.
 - Adapts to your watch — round or rectangular, touchscreen or buttons.
 
 Water-safe touch (touchscreen watches)
 
-Spa screens get wet, and warm droplets on a touchscreen can fire off taps you never made — enough to start or switch an activity by accident. Sparmin has an optional Water-safe touch mode for this. Turn it on in Settings and two things change:
+Spa screens get wet, and warm droplets can fire off taps you never made — enough to start or switch an activity by accident. Turn on Water-safe touch in Settings and two things change:
 
 - Selecting an activity (or confirming the end of a session) needs a deliberate double tap of the same tile, so a stray droplet tap is ignored.
-- A touch-lock lets you disable the screen entirely for a full soak; the app shows a padlock while locked, and the physical Stop button still works, so you can always end the session even with the touchscreen off.
+- A touch-lock lets you disable the screen entirely for a full soak; the app shows a padlock while locked, and the physical Stop button still works, so you can always end the session.
 
-It's off by default, so nothing changes unless you want it. You can also move through the activity list with the physical buttons on a touchscreen watch — the thing you want when your hands and the screen are both wet. On button watches there's nothing to enable; the buttons are already splash-proof.
+It's off by default. You can also move through the activity list with the physical buttons on a touchscreen watch — the thing you want when your hands and the screen are both wet. On button watches there's nothing to enable; the buttons are already splash-proof.

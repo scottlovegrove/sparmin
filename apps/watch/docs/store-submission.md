@@ -134,7 +134,9 @@ it, and add the manifest entry.
 - **Text** — app name, short + long description, category, keywords, and a
   "what's new" note per release. The long description lives in
   `submission/description.txt` and the short one in `submission/tagline.txt`, so
-  they are versioned rather than living only in the portal. Keep them current as
+  they are versioned rather than living only in the portal. **The long one is
+  capped at 4,000 characters** by the portal — it currently sits around 3,700, so
+  anything added usually costs something elsewhere. `wc -m` before you write. Keep them current as
   features land (`AGENTS.md`) — paste them in at submission time.
 
 ## 3.1 Privacy policy
