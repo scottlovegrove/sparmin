@@ -1,4 +1,5 @@
 import { and, desc, eq, gt, isNull, lt, ne, or } from 'drizzle-orm'
+import { user } from '../src/db/auth-schema'
 import { deviceLinkCodes, devices } from '../src/db/schema'
 import { generateUserCode, normaliseUserCode } from '../src/lib/device-code'
 import type { Db } from './db'
@@ -178,7 +179,7 @@ export type PollResult =
     | { status: 'authorization_pending' }
     | { status: 'slow_down' }
     | { status: 'expired_token' }
-    | { status: 'linked'; token: string; deviceId: string }
+    | { status: 'linked'; token: string; deviceId: string; account: string; linkedAt: number }
 
 //! The watch asking whether anyone has approved it yet.
 //!
@@ -255,7 +256,22 @@ export async function pollLink(db: Db, deviceCode: string, now: number): Promise
         })
         .returning({ id: devices.id })
 
-    return { status: 'linked', token, deviceId: device.id }
+    // The address the watch shows on its account screen. Sent once, at approval,
+    // because it is the only moment the watch is entitled to it: from here on it
+    // holds a token that says which account it posts for but never who that is.
+    const [account] = await db
+        .select({ email: user.email })
+        .from(user)
+        .where(eq(user.id, row.userId))
+        .limit(1)
+
+    return {
+        status: 'linked',
+        token,
+        deviceId: device.id,
+        account: account?.email ?? '',
+        linkedAt: now,
+    }
 }
 
 //! The account's linked watches, newest first. Revoked ones are gone, not listed

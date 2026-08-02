@@ -32,6 +32,21 @@ class BackendClient {
         _inFlight = null;
     }
 
+    //! Unlink on purpose, from the account screen.
+    //!
+    //! Takes the queue with it, for the reason the 401 path does: those sessions
+    //! were recorded for an account this watch is deliberately leaving, and
+    //! linking to a different one later must not post them into it. Nothing is
+    //! lost that Garmin Connect does not still hold.
+    //!
+    //! This end only. The account keeps its record of the watch until it is
+    //! removed in the companion, which is where a server-side revoke lives.
+    function forget() as Void {
+        WatchLog.add("link: forgetting account, dropping " + queuedCount());
+        LinkConfig.clearToken();
+        Application.Storage.deleteValue(QUEUE_KEY);
+    }
+
     //! Send now if there is a phone and a token, otherwise keep it for later.
     function send(payload) {
         if (!LinkConfig.isLinked()) {

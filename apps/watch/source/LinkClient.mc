@@ -120,6 +120,7 @@ class LinkClient {
         if (status.equals(LINKED)) {
             WatchLog.add("link: approved");
             LinkConfig.setToken(data["token"]);
+            LinkConfig.setAccount(data["account"], data["linkedAt"]);
             _deviceCode = null;
             _onResult.invoke(LINKED, data);
             return;

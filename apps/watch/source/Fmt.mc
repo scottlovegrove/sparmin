@@ -44,4 +44,27 @@ module Fmt {
         }
         return value.format("%d");
     }
+
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    //! A short date, "2 Aug 2026", from a Gregorian day/month/year. Pure — the
+    //! caller does the `Gregorian.info()` call — so it stays testable off-device.
+    //!
+    //! The year is always shown. A watch may sit linked for years, and "2 Aug"
+    //! on its own is read as *this* August by anyone glancing at it.
+    function date(day, month, year) as Lang.String {
+        if (day == null || month == null || year == null) {
+            return "";
+        }
+        var index = month.toNumber() - 1;
+        if (index < 0 || index >= MONTHS.size()) {
+            return "";
+        }
+        return Lang.format("$1$ $2$ $3$", [
+            day.format("%d"),
+            MONTHS[index],
+            year.format("%04d")
+        ]);
+    }
 }

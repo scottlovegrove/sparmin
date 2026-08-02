@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import app from '../worker'
-import { type SignedIn, signIn } from './auth-helper'
+import { type SignedIn, TEST_EMAIL, signIn } from './auth-helper'
 import {
     approveCode,
     countRows,
@@ -23,6 +23,8 @@ async function pollBody(deviceCode: string) {
         status: string
         token?: string
         deviceId?: string
+        account?: string
+        linkedAt?: number
     }>
 }
 
@@ -42,6 +44,36 @@ describe('linking a watch', () => {
         expect(linked.status).toBe('linked')
         expect(linked.token).toEqual(expect.any(String))
         expect(await countRows('devices')).toBe(1)
+    })
+
+    // The watch shows this on its account screen. Approval is the only moment it
+    // can learn the address: from then on it holds a token, which says which
+    // account it posts for but never who that is.
+    it('names the account it linked to, so the watch can show it', async () => {
+        const { userCode, deviceCode } = await requestCode()
+        await approveCode(me, userCode)
+
+        const linked = await pollBody(deviceCode)
+
+        expect(linked.account).toBe(TEST_EMAIL)
+        expect(linked.linkedAt).toEqual(expect.any(Number))
+    })
+
+    it('names the account that actually approved it, not the one that asked', async () => {
+        const other = await signIn('someone-else@example.com')
+        const { userCode, deviceCode } = await requestCode()
+        await approveCode(other, userCode)
+
+        expect((await pollBody(deviceCode)).account).toBe('someone-else@example.com')
+    })
+
+    // Only the account holder gets the address, and only once they have taken
+    // ownership of the code. A poll before approval is answered by a watch
+    // nobody has claimed, so it learns nothing.
+    it('says nothing about any account before approval', async () => {
+        const { deviceCode } = await requestCode()
+
+        expect(await pollBody(deviceCode)).toEqual({ status: 'authorization_pending' })
     })
 
     it('hands the code back in the form a human reads off a watch', async () => {

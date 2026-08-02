@@ -595,6 +595,24 @@ function testClock24Hour(logger) {
 }
 
 (:test)
+function testShortDate(logger) {
+    Test.assertEqual(Fmt.date(2, 8, 2026), "2 Aug 2026");
+    Test.assertEqual(Fmt.date(31, 12, 2025), "31 Dec 2025");
+    Test.assertEqual(Fmt.date(1, 1, 2026), "1 Jan 2026");
+    return true;
+}
+
+//! A date the account screen cannot render is shown as nothing at all — an
+//! empty string the caller drops — rather than as a guess or a crash.
+(:test)
+function testShortDateRejectsNonsense(logger) {
+    Test.assertEqual(Fmt.date(null, 8, 2026), "");
+    Test.assertEqual(Fmt.date(2, 0, 2026), "");
+    Test.assertEqual(Fmt.date(2, 13, 2026), "");
+    return true;
+}
+
+(:test)
 function testClock12Hour(logger) {
     Test.assertEqual(Fmt.clock(0, 7, false), "12:07");   // midnight reads as 12
     Test.assertEqual(Fmt.clock(12, 0, false), "12:00");  // noon stays 12
