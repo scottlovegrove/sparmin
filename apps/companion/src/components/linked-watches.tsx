@@ -1,5 +1,7 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useId, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { formatUserCode, isUserCodeShaped, normaliseUserCode } from '../lib/device-code'
+import { watchLabel, watchSubtitle } from '../lib/watch-label'
 import { ConfirmDialog } from './confirm-dialog'
 
 type LinkedDevice = {
@@ -45,18 +47,6 @@ export function formatLastSeen(lastSeenAt: number | null, nowS: number): string 
     return `Last sent a session ${days} ${days === 1 ? 'day' : 'days'} ago`
 }
 
-//! A watch's model, as something to read rather than an identifier.
-export function describeWatch(product: string | null): string {
-    if (product == null) {
-        return 'A Garmin watch'
-    }
-    const named: Record<string, string> = {
-        vivoactive5: 'vívoactive 5',
-        fr745: 'Forerunner 745',
-    }
-    return named[product] ?? product
-}
-
 export function LinkedWatches() {
     const [state, setState] = useState<ListState>({ status: 'loading' })
     const [reloadKey, setReloadKey] = useState(0)
@@ -65,6 +55,10 @@ export function LinkedWatches() {
     const [checking, setChecking] = useState(false)
     const [linking, setLinking] = useState(false)
     const [revoking, setRevoking] = useState<LinkedDevice | null>(null)
+    // The watch whose name is being edited, and the text in the box. Held
+    // separately so cancelling leaves the stored name alone.
+    const [renaming, setRenaming] = useState<LinkedDevice | null>(null)
+    const [draftName, setDraftName] = useState('')
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
     // How many watches the list should show once the one just approved appears.
@@ -165,6 +159,32 @@ export function LinkedWatches() {
         }
     }
 
+    async function handleRename(event: FormEvent) {
+        event.preventDefault()
+        if (renaming == null) {
+            return
+        }
+        setBusy(true)
+        setError(null)
+        try {
+            const res = await fetch(`/api/devices/${renaming.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: draftName }),
+            })
+            if (!res.ok) {
+                setError("That watch couldn't be renamed — try again")
+                return
+            }
+            setRenaming(null)
+            setReloadKey((key) => key + 1)
+        } catch {
+            setError("Couldn't reach the server — try again")
+        } finally {
+            setBusy(false)
+        }
+    }
+
     async function handleRevoke() {
         if (revoking == null) {
             return
@@ -204,12 +224,22 @@ export function LinkedWatches() {
                 <ul className="watches">
                     {state.devices.map((device) => (
                         <li key={device.id}>
-                            <span className="watch-name">
-                                {device.name?.trim() || describeWatch(device.product)}
-                            </span>
+                            <span className="watch-name">{watchLabel(device)}</span>
                             <span className="muted small watch-meta">
-                                {formatLastSeen(device.lastSeenAt, nowS)}
+                                {[watchSubtitle(device), formatLastSeen(device.lastSeenAt, nowS)]
+                                    .filter(Boolean)
+                                    .join(' · ')}
                             </span>
+                            <button
+                                type="button"
+                                className="link"
+                                onClick={() => {
+                                    setRenaming(device)
+                                    setDraftName(device.name ?? '')
+                                }}
+                            >
+                                Rename
+                            </button>
                             <button
                                 type="button"
                                 className="link"
@@ -255,7 +285,7 @@ export function LinkedWatches() {
             {pending && (
                 <ConfirmDialog
                     title="Link this watch?"
-                    message={`${describeWatch(pending.product)} asked to link ${
+                    message={`${watchLabel({ product: pending.product })} asked to link ${
                         pending.askedSecondsAgo < 60
                             ? 'just now'
                             : `${Math.round(pending.askedSecondsAgo / 60)} minutes ago`
@@ -268,12 +298,21 @@ export function LinkedWatches() {
                 />
             )}
 
+            {renaming && (
+                <RenameWatchDialog
+                    watch={renaming}
+                    value={draftName}
+                    busy={busy}
+                    onChange={setDraftName}
+                    onSubmit={handleRename}
+                    onCancel={() => setRenaming(null)}
+                />
+            )}
+
             {revoking && (
                 <ConfirmDialog
                     title="Remove this watch?"
-                    message={`${
-                        revoking.name?.trim() || describeWatch(revoking.product)
-                    } will stop sending sessions. Anything it already sent stays.`}
+                    message={`${watchLabel(revoking)} will stop sending sessions. Anything it already sent stays.`}
                     confirmText="Remove it"
                     isDestructive
                     busy={busy}
@@ -283,5 +322,76 @@ export function LinkedWatches() {
                 />
             )}
         </section>
+    )
+}
+
+// The one dialog in the app that takes input, so it can't be a ConfirmDialog.
+// Same portal, backdrop and panel classes, so it looks like one.
+function RenameWatchDialog(props: {
+    readonly watch: LinkedDevice
+    readonly value: string
+    readonly busy: boolean
+    readonly onChange: (value: string) => void
+    readonly onSubmit: (event: FormEvent) => void
+    readonly onCancel: () => void
+}) {
+    const { watch, value, busy, onChange, onSubmit, onCancel } = props
+    const titleId = useId()
+
+    useEffect(() => {
+        function onKeyDown(event: KeyboardEvent) {
+            if (event.key === 'Escape' && !busy) {
+                onCancel()
+            }
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+    }, [busy, onCancel])
+
+    return createPortal(
+        <div
+            className="overlay"
+            onClick={() => {
+                if (!busy) {
+                    onCancel()
+                }
+            }}
+        >
+            <form
+                className="modal"
+                aria-labelledby={titleId}
+                onClick={(event) => event.stopPropagation()}
+                onSubmit={onSubmit}
+            >
+                <h2 id={titleId}>Rename this watch</h2>
+                <p className="muted small">
+                    Two watches of the same model look identical in this list. Give this one a name
+                    you will recognise, or clear the box to go back to its model.
+                </p>
+                <input
+                    type="text"
+                    value={value}
+                    // The model, so clearing the box shows what it would revert to.
+                    placeholder={watchSubtitle(watch) ?? watchLabel(watch)}
+                    maxLength={60}
+                    autoComplete="off"
+                    onChange={(event) => onChange(event.target.value)}
+                />
+                <div className="modal-actions">
+                    <button
+                        type="button"
+                        className="button secondary"
+                        onClick={onCancel}
+                        disabled={busy}
+                    >
+                        Cancel
+                    </button>
+                    <button type="submit" className="button" disabled={busy}>
+                        {busy ? 'Saving…' : 'Save'}
+                    </button>
+                </div>
+            </form>
+        </div>,
+        document.body,
     )
 }

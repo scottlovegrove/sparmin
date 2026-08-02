@@ -291,6 +291,26 @@ export async function listDevices(db: Db, userId: string) {
         .orderBy(desc(devices.linkedAt))
 }
 
+//! Rename a watch. The part number identifies the hardware and nothing else, so
+//! two of the same model are indistinguishable in the list until one is named.
+//!
+//! An empty name clears it and the row goes back to showing its model, which is
+//! what someone clearing the box means rather than an error to reject.
+export async function renameDevice(
+    db: Db,
+    userId: string,
+    deviceId: string,
+    name: string,
+): Promise<boolean> {
+    const trimmed = name.trim()
+    const renamed = await db
+        .update(devices)
+        .set({ name: trimmed === '' ? null : trimmed })
+        .where(and(eq(devices.id, deviceId), eq(devices.userId, userId), isNull(devices.revokedAt)))
+        .returning({ id: devices.id })
+    return renamed.length > 0
+}
+
 //! Revoke a watch. Immediate: the next thing it posts gets a 401.
 export async function revokeDevice(
     db: Db,

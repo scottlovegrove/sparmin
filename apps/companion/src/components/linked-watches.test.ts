@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeWatch, formatLastSeen } from './linked-watches'
+import { formatLastSeen } from './linked-watches'
 
 // Components aren't rendered in this app's tests — there's no jsdom and no
 // testing-library. Exported pure helpers are, which is the pattern
@@ -34,21 +34,5 @@ describe('formatLastSeen', () => {
 
     it('does not report the future when a clock disagrees', () => {
         expect(formatLastSeen(NOW + 120, NOW)).toBe('Last sent a session just now')
-    })
-})
-
-describe('describeWatch', () => {
-    it('names the watches this app is built for', () => {
-        expect(describeWatch('vivoactive5')).toBe('vívoactive 5')
-        expect(describeWatch('fr745')).toBe('Forerunner 745')
-    })
-
-    it('shows an unknown product rather than hiding it', () => {
-        // Better a raw product code than pretending we don't know which watch.
-        expect(describeWatch('fenix8')).toBe('fenix8')
-    })
-
-    it('has something to say when the product is missing', () => {
-        expect(describeWatch(null)).toBe('A Garmin watch')
     })
 })
