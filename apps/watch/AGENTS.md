@@ -72,6 +72,10 @@ to the watch's `GARMIN/APPS/`.
      anyone noticed. Fixes and internal work don't touch it; anything that adds
      or changes a capability does.
 
+     **The Store caps the long description at 4,000 characters**, and it is
+     already close, so an addition usually means a cut somewhere else. Check with
+     `wc -m submission/description.txt` before assuming there is room.
+
      Beware the fix dressed as a feature. "A stray swipe can't cut your
      recording short" is not something to sell — it advertises a flaw the reader
      had no idea existed, and invites them to wonder what else bites. If the
