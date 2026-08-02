@@ -81,8 +81,9 @@ source/
 ├─ TouchConfig.mc         # module: "water-safe touch" flag in Storage + pure
 │                         # confirmsTap() double-tap rule (unit-tested).
 ├─ StripController.mc     # pure strip nav: focus cursor + visible window +
-│                         # edge-slide rule + trailing End/Exit slot (touch
-│                         # button fallback). idAtIndex() for animated render.
+│                         # edge-slide rule + one trailing slot, End/Exit on
+│                         # touch or Settings on buttons (TRAILING_* kinds).
+│                         # idAtIndex() for animated render.
 ├─ ButtonHints.mc         # module: native-style bezel arc + glyph physical-button
 │                         # hints (touch wet-fallback); StripView + ConfirmEndView.
 ├─ Segment.mc             # one lap: activityId(null=transition), times, HR stats,
@@ -191,6 +192,14 @@ over; from then on the Exit tile is the way out, so nobody is stranded.
 
 **FR745** buttons — Up(13)/Down(8) = focus; Start `KEY_ENTER`(4) = select;
 Back/Lap `KEY_ESC`(5) = Stop/Back; **hold-Up → `KEY_MENU`(7)** = Settings.
+
+On a button device the trailing slot carries **Settings** instead, and only at
+idle (the config screen edits the strip, so it refuses to open mid-session).
+Hold-Up is the standard menu gesture but nothing on screen advertises it, and
+it is one firmware decision away from being swallowed by the system — the tile
+is the discoverable route, reached with the same Up/Down/Start as the stations.
+The idle footer pill is drawn on touch only; a button device cannot put a
+cursor on it, so there it was a control that could not be pressed.
 
 The **live strip shows no button overlay** — like native activity screens, the
 buttons just drive the focus highlight. Hints appear only at the decision point:

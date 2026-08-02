@@ -77,7 +77,7 @@ class StripDelegate extends WatchUi.InputDelegate {
         // Button device (FR745)
         if (key == WatchUi.KEY_UP) { _ctrl.moveFocus(-1); _view.animateToWindow(); return true; }
         if (key == WatchUi.KEY_DOWN) { _ctrl.moveFocus(1); _view.animateToWindow(); return true; }
-        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) { _selectActivity(_ctrl.focusedId()); return true; }
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) { _commit(); return true; }
         if (key == WatchUi.KEY_ESC || key == WatchUi.KEY_LAP) { return _back(); }
         if (key == WatchUi.KEY_MENU) { _openConfig(); return true; }
         return false;
@@ -191,12 +191,18 @@ class StripDelegate extends WatchUi.InputDelegate {
         _view.animateToWindow();
     }
 
-    //! Bottom-right: commit the highlighted target — start/switch a station, or
-    //! end/exit on the trailing tile.
+    //! Commit the highlighted target — start/switch a station, or act on the
+    //! trailing tile, whose meaning differs by device (End/Exit on touch,
+    //! Settings on buttons). Reached by the bottom-right button on touch and by
+    //! Start/Enter on a button device.
     private function _commit() as Void {
         _view.revealCursor();
-        if (_ctrl.isOnEndSlot()) {
-            _endOrExit();
+        if (_ctrl.isOnTrailingSlot()) {
+            if (_ctrl.trailingSlot == TRAILING_SETTINGS) {
+                _openConfig();
+            } else {
+                _endOrExit();
+            }
             return;
         }
         _selectActivity(_ctrl.focusedId());

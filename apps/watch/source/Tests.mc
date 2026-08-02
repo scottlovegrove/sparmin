@@ -361,7 +361,7 @@ function testHrFoldingRejectsInvalidAndTransition(logger) {
 
 (:test)
 function testStripWindowSlidesAtEdges(logger) {
-    var c = new StripController(SpaActivity.allIds(), 3, false); // full catalogue, window 3
+    var c = new StripController(SpaActivity.allIds(), 3, TRAILING_NONE); // full catalogue, window 3
     Test.assertEqual(c.windowStart, 0);
     c.moveFocus(1);
     c.moveFocus(1);              // focus 2, still fully visible
@@ -374,7 +374,7 @@ function testStripWindowSlidesAtEdges(logger) {
 
 (:test)
 function testStripWrapsAtStart(logger) {
-    var c = new StripController(SpaActivity.allIds(), 3, false);
+    var c = new StripController(SpaActivity.allIds(), 3, TRAILING_NONE);
     var n = SpaActivity.count();
     c.moveFocus(-1);             // wrap 0 -> last
     Test.assertEqual(c.focusedIndex, n - 1);
@@ -384,7 +384,7 @@ function testStripWrapsAtStart(logger) {
 
 (:test)
 function testStripReloadClampsFocus(logger) {
-    var c = new StripController(SpaActivity.allIds(), 3, false);
+    var c = new StripController(SpaActivity.allIds(), 3, TRAILING_NONE);
     c.moveFocus(1);
     c.moveFocus(1);
     c.moveFocus(1);             // focus 3
@@ -397,36 +397,63 @@ function testStripReloadClampsFocus(logger) {
 (:test)
 function testEndSlotIsTrailingAndWraps(logger) {
     // 3 stations + the End slot = 4 cursor targets, window 3.
-    var c = new StripController(["finnish_sauna", "ice_cave", "hydro_pool"], 3, true);
+    var c = new StripController(["finnish_sauna", "ice_cave", "hydro_pool"], 3, TRAILING_END);
     Test.assertEqual(c.slotCount(), 4);
     Test.assertEqual(c.count(), 3);
-    Test.assertEqual(c.isOnEndSlot(), false);
+    Test.assertEqual(c.isOnTrailingSlot(), false);
 
     c.moveFocus(1);
     c.moveFocus(1);              // focus 2 (last station)
-    Test.assertEqual(c.isOnEndSlot(), false);
+    Test.assertEqual(c.isOnTrailingSlot(), false);
     c.moveFocus(1);              // focus 3 = End slot
     Test.assertEqual(c.focusedIndex, 3);
-    Test.assertEqual(c.isOnEndSlot(), true);
+    Test.assertEqual(c.isOnTrailingSlot(), true);
     Test.assert(c.focusedId() == null);         // End carries no activityId
-    Test.assert(c.isEndIndex(3));
+    Test.assert(c.isTrailingIndex(3));
     Test.assertEqual(c.windowStart, 1);         // window slid to reveal the End tile
 
     c.moveFocus(1);              // wrap End -> first station
     Test.assertEqual(c.focusedIndex, 0);
-    Test.assertEqual(c.isOnEndSlot(), false);
+    Test.assertEqual(c.isOnTrailingSlot(), false);
     Test.assertEqual(c.focusedId(), "finnish_sauna");
     return true;
 }
 
 (:test)
 function testNoEndSlotWhenDisabled(logger) {
-    var c = new StripController(["finnish_sauna", "ice_cave"], 2, false);
+    var c = new StripController(["finnish_sauna", "ice_cave"], 2, TRAILING_NONE);
     Test.assertEqual(c.slotCount(), 2);
     c.moveFocus(1);              // focus 1 (last)
     c.moveFocus(1);              // wraps straight back to 0, no End slot
     Test.assertEqual(c.focusedIndex, 0);
-    Test.assertEqual(c.isOnEndSlot(), false);
+    Test.assertEqual(c.isOnTrailingSlot(), false);
+    return true;
+}
+
+(:test)
+function testSettingsSlotAppearsAndRetreatsWithState(logger) {
+    // Button devices trail Settings at idle and nothing once a session runs.
+    var c = new StripController(["finnish_sauna", "ice_cave"], 2, TRAILING_SETTINGS);
+    Test.assertEqual(c.slotCount(), 3);
+
+    c.moveFocus(-1);             // wrap backwards onto the trailing tile
+    Test.assertEqual(c.focusedIndex, 2);
+    Test.assertEqual(c.isOnTrailingSlot(), true);
+    Test.assert(c.focusedId() == null);          // Settings carries no activityId
+    Test.assertEqual(c.windowStart, 1);          // window slid to reveal it
+
+    // Session starts with the cursor parked on Settings: the slot goes, and the
+    // cursor must come back to a real station rather than point past the end.
+    c.setTrailingSlot(TRAILING_NONE);
+    Test.assertEqual(c.slotCount(), 2);
+    Test.assertEqual(c.isOnTrailingSlot(), false);
+    Test.assertEqual(c.focusedIndex, 1);
+    Test.assertEqual(c.focusedId(), "ice_cave");
+    Test.assertEqual(c.windowStart, 0);
+
+    c.setTrailingSlot(TRAILING_SETTINGS);        // back to idle
+    Test.assertEqual(c.slotCount(), 3);
+    Test.assertEqual(c.focusedIndex, 1);         // cursor stays put
     return true;
 }
 
