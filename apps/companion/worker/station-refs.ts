@@ -14,8 +14,17 @@ export function stationKey(ref: StationRef): string {
     return ref.kind === 'name' ? `name:${ref.name}` : `slug:${ref.slug}`
 }
 
+// Stations the catalogue has since renamed, old name to current one. A FIT
+// recorded before a rename still carries the old label in its laps, so it is
+// folded onto the row it has always meant rather than auto-inserted as a station
+// of its own.
+const RENAMED_STATIONS: Readonly<Record<string, string>> = {
+    'Outdoor lounger': 'Loungers',
+}
+
 function label(ref: StationRef): string {
-    return ref.kind === 'name' ? ref.name : (ref.displayName ?? ref.slug)
+    const name = ref.kind === 'name' ? ref.name : (ref.displayName ?? ref.slug)
+    return RENAMED_STATIONS[name] ?? name
 }
 
 //! Resolve every station a session refers to, whichever key it used, inserting
@@ -56,7 +65,7 @@ export async function resolveStations(
     const missing: StationRef[] = []
 
     for (const [key, ref] of unique) {
-        const id = ref.kind === 'name' ? byName.get(ref.name)?.id : bySlug.get(ref.slug)
+        const id = ref.kind === 'name' ? byName.get(label(ref))?.id : bySlug.get(ref.slug)
         if (id != null) {
             resolved.set(key, id)
             continue

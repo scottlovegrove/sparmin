@@ -146,6 +146,39 @@ describe('POST /api/sessions', () => {
         expect(station).toMatchObject({ thermal_class: 'unclassified', is_transition: 0 })
     })
 
+    it("folds a renamed station's old lap label onto the row it always meant", async () => {
+        // A file recorded before the rename still says "Outdoor lounger".
+        const res = await post(
+            payload({
+                laps: [
+                    {
+                        lapIndex: 0,
+                        station: 'Outdoor lounger',
+                        startedAt: 1783496460,
+                        elapsedS: 120,
+                        timerS: 120,
+                        avgHr: null,
+                        maxHr: null,
+                        calories: null,
+                        cycles: null,
+                    },
+                ],
+            }),
+        )
+
+        expect(res.status).toBe(201)
+        const row = await env.DB.prepare(
+            `SELECT s.name, s.slug FROM station_intervals si
+             JOIN stations s ON s.id = si.station_id`,
+        ).first<{ name: string; slug: string }>()
+        expect(row).toMatchObject({ name: 'Loungers', slug: 'outdoor_lounger' })
+        // Nothing auto-inserted under the old name.
+        const stale = await env.DB.prepare(
+            "SELECT COUNT(*) AS n FROM stations WHERE name = 'Outdoor lounger'",
+        ).first<{ n: number }>()
+        expect(stale?.n).toBe(0)
+    })
+
     it('rejects a payload that fails validation', async () => {
         const res = await post({ ...payload(), id: 'not-a-uuid' })
 

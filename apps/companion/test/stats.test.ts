@@ -48,7 +48,7 @@ describe('GET /api/stats', () => {
                 { station: 'Himalayan salt sauna', elapsedS: 900 },
                 { station: 'transition', elapsedS: 60 },
                 { station: 'Outdoor cold plunge', elapsedS: 300 },
-                { station: 'Outdoor lounger', elapsedS: 120 },
+                { station: 'Loungers', elapsedS: 120 },
             ]),
         )
 
