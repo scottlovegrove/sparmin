@@ -208,10 +208,11 @@ Merging fills gaps; it does not overwrite. Concretely:
   renamed later.
 - **`started_at` stays as first written.** Rewriting it would move the row
   relative to any window match still in flight.
-- Intervals are matched within a session by order, not by timestamp — the watch
-  emits activity segments only, while the FIT emits every lap including
-  transitions, so the two lists are different lengths by construction. The FIT
-  list is the spine; watch segments attach to it in order.
+- Intervals are matched within a session by order, not by timestamp. Both lists
+  are filtered to their stays first: the FIT emits a lap for every transition,
+  and so does the watch, but only since 0.7.2 — a queued session recorded before
+  that carries stays alone, and a transition has no `min_hr` to place either way.
+  The FIT list is the spine; watch segments attach to it in order.
 
 Write the whole merge in one `db.batch()`, as `SL§5.2` already requires for
 imports.

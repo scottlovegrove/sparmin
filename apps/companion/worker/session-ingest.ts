@@ -42,7 +42,7 @@ export type ArrivingInterval = {
 }
 
 //! Which of these station ids are transitions — the walk between two stays, which
-//! the FIT records as a lap of its own and the watch never sends at all.
+//! both sources record as a lap of its own.
 async function transitionStationIds(db: Db, ids: readonly number[]): Promise<Set<number>> {
     if (ids.length === 0) {
         return new Set()
@@ -148,10 +148,10 @@ export async function ingestSession(
     )
 
     if (match != null) {
-        // The watch recorded this visit first. Its rows are its stays; the FIT
-        // has a lap for every transition too, and per-lap timings and calories
-        // the watch never had — so the FIT becomes the spine and the stored rows
-        // are replaced, carrying across the one thing only the watch knew (§3.4).
+        // The watch recorded this visit first. The FIT has per-lap timings and
+        // calories the watch never had, and Garmin timed the boundaries — so the
+        // FIT becomes the spine and the stored rows are replaced, carrying across
+        // the one thing only the watch knew (§3.4).
         const stored = await db
             .select({
                 lapIndex: stationIntervals.lapIndex,
@@ -167,16 +167,20 @@ export async function ingestSession(
             stationId: stationIds.get(stationKey(interval.station)) as number,
             isTransition: false,
         }))
-        const transitions = await transitionStationIds(
-            db,
-            spine.map((interval) => interval.stationId),
-        )
+        const transitions = await transitionStationIds(db, [
+            ...spine.map((interval) => interval.stationId),
+            ...stored.map((row) => row.stationId),
+        ])
         const aligned = alignWatchSegments(
             spine.map((interval) => ({
                 ...interval,
                 isTransition: transitions.has(interval.stationId),
             })),
-            stored.map((row) => ({ stationId: row.stationId, minHr: row.minHr })),
+            stored.map((row) => ({
+                stationId: row.stationId,
+                isTransition: transitions.has(row.stationId),
+                minHr: row.minHr,
+            })),
         )
         // A disagreement means an assumption behind the match already failed.
         // Take the FIT's laps and drop the minimums rather than risk pinning one
@@ -280,9 +284,10 @@ async function insertSession(
 //!
 //! Everything the watch cannot know stays null — the device serial, calories,
 //! timer times, per-lap step counts — so a later FIT import fills them rather
-//! than finding them already occupied (§3.4). The stays arrive in order and
-//! become lap indices; the watch has no lap numbering of its own, and does not
-//! record the walks between stations at all.
+//! than finding them already occupied (§3.4). The laps arrive in order and become
+//! lap indices; the watch has no lap numbering of its own. The walks between
+//! stations come through as laps at the station id `transition`, so a session
+//! that only ever arrived live still accounts for the whole visit.
 export function watchToArriving(
     payload: WatchPayload,
     device: { id: string; product: string | null },
@@ -373,10 +378,15 @@ export async function ingestWatchSession(
             db,
             arriving.intervals.map((interval) => interval.station),
         )
+        const arrivingStationIds = arriving.intervals.map(
+            (interval) => stationIds.get(stationKey(interval.station)) as number,
+        )
+        const transitions = await transitionStationIds(db, arrivingStationIds)
         const aligned = alignWatchSegments(
             stored,
-            arriving.intervals.map((interval) => ({
-                stationId: stationIds.get(stationKey(interval.station)) as number,
+            arriving.intervals.map((interval, index) => ({
+                stationId: arrivingStationIds[index],
+                isTransition: transitions.has(arrivingStationIds[index]),
                 minHr: interval.minHr,
             })),
         )
