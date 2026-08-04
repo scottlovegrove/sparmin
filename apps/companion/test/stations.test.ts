@@ -27,7 +27,7 @@ describe('GET /api/stations', () => {
             'Fire and ice room',
             'Finnish sauna',
             'Ice cave',
-            'Outdoor lounger',
+            'Loungers',
             'transition',
             // Seeded later (migration 0004), so it sorts last by id — after the
             // original watch-order block, transition included.
@@ -46,7 +46,7 @@ describe('GET /api/stations', () => {
         expect(byName.get('Hot tub')?.thermalClass).toBe('hot')
         expect(byName.get('Ice cave')?.thermalClass).toBe('cold')
         expect(byName.get('Outdoor cold plunge')?.thermalClass).toBe('cold')
-        expect(byName.get('Outdoor lounger')?.thermalClass).toBe('neutral')
+        expect(byName.get('Loungers')?.thermalClass).toBe('neutral')
 
         // transition is the walk between stations: never counts as hot or cold.
         const transition = byName.get('transition')

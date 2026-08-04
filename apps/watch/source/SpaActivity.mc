@@ -18,6 +18,8 @@ module SpaActivity {
         "fire_ice_room",
         "finnish_sauna",
         "ice_cave",
+        // Shown as "Loungers" — the venue has indoor ones as well as outdoor.
+        // The id is written into FIT laps, so it keeps its original wording.
         "outdoor_lounger",
         "hot_tub"
     ];
@@ -35,7 +37,7 @@ module SpaActivity {
         "Fire and ice room",
         "Finnish sauna",
         "Ice cave",
-        "Outdoor lounger",
+        "Loungers",
         "Hot tub"
     ];
 
@@ -52,7 +54,7 @@ module SpaActivity {
         "Fire/Ice",
         "Finnish",
         "Ice Cave",
-        "Outdoor",
+        "Lounger",
         "Hot Tub"
     ];
 

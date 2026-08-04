@@ -20,7 +20,7 @@ const stay = (station: string, thermalClass: ThermalClass, elapsedS: number): St
 const hot = (s: number) => stay('Himalayan salt sauna', 'hot', s)
 const cold = (s: number) => stay('Outdoor cold plunge', 'cold', s)
 const walk = (s: number) => stay('transition', 'unclassified', s)
-const lounge = (s: number) => stay('Outdoor lounger', 'neutral', s)
+const lounge = (s: number) => stay('Loungers', 'neutral', s)
 
 describe('summarise', () => {
     it('splits the time by what the station is', () => {
