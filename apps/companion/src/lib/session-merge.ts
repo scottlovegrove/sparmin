@@ -97,6 +97,7 @@ export type AlignableInterval = {
 
 export type WatchSegment = {
     readonly stationId: number
+    readonly isTransition: boolean
     readonly minHr: number | null
 }
 
@@ -107,10 +108,12 @@ export type AlignResult =
 //! Attach a watch's segments to a FIT's lap list so the minimum heart rate lands
 //! on the right station.
 //!
-//! The two lists are different lengths by construction: the FIT emits a lap for
-//! every transition, the watch emits activity segments only. So the spine is
-//! filtered to non-transition laps before the ordinal zip — pairing them raw
-//! would put segment 0 against the FIT's opening *transition*.
+//! Both lists are filtered to their stays before the ordinal zip. The FIT emits a
+//! lap for every transition, and so does the watch — but only since 0.7.2, and a
+//! watch's offline queue can hold sessions recorded before that. Matching stays
+//! to stays is the one pairing that holds either way, and a transition has no
+//! minimum heart rate to place regardless: the watch never folds a reading into
+//! one.
 //!
 //! A disagreement aborts rather than guesses. Writing a minimum heart rate onto
 //! the wrong station is worse than not writing one at all, and the two lists
@@ -120,16 +123,17 @@ export function alignWatchSegments(
     segments: readonly WatchSegment[],
 ): AlignResult {
     const stays = spine.filter((interval) => !interval.isTransition)
-    if (stays.length !== segments.length) {
+    const sent = segments.filter((segment) => !segment.isTransition)
+    if (stays.length !== sent.length) {
         return {
             status: 'mismatched',
-            reason: `the FIT has ${stays.length} stays, the watch sent ${segments.length}`,
+            reason: `the FIT has ${stays.length} stays, the watch sent ${sent.length}`,
         }
     }
 
     const minHrByLapIndex = new Map<number, number | null>()
     for (const [i, stay] of stays.entries()) {
-        const segment = segments[i]
+        const segment = sent[i]
         if (stay.stationId !== segment.stationId) {
             return {
                 status: 'mismatched',

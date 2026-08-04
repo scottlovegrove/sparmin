@@ -28,12 +28,43 @@ describe('a session the watch posts', () => {
         token = (await linkWatch(me)).token
     })
 
-    it('creates the session and one stay per segment', async () => {
+    it('creates the session and one row per lap', async () => {
         const res = await postWatchSession(token, watchPayload())
 
         expect(res.status).toBe(201)
         expect(await countRows('sessions')).toBe(1)
-        expect(await countRows('station_intervals')).toBe(1)
+        // The stay, plus the walk in and the walk out.
+        expect(await countRows('station_intervals')).toBe(3)
+    })
+
+    it('keeps the walks between stations, so the visit has no holes in it', async () => {
+        await postWatchSession(token, watchPayload())
+
+        const rows = await env.DB.prepare(
+            `SELECT s.name, s.is_transition, si.elapsed_s FROM station_intervals si
+             JOIN stations s ON s.id = si.station_id ORDER BY si.lap_index`,
+        ).all<{ name: string; is_transition: number; elapsed_s: number }>()
+
+        expect(rows.results.map((row) => row.name)).toEqual([
+            'transition',
+            'Himalayan salt sauna',
+            'transition',
+        ])
+        expect(rows.results.map((row) => row.is_transition)).toEqual([1, 0, 1])
+        // Consecutive rows, so the session's own total is fully accounted for.
+        expect(rows.results.map((row) => row.elapsed_s)).toEqual([1, 900, 1413])
+    })
+
+    it('walks land on the seeded transition station rather than a new one', async () => {
+        await postWatchSession(token, watchPayload())
+
+        const row = await env.DB.prepare(
+            `SELECT id, slug FROM stations WHERE name = 'transition'`,
+        ).first<{ id: number; slug: string | null }>()
+        // The row a FIT import already uses for the same thing, which claims the
+        // watch's id for it the first time a payload names it.
+        expect(row?.slug).toBe('transition')
+        expect(await countRows('stations')).toBe(12)
     })
 
     it('records what the watch knows and leaves the rest for the FIT', async () => {
@@ -57,7 +88,7 @@ describe('a session the watch posts', () => {
 
         const row = await env.DB.prepare(
             `SELECT s.name, s.slug FROM station_intervals si
-             JOIN stations s ON s.id = si.station_id`,
+             JOIN stations s ON s.id = si.station_id WHERE si.lap_index = 1`,
         ).first<{ name: string; slug: string }>()
         // The seeded row, reached by slug — not a second station named after it.
         expect(row).toMatchObject({ name: 'Himalayan salt sauna', slug: 'salt_sauna' })
@@ -67,9 +98,9 @@ describe('a session the watch posts', () => {
     it('keeps the minimum heart rate only it can measure', async () => {
         await postWatchSession(token, watchPayload())
 
-        const row = await env.DB.prepare('SELECT min_hr FROM station_intervals').first<{
-            min_hr: number
-        }>()
+        const row = await env.DB.prepare(
+            'SELECT min_hr FROM station_intervals WHERE lap_index = 1',
+        ).first<{ min_hr: number }>()
         expect(row?.min_hr).toBe(71)
     })
 

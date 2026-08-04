@@ -172,10 +172,31 @@ describe('alignWatchSegments', () => {
         { lapIndex: 3, stationId: 9, isTransition: false },
     ]
 
-    it('skips the transitions the watch never sends', () => {
+    it('pairs the stays when the watch sends its transitions too', () => {
         const segments: WatchSegment[] = [
-            { stationId: 5, minHr: 71 },
-            { stationId: 9, minHr: 58 },
+            { stationId: 11, isTransition: true, minHr: null },
+            { stationId: 5, isTransition: false, minHr: 71 },
+            { stationId: 11, isTransition: true, minHr: null },
+            { stationId: 9, isTransition: false, minHr: 58 },
+        ]
+
+        const result = alignWatchSegments(spine, segments)
+
+        expect(result).toEqual({
+            status: 'aligned',
+            minHrByLapIndex: new Map([
+                [1, 71],
+                [3, 58],
+            ]),
+        })
+    })
+
+    it('still aligns a payload from a watch that sends stays only', () => {
+        // An older build, or a session that has been sat in its offline queue
+        // since before one — the walks between stations are simply absent.
+        const segments: WatchSegment[] = [
+            { stationId: 5, isTransition: false, minHr: 71 },
+            { stationId: 9, isTransition: false, minHr: 58 },
         ]
 
         const result = alignWatchSegments(spine, segments)
@@ -190,7 +211,7 @@ describe('alignWatchSegments', () => {
     })
 
     it('refuses to align when the stays and segments disagree in number', () => {
-        const result = alignWatchSegments(spine, [{ stationId: 5, minHr: 71 }])
+        const result = alignWatchSegments(spine, [{ stationId: 5, isTransition: false, minHr: 71 }])
 
         expect(result.status).toBe('mismatched')
     })
@@ -198,8 +219,8 @@ describe('alignWatchSegments', () => {
     it('refuses to align when a station does not match', () => {
         // Better no minimum heart rate than one on the wrong station.
         const segments: WatchSegment[] = [
-            { stationId: 5, minHr: 71 },
-            { stationId: 4, minHr: 58 },
+            { stationId: 5, isTransition: false, minHr: 71 },
+            { stationId: 4, isTransition: false, minHr: 58 },
         ]
 
         const result = alignWatchSegments(spine, segments)
@@ -209,8 +230,8 @@ describe('alignWatchSegments', () => {
 
     it('carries a missing minimum through rather than dropping the stay', () => {
         const segments: WatchSegment[] = [
-            { stationId: 5, minHr: null },
-            { stationId: 9, minHr: 58 },
+            { stationId: 5, isTransition: false, minHr: null },
+            { stationId: 9, isTransition: false, minHr: 58 },
         ]
 
         const result = alignWatchSegments(spine, segments)

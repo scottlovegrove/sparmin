@@ -391,11 +391,12 @@ class SessionManager {
             activities.add(aggs[i].toDict());
         }
         var segs = [];
-        var chron = activitySegments();
-        for (var i = 0; i < chron.size(); i += 1) {
-            var s = chron[i];
+        for (var i = 0; i < _segments.size(); i += 1) {
+            var s = _segments[i];
             segs.add({
-                "activityId" => s.activityId,
+                // The walks between stations go too, labelled the way the FIT
+                // lap is, so both records of a visit describe the same laps.
+                "activityId" => s.isActivity() ? s.activityId : LABEL_TRANSITION,
                 "startedAt" => Iso.fromEpoch(s.startTime),
                 "endedAt" => Iso.fromEpoch(s.endTime),
                 "hrAvg" => s.hrAvg(),

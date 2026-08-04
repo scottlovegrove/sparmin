@@ -54,7 +54,10 @@ export const watchPayloadSchema = z
         installId: z.string().min(1).max(128).nullish().default(null),
         appVersion: z.string().min(1).max(32).nullish().default(null),
         activities: z.array(watchActivitySchema),
-        // Stays only — the watch does not send the walks between them.
+        // Every lap in order, the walks between stations included — those carry
+        // the station id `transition`, as the FIT lap's label does. Watches on
+        // older builds send the stays only, which still ingests and still
+        // merges; they just leave the gaps unrecorded.
         segments: z.array(watchSegmentSchema).min(1),
     })
     .refine((payload) => Date.parse(payload.endedAt) >= Date.parse(payload.startedAt), {
@@ -72,14 +75,15 @@ export function toUnixSeconds(iso: string): number {
     return Math.floor(Date.parse(iso) / 1000)
 }
 
-//! Session-level heart rates, derived from the stays.
+//! Session-level heart rates, derived from the segments.
 //!
 //! The watch does not send them: its own summary is per-station. Leaving them
 //! null would mean a session that arrived live shows no heart rate in the list,
 //! which is the main view. Averaged by duration so a long stay counts for more
-//! than a brief one. Garmin's own figures span the whole visit including the
-//! walks between stations, so a later FIT import overwrites these — which is
-//! exactly what the merge rules already do.
+//! than a brief one. The walks between stations drop out of the average on their
+//! own: the watch only folds readings into a station's lap, so they arrive with
+//! no heart rate to weigh. Garmin's own figures do cover them, so a later FIT
+//! import overwrites these — which is exactly what the merge rules already do.
 export function deriveSessionHeartRate(segments: readonly WatchSegment[]): {
     avgHr: number | null
     maxHr: number | null

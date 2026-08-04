@@ -223,7 +223,7 @@ export function watchPayload(
     options: {
         sessionId?: string
         startedAt?: string
-        stays?: { activityId: string; displayName: string; startedAt: string; endedAt: string }[]
+        stays?: WatchStay[]
     } = {},
 ) {
     const stays = options.stays ?? [
@@ -234,10 +234,12 @@ export function watchPayload(
             endedAt: '2026-07-03T15:56:01Z',
         },
     ]
+    const startedAt = options.startedAt ?? '2026-07-03T15:41:00Z'
+    const endedAt = '2026-07-03T16:19:34Z'
     return {
         sessionId: options.sessionId ?? '77777777-2222-4333-8444-555555555555',
-        startedAt: options.startedAt ?? '2026-07-03T15:41:00Z',
-        endedAt: '2026-07-03T16:19:34Z',
+        startedAt,
+        endedAt,
         totalSeconds: 2314,
         transitionSeconds: 240,
         utcOffsetS: 3600,
@@ -252,15 +254,45 @@ export function watchPayload(
             hrMax: 119,
             hrMin: 71,
         })),
-        segments: stays.map((stay) => ({
+        segments: walkedSegments(startedAt, endedAt, stays),
+    }
+}
+
+type WatchStay = { activityId: string; displayName: string; startedAt: string; endedAt: string }
+
+// The lap list as the watch builds it: every stay, and the walk that led to it,
+// with a last one closing the session. A walk carries no heart rate — the watch
+// only folds readings into a station's lap.
+function walkedSegments(startedAt: string, endedAt: string, stays: readonly WatchStay[]) {
+    const walk = (from: string, to: string) => ({
+        activityId: 'transition',
+        startedAt: from,
+        endedAt: to,
+        hrAvg: null,
+        hrMax: null,
+        hrMin: null,
+    })
+
+    const segments = []
+    let cursor = startedAt
+    for (const stay of stays) {
+        if (stay.startedAt !== cursor) {
+            segments.push(walk(cursor, stay.startedAt))
+        }
+        segments.push({
             activityId: stay.activityId,
             startedAt: stay.startedAt,
             endedAt: stay.endedAt,
             hrAvg: 98,
             hrMax: 119,
             hrMin: 71,
-        })),
+        })
+        cursor = stay.endedAt
     }
+    if (cursor !== endedAt) {
+        segments.push(walk(cursor, endedAt))
+    }
+    return segments
 }
 
 // POST a session the way a linked watch does: a bearer token, no cookie.

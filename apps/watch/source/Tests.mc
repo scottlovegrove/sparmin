@@ -569,9 +569,13 @@ function testBuildPayloadShape(logger) {
     var activities = p["activities"] as Lang.Array;
     var segments = p["segments"] as Lang.Array;
     Test.assertEqual(activities.size(), 1);
-    Test.assertEqual(segments.size(), 1);    // activity laps only
-    var firstSeg = segments[0] as Lang.Dictionary;
+    // Every lap, walks included, in the order they happened — the same list the
+    // FIT carries, so the companion can line the two up.
+    Test.assertEqual(segments.size(), 3);
+    Test.assertEqual((segments[0] as Lang.Dictionary)["activityId"], "transition");
+    var firstSeg = segments[1] as Lang.Dictionary;
     Test.assertEqual(firstSeg["activityId"], "finnish_sauna");
+    Test.assertEqual((segments[2] as Lang.Dictionary)["activityId"], "transition");
     Test.assert(p["startedAt"] != null);
     Test.assert(p["endedAt"] != null);
     // The companion has no other way to know when the visit was in local terms:
