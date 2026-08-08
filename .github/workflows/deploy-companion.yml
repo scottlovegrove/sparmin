@@ -150,13 +150,27 @@ jobs:
             - name: Check the live build number
               env:
                   BUILD: ${{ needs.version.outputs.build }}
+              # Retry on the wrong answer, not just on no answer. A deploy takes a
+              # moment to reach every edge, and until it does the previous Worker is
+              # still serving — which on the very first deploy of this route meant a
+              # 401, because the old build's guard had never heard of /api/version.
+              #
+              # `pipefail` is load-bearing: a command substitution takes the exit
+              # status of the LAST command in the pipeline, so without it a failed
+              # curl still looks successful because `jq` exited 0 on empty input.
+              # That is exactly how the first run of this check retried zero times
+              # and reported a build number of "".
               run: |
-                  for attempt in 1 2 3 4 5; do
+                  set -o pipefail
+                  for attempt in $(seq 1 10); do
                       live=$(curl -fsS --max-time 10 \
                           https://sparmin-app.scottlovegrove.co.uk/api/version \
-                          | jq -r '.version') && break
-                      echo "attempt ${attempt}: not answering yet"
-                      sleep 5
+                          | jq -r '.version') || live=''
+                      echo "attempt ${attempt}: live=${live:-<no answer>} expected=${BUILD}"
+                      if [ "$live" = "$BUILD" ]; then
+                          exit 0
+                      fi
+                      sleep 10
                   done
-                  echo "live=${live} expected=${BUILD}"
-                  test "$live" = "$BUILD"
+                  echo "::error::/api/version never reported build ${BUILD}"
+                  exit 1
