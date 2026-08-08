@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { Link } from 'wouter'
+import { APP_VERSION } from '../lib/app-version'
 import { authClient, signOut, useListPasskeys } from '../lib/auth-client'
 import { ConfirmDialog } from './confirm-dialog'
 import { LinkedWatches } from './linked-watches'
@@ -126,6 +127,10 @@ export function Settings() {
             <LinkedWatches />
 
             <DangerZone />
+
+            {/* The one place the running build is visible. Worth quoting in a bug
+                report, and it's the same number `/api/version` reports. */}
+            <p className="muted small">Sparmin · build {APP_VERSION}</p>
         </main>
     )
 }

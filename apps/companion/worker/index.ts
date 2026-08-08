@@ -2,6 +2,7 @@ import { asc } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { stations } from '../src/db/schema'
+import { APP_VERSION } from '../src/lib/app-version'
 import { formatUserCode } from '../src/lib/device-code'
 import { ingestPayloadSchema, replaceLapsSchema } from '../src/lib/session-payload'
 import { watchPayloadSchema } from '../src/lib/watch-payload'
@@ -40,8 +41,9 @@ const app = new Hono<{
 }>()
 
 // Everything under /api needs a session except these: the auth endpoints
-// themselves (you can't be signed in while signing in), the liveness check, which
-// says nothing about anyone's data, and the two device-pairing routes.
+// themselves (you can't be signed in while signing in), the liveness check and the
+// build number, neither of which says anything about anyone's data, and the two
+// device-pairing routes.
 //
 // The pairing pair are anonymous by construction — a watch has no cookie yet, and
 // obtaining one is the entire point of the flow. Neither returns anything of
@@ -49,7 +51,12 @@ const app = new Hono<{
 // `authorization_pending` to anyone, and the code request only ever mints a
 // code that is useless on its own. Exact matches, not a `/api/device/` prefix,
 // so `approve` and `pending` stay behind the session.
-const PUBLIC_PATHS = new Set(['/api/health', '/api/device/code', '/api/device/token'])
+const PUBLIC_PATHS = new Set([
+    '/api/health',
+    '/api/version',
+    '/api/device/code',
+    '/api/device/token',
+])
 
 function isPublic(pathname: string) {
     return PUBLIC_PATHS.has(pathname) || pathname.startsWith('/api/auth/')
@@ -149,6 +156,11 @@ const statsQuerySchema = z
     })
 
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
+
+// The build this Worker was deployed from. Public, and the only way to tell what is
+// live without opening the app. The client bundle carries the same value — they
+// ship as one deploy — so the two can't disagree.
+app.get('/api/version', (c) => c.json({ version: APP_VERSION }))
 
 const linkRequestSchema = z.object({
     installId: z.string().min(1).max(128),

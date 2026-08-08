@@ -64,6 +64,26 @@ the one end-to-end ingest test are read in node by `vitest.config.ts` and passed
 through as the `TEST_FIT_FIXTURE` binding. Don't add a second copy of a fixture or
 a parallel loader — extend the existing path.
 
+## Build number
+
+The version is a monotonic integer in `companion-v<N>` git tags, computed by the
+deploy workflow. `package.json` stays at `0.0.0` — don't bump it, and never
+hand-edit or delete a `companion-v*` tag; the next number is derived from the
+highest one that exists. The README's Versioning section has the full flow.
+
+- `__APP_VERSION__` comes from the `define` in `vite.config.ts` and is declared once
+  in `app-version.d.ts`, which both `tsconfig.app.json` and `tsconfig.worker.json`
+  include. Read it only through `src/lib/app-version.ts`.
+- **That module's `typeof` guard is load-bearing.** A `define` is a build-time
+  substitution and nothing substitutes it under vitest — the worker pool takes its
+  defines from wrangler's config, not Vite's — so a bare read throws a
+  `ReferenceError` in every worker test. Don't "simplify" it, and don't add
+  `__APP_VERSION__` to `wrangler.jsonc` to work around it: the Cloudflare Vite
+  plugin may then apply that stale copy to the real build.
+- The guard's cost is that a broken `define` would read as `dev` in production. The
+  deploy workflow's post-deploy `/api/version` assertion is what catches that. Keep
+  it.
+
 ## Migrations
 
 Generated with `npm run db:generate`, applied with `npm run db:migrate`. Two

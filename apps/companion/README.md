@@ -107,9 +107,12 @@ npx @better-auth/cli generate --config ./better-auth.config.ts --output ./src/db
 npm run db:generate    # then a migration for the change
 ```
 
-Everything under `/api` needs a session except `/api/health` and `/api/auth/*` —
-the guard is registered before the routes, so anything added later is closed
-unless it's deliberately opened.
+Everything under `/api` needs a session except `/api/auth/*`, `/api/health`,
+`/api/version`, and the two watch-pairing routes (`/api/device/code` and
+`/api/device/token`, which are anonymous by construction — a watch has no cookie
+yet, and getting one is the point). The guard is registered before the routes, so
+anything added later is closed unless it's deliberately opened. `PUBLIC_PATHS` in
+`worker/index.ts` is the list; keep this paragraph in step with it.
 
 Secrets are declared by hand in `worker/env.d.ts`, not picked up by
 `cf-typegen` — it can only see them if they're in your local `.dev.vars`, which
@@ -190,6 +193,62 @@ handshake with no certificate (`ERR_SSL_VERSION_OR_CIPHER_MISMATCH`). Nothing ab
 that resolves with time. Covering a deeper name needs Total TLS → Advanced
 Certificate Manager → a paid add-on. Hence the hyphen.
 
+### Versioning
+
+The companion's version is a **monotonic integer**, and it lives in git tags —
+`companion-v1`, `companion-v2` — and nowhere else. `package.json` stays at `0.0.0`;
+there is no semver and no changelog. (The watch is different: it hand-bumps
+`Version.mc` and gets a changelog entry on the marketing site. The two are separate
+products with separate release cadences.)
+
+The deploy workflow does it in three jobs:
+
+1. **`version`** lists the `companion-v*` tags, keeps the ones that are the prefix
+   followed by digits and nothing else, takes the highest **number** and adds one.
+   Highest number rather than newest tag, because `taggerdate` is at the mercy of
+   clock skew and of a tag being recreated. A malformed tag is skipped rather than
+   counted — counted, it would sort above every real one and reset the sequence to
+   `1`, and the post-deploy check couldn't catch that, since the number it asserts
+   would agree. No tags at all — the first ever deploy — starts at `0`, so the
+   first build is `companion-v1`.
+2. **`deploy`** passes that number to `integrity-check` as `COMPANION_BUILD`. The
+   `define` in `vite.config.ts` bakes it into `__APP_VERSION__`, which reaches both
+   the client bundle and the Worker, because they are one `vite build`. The later
+   `wrangler deploy` does not rebuild — the Cloudflare Vite plugin writes
+   `.wrangler/deploy/config.json`, which redirects wrangler at the already-built
+   `dist/sparmin_companion/wrangler.json`, so what ships is the bundle that
+   `integrity-check` produced.
+3. **`tag`** pushes `companion-v<N>`, and **`verify`** curls `/api/version` and
+   asserts the number came back. Both `needs:` the deploy, so a failed deploy is
+   never tagged and the number stays free for the next attempt.
+
+`verify` runs _alongside_ `tag`, not before it. Once `wrangler deploy` has
+succeeded, build N is live whether or not the endpoint answers correctly for it —
+and a number that is live but untagged gets handed straight back out to the next
+run, so two deploys end up answering to one build. The tag records what happened;
+`verify` says whether it went well, and fails the run on its own.
+
+Locally and on PRs `COMPANION_BUILD` is unset and the build is honestly labelled
+`dev`.
+
+Read it two ways: `curl https://sparmin-app.scottlovegrove.co.uk/api/version`, or
+the line at the bottom of the app's Settings screen. They are the same build by
+construction.
+
+**One failure mode to know.** If the deploy goes green but the tag push fails, the
+number is never recorded and the next deploy claims it again — two deploys, one
+build number. Re-running the `tag` job fixes it.
+
+**Why the version isn't read directly.** `src/lib/app-version.ts` guards with
+`typeof __APP_VERSION__ === 'string'` rather than reading the global outright. A
+`define` is a textual substitution at build time, and nothing substitutes it under
+vitest: the worker test pool takes its defines from wrangler's config, not Vite's,
+so supplying it there would mean a second, stale copy of the number in
+`wrangler.jsonc` — which the Cloudflare Vite plugin might then apply to the real
+build. The guard is what makes `dev` the answer in tests instead of a
+`ReferenceError`, and the post-deploy assertion is what stops it quietly becoming
+the answer in production too.
+
 ### What CI needs
 
 A `CLOUDFLARE_API_TOKEN` repository secret — a local `wrangler login` is a
@@ -206,3 +265,7 @@ Restrict it to this account and the `scottlovegrove.co.uk` zone. The `production
 environment in the workflow is where it should live, rather than as a plain
 repository secret: it means only a run targeting that environment can read it,
 and it gives somewhere to require an approval later if that ever seems worth it.
+
+No other secret is needed. The `tag` job pushes with the built-in `GITHUB_TOKEN`,
+which is why that one job — and only that job — declares
+`permissions: contents: write`; the workflow default stays `contents: read`.
