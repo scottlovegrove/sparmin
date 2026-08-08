@@ -9,3 +9,17 @@ EMAIL_FROM=Sparmin <hello@sparmin.scottlovegrove.co.uk>
 
 # Leave unset to print magic links to the console. Set it to send real mail.
 # RESEND_API_KEY=re_...
+
+# Web Push. Leave unset and the app simply has no push: /api/push/config reports
+# no key and the notifications card says so, rather than offering a toggle that
+# cannot work. A shared development pair is in .dev.vars.sops — see the README —
+# or generate your own; the production keys are Cloudflare secrets, set with
+# `npm run secret`, and are not in this repo.
+#
+# The third value push needs, VAPID_SUBJECT, is a plain `vars` entry in
+# wrangler.jsonc rather than a secret, and wrangler binds those alongside this
+# file — so it is already set in development and only belongs here if you want to
+# override it. All three must be present or the Worker treats push as
+# unconfigured.
+# VAPID_PUBLIC_KEY=B...
+# VAPID_PRIVATE_KEY=...
