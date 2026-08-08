@@ -228,6 +228,14 @@ and a number that is live but untagged gets handed straight back out to the next
 run, so two deploys end up answering to one build. The tag records what happened;
 `verify` says whether it went well, and fails the run on its own.
 
+It retries on the _wrong_ answer as well as on no answer. A deploy takes a moment to
+reach every edge, and until it does the previous Worker is still serving — which on
+the very first deploy of that route meant a `401`, because the old build's guard had
+never heard of `/api/version`. Its `set -o pipefail` is load-bearing for the same
+reason: a command substitution takes the exit status of the _last_ command in the
+pipeline, so without it a failed `curl` still looks successful, because `jq` exits 0
+on empty input.
+
 Locally and on PRs `COMPANION_BUILD` is unset and the build is honestly labelled
 `dev`.
 
