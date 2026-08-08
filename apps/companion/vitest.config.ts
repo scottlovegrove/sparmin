@@ -47,6 +47,19 @@ export default defineConfig({
                                 // tests invent, every run. Blank takes the branch
                                 // that logs the link instead.
                                 RESEND_API_KEY: '',
+                                // A throwaway VAPID pair, generated for this file
+                                // and used nowhere else. It has to be a real
+                                // P-256 pair rather than a placeholder string:
+                                // the send path imports it through WebCrypto, so
+                                // anything else fails at importKey and every push
+                                // test fails for the wrong reason. Without these
+                                // three the push routes take their
+                                // not-configured branch and most of the suite
+                                // would silently assert nothing.
+                                VAPID_SUBJECT: 'mailto:test@example.com',
+                                VAPID_PUBLIC_KEY:
+                                    'BDaeIk4jPeXhMGAqIE-mhJIET6ocg9rvvESnU_sOzLzUO72aQdMjxr2BGjIjsLsKJDjQm9QA0yhs6SICrI3NkYg',
+                                VAPID_PRIVATE_KEY: 'XMZijkPX3IPYYqQNRVmRJgqJ6CNxeVkKH5ANxa1dNOc',
                             },
                         },
                     }),

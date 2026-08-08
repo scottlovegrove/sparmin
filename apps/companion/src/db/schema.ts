@@ -194,8 +194,59 @@ export const stationIntervals = sqliteTable(
     ],
 )
 
+// One browser install that has agreed to be notified. Per install rather than per
+// account because that is what the Push API models: permission is granted to an
+// origin in one browser, and the endpoint it hands back is only good for that one.
+//
+// The endpoint is a capability URL — anyone holding it and the two keys can push to
+// that device — but unlike a device token it cannot be hashed at rest, because
+// sending needs it verbatim. `endpoint_hash` is what leaves the server instead, so
+// the settings screen can recognise its own row without the URL travelling.
+export const pushSubscriptions = sqliteTable(
+    'push_subscriptions',
+    {
+        id: text('id').primaryKey(), // uuid
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
+        endpoint: text('endpoint').notNull(),
+        // The UA's public key (65 bytes) and auth secret (16), base64url, exactly
+        // as PushSubscription.toJSON() serialises them.
+        p256dh: text('p256dh').notNull(),
+        auth: text('auth').notNull(),
+        // "Safari · iPhone". Supplied by the client, which is the only thing that
+        // knows its own browser — the Worker sees a user-agent string and little
+        // else. Display only.
+        label: text('label'),
+        createdAt: integer('created_at').notNull(),
+    },
+    (table) => [
+        // A unique index rather than .unique() on the column, for the reason
+        // stations_slug_unique is: a unique *constraint* is on drizzle-kit's
+        // rebuild-trigger list, and a rebuild of this table would take rows that
+        // cost a permission prompt each to earn back.
+        uniqueIndex('push_subscriptions_endpoint_unique').on(table.endpoint),
+        index('idx_push_subscriptions_user').on(table.userId),
+    ],
+)
+
+// Which notifications an account wants, as mutes. No row means everything is on,
+// so the common case costs no write and a notification type added later defaults
+// to on for people who have never opened this screen.
+export const notificationPrefs = sqliteTable('notification_prefs', {
+    userId: text('user_id')
+        .primaryKey()
+        .references(() => user.id, { onDelete: 'cascade' }),
+    // A session arriving from a linked watch. Account-wide on purpose: it is a
+    // statement about what is worth interrupting you for, not about one browser.
+    sessionUploaded: integer('session_uploaded', { mode: 'boolean' }).notNull().default(true),
+    updatedAt: integer('updated_at').notNull(),
+})
+
 export type Station = typeof stations.$inferSelect
 export type Session = typeof sessions.$inferSelect
 export type StationInterval = typeof stationIntervals.$inferSelect
 export type Device = typeof devices.$inferSelect
 export type DeviceLinkCode = typeof deviceLinkCodes.$inferSelect
+export type PushSubscription = typeof pushSubscriptions.$inferSelect
+export type NotificationPrefs = typeof notificationPrefs.$inferSelect

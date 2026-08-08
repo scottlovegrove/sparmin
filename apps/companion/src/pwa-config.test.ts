@@ -101,6 +101,27 @@ describe('service worker source', () => {
         expect(source).toContain('cleanupOutdatedCaches()')
     })
 
+    it('shows a notification when a push arrives', () => {
+        // Nothing else covers the receive side: the delivery tests stop at a
+        // mocked fetch and the payload tests only parse JSON, so a deleted
+        // listener leaves the whole suite green while users get nothing.
+        expect(source).toMatch(/addEventListener\(\s*'push'/)
+        expect(source).toContain('parsePushPayload')
+        // A push handler that resolves without showing anything makes some
+        // browsers substitute their own "site updated in the background" notice.
+        expect(source).toMatch(/waitUntil\(\s*self\.registration\.showNotification\(/)
+    })
+
+    it('brings the app forward when a notification is clicked', () => {
+        expect(source).toMatch(/addEventListener\(\s*'notificationclick'/)
+        expect(source).toContain('event.notification.close()')
+        // Nothing claims clients, so a tab opened before this worker activated is
+        // uncontrolled — without this the user gets a second window alongside the
+        // app they already had open.
+        expect(source).toContain('includeUncontrolled: true')
+        expect(source).toContain('openWindow')
+    })
+
     it('does not claim clients', () => {
         // use-app-update.ts reloads on a timer precisely because the page stays
         // uncontrolled on first load. Claiming here would make that reload race

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatDuration } from '../lib/format-duration'
 import {
     DEFAULT_PERIOD,
     isoDay,
@@ -7,7 +8,6 @@ import {
     type Period,
     periodDates,
 } from '../lib/period'
-import { formatDuration } from './session-list'
 
 type StationTotal = {
     station: string

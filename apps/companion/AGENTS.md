@@ -52,6 +52,16 @@ exists to stop.
 - **`uuid(n)`** — a readable, valid session uuid keyed by one digit
   (`uuid(1)`, `uuid(2)`, …), easy to eyeball in assertions.
 - **`countRows(table)`** — `SELECT COUNT(*)`, 0 when empty.
+- **`postWatchSession(token, body)`** — POST `/api/sessions/watch` as a linked
+  watch. It builds a real `ExecutionContext` and waits on it, because this is the
+  one route that uses `waitUntil` (the push notification). Don't call the route
+  without one: `c.executionCtx` throws, and without the wait the push is still in
+  flight when the assertions run.
+- **`pushSubscription(options)`** / **`subscribePush(who, body?)`** — a
+  `PushSubscription.toJSON()`-shaped body, and registering one. The keys in
+  `PUSH_KEYS` are RFC 8291 §5's real receiver pair, not invented strings: the send
+  path imports them through WebCrypto, so anything else fails at `importKey`.
+- **`setPushPreferences(who, preferences)`** — mute or unmute a notification type.
 
 When you add a helper other suites will want, put it in `test/helpers.ts` and add
 it to the list above. When you find setup copy-pasted across suites, fold it into

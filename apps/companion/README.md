@@ -189,6 +189,86 @@ localhost so the worker registers:
 Note that `vite preview` computes asset ETags once at startup, so rebuilding
 underneath a running preview is invisible to the browser — it revalidates and gets a 304. Restart the preview between builds when testing the update flow.
 
+### Push notifications
+
+A linked watch posts each session as you finish it, and until now the app said
+nothing about it until you next opened it. `src/sw.ts` now shows a notification
+instead, fired from the ingest route behind `waitUntil` so the watch is never held
+up by a push service.
+
+**Only on a session it actually created.** A `merged` result means the visit was
+already here from a FIT import, and `duplicate` is the watch's offline queue
+re-sending something already delivered — announcing either would be telling
+someone about a session they have already seen.
+
+Two settings, and they are different kinds of thing. **Enable push
+notifications** is per browser install, because that is what the Push API models:
+permission belongs to an origin in one browser and the endpoint it returns is good
+only for that one. **Activity uploaded** is per account, because muting an event is
+a statement about the event rather than about one browser.
+
+#### The encryption is hand-rolled, on purpose
+
+`worker/web-push.ts` implements RFC 8291 `aes128gcm` and RFC 8292 VAPID on
+`crypto.subtle` and nothing else. Both maintained WebCrypto packages
+(`webpush-webcrypto`, `@block65/webcrypto-web-push`) still send the superseded
+draft-04 scheme — `Content-Encoding: aesgcm` with an `Authorization: WebPush …`
+header — which Apple's push service rejects. That would break notifications on
+precisely the platform this feature exists for: an iOS PWA on a home screen. The
+node-only `web-push` can't run in workerd at all.
+
+What that buys is a hundred lines to own; what makes it safe is that RFC 8291 §5
+publishes a complete worked example, and `test/web-push-crypto.test.ts` reproduces
+it byte for byte. A derivation that drifts fails there rather than in production.
+
+#### Generating a VAPID pair
+
+Any P-256 pair works, in the encoding every tool in this space uses — raw
+uncompressed public point and raw private scalar, both base64url — so
+`npx web-push generate-vapid-keys` output can be pasted straight in. Or locally:
+
+```bash
+node -e "const{webcrypto:w}=require('node:crypto');(async()=>{
+const p=await w.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+const b=x=>Buffer.from(x).toString('base64url');
+console.log('public :',b(await w.subtle.exportKey('raw',p.publicKey)));
+console.log('private:',(await w.subtle.exportKey('jwk',p.privateKey)).d)})()"
+```
+
+Set both with `npm run secret`, and put them in `.dev.vars.sops` for local work
+(`npm run secrets:edit`). `VAPID_SUBJECT` is a `mailto:` in `wrangler.jsonc` — it
+is published in every token, so it is deliberately public.
+
+**Both keys are optional.** With none set the app simply has no push:
+`/api/push/config` reports `publicKey: null` and the settings card says so, rather
+than offering a toggle that cannot work. That is the right state for a fresh
+checkout, and it is why the worker tests pin their own throwaway pair in
+`vitest.config.ts` — without it every push test would take the not-configured
+branch, assert nothing, and still pass.
+
+#### Verifying a push
+
+Notifications need a real browser and a secure context, so `npm run preview`:
+
+- turn the toggle on and confirm a row appears —
+  `wrangler d1 execute DB --local --command "select id,label from push_subscriptions"`;
+- post a session as a linked watch (below) and expect a notification;
+- click it: an already-open window comes forward rather than a second one opening;
+- turn **Activity uploaded** off, post again with a fresh `sessionId`, expect
+  silence; post the _same_ `sessionId` and expect silence too;
+- on iOS this only works from an installed app — Safari in a tab has no Push API
+  at all, which is why the card offers an Add to Home Screen line instead of a
+  toggle there.
+
+Posting as a watch, with a token from a linked device:
+
+```bash
+curl -X POST localhost:4173/api/sessions/watch \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d @payload.json
+```
+
 ### If the service worker ever misbehaves in production
 
 `VitePWA({ selfDestroying: true })` builds a worker that unregisters itself and
@@ -290,6 +370,8 @@ prompts for the value, so it stays out of your shell history.
 ```bash
 npm run secret BETTER_AUTH_SECRET   # a fresh one: openssl rand -hex 32
 npm run secret RESEND_API_KEY
+npm run secret VAPID_PUBLIC_KEY     # see Push notifications below
+npm run secret VAPID_PRIVATE_KEY
 npm run secrets                     # lists the names, never the values
 ```
 

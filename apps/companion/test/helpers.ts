@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test'
+import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test'
 import { expect } from 'vitest'
 import type { IngestPayload } from '../src/lib/session-payload'
 import app from '../worker'
@@ -296,8 +296,14 @@ function walkedSegments(startedAt: string, endedAt: string, stays: readonly Watc
 }
 
 // POST a session the way a linked watch does: a bearer token, no cookie.
+//
+// A real ExecutionContext, unlike most requests here, because this is the one
+// route that uses `waitUntil` — it fires the push notification behind the
+// response. Without one `c.executionCtx` throws; without waiting on it the push
+// would still be in flight when the test asserts.
 export async function postWatchSession(token: string, body: unknown): Promise<Response> {
-    return app.request(
+    const ctx = createExecutionContext()
+    const res = await app.request(
         '/api/sessions/watch',
         {
             method: 'POST',
@@ -305,5 +311,68 @@ export async function postWatchSession(token: string, body: unknown): Promise<Re
             body: JSON.stringify(body),
         },
         env,
+        ctx,
     )
+    await waitOnExecutionContext(ctx)
+    return res
+}
+
+// ---- Push notifications ----
+
+// RFC 8291 §5's receiver keys. Real ones on purpose: the send path imports them
+// through WebCrypto, so an invented string fails at importKey and every send test
+// fails for a reason that has nothing to do with what it is testing.
+export const PUSH_KEYS = {
+    p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4',
+    auth: 'BTBZMqHH6r4Tts7J_aSIgg',
+} as const
+
+export const PUSH_ORIGIN = 'https://push.example.com'
+
+// A subscription body shaped the way PushSubscription.toJSON() serialises one.
+export function pushSubscription(options: { endpoint?: string; label?: string | null } = {}): {
+    endpoint: string
+    keys: { p256dh: string; auth: string }
+    label: string | null
+} {
+    return {
+        endpoint: options.endpoint ?? `${PUSH_ORIGIN}/s/default`,
+        keys: { ...PUSH_KEYS },
+        label: options.label === undefined ? 'Chrome · MacBook' : options.label,
+    }
+}
+
+// Register a subscription as `who`, asserting it stuck — for arranging state a
+// test depends on rather than for testing the route itself.
+export async function subscribePush(
+    who: SignedIn,
+    body: unknown = pushSubscription(),
+): Promise<void> {
+    const res = await app.request(
+        '/api/push/subscriptions',
+        {
+            method: 'PUT',
+            headers: { ...who.headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        },
+        env,
+    )
+    expect(res.status).toBe(204)
+}
+
+// Mute or unmute a notification type as `who`.
+export async function setPushPreferences(
+    who: SignedIn,
+    preferences: { sessionUploaded: boolean },
+): Promise<void> {
+    const res = await app.request(
+        '/api/push/preferences',
+        {
+            method: 'PATCH',
+            headers: { ...who.headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(preferences),
+        },
+        env,
+    )
+    expect(res.status).toBe(204)
 }

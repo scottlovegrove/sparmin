@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
+import { formatDuration } from '../lib/format-duration'
 import { type Stay, formatStay, summarise } from '../lib/session-summary'
-import { formatDuration } from './session-list'
 
 type Detail = { session: { id: string }; intervals: Stay[] }
 type StationOption = { id: number; name: string; isTransition: boolean }

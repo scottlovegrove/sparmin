@@ -13,4 +13,12 @@ interface __BaseEnv_Env {
     // app runs with no email provider. In production its absence is an error, not
     // a fallback (see email.ts).
     RESEND_API_KEY?: string
+    // The VAPID identity push services check a notification against. Optional
+    // together: with none of them set the app simply has no push, which is the
+    // right state for a local checkout that has never generated a pair. The
+    // public half is not a secret — it is handed to every browser that subscribes
+    // — but it lives here beside the private one so the two can't drift apart
+    // across environments.
+    VAPID_PUBLIC_KEY?: string
+    VAPID_PRIVATE_KEY?: string
 }

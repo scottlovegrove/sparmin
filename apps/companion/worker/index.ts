@@ -20,6 +20,15 @@ import {
     renameDevice,
     revokeDevice,
 } from './devices'
+import {
+    deleteSubscription,
+    getPreferences,
+    listSubscriptions,
+    notifySessionUploaded,
+    saveSubscription,
+    setPreferences,
+    vapidKeys,
+} from './push'
 import { ingestSession, ingestWatchSession } from './session-ingest'
 import {
     DEFAULT_PAGE_SIZE,
@@ -274,6 +283,86 @@ app.delete('/api/devices/:id', async (c) => {
     return c.body(null, 204)
 })
 
+// A browser's PushSubscription as it serialises itself, plus a label the client
+// derives from its own user agent — the Worker sees a UA string and little else,
+// so the client is the only thing that can name the browser it is running in.
+const subscribeSchema = z.object({
+    endpoint: z.url().max(1024),
+    keys: z.object({
+        // 65 raw bytes and 16, base64url. Bounded rather than exact: the lengths
+        // are the Push API's business, and web-push.ts rejects anything it can't
+        // import. This is only here to stop a megabyte landing in the row.
+        p256dh: z.string().min(1).max(255),
+        auth: z.string().min(1).max(255),
+    }),
+    label: z.string().max(60).nullish(),
+})
+
+const preferencesSchema = z.object({ sessionUploaded: z.boolean() })
+
+// Everything the notifications card needs, in one call rather than three: the key
+// to subscribe with, what this account has muted, and which devices are already
+// subscribed. `publicKey` is null on a deployment with no VAPID pair configured,
+// which the UI reports rather than offering a toggle that cannot work.
+app.get('/api/push/config', async (c) => {
+    const keys = vapidKeys(c.env)
+    const db = createDb(c.env.DB)
+    const userId = c.get('userId')
+
+    return c.json({
+        publicKey: keys?.publicKey ?? null,
+        preferences: await getPreferences(db, userId),
+        subscriptions: await listSubscriptions(db, userId),
+    })
+})
+
+// Idempotent by design, hence PUT: a browser hands back the same endpoint until
+// permission is revoked, and the client re-sends it on every load to repair a row
+// lost to an account deletion or a subscription the browser rotated underneath it.
+app.put('/api/push/subscriptions', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = subscribeSchema.safeParse(body)
+    if (!parsed.success) {
+        return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
+    }
+
+    await saveSubscription(
+        createDb(c.env.DB),
+        c.get('userId'),
+        {
+            endpoint: parsed.data.endpoint,
+            p256dh: parsed.data.keys.p256dh,
+            auth: parsed.data.keys.auth,
+            label: parsed.data.label ?? null,
+        },
+        nowSeconds(),
+    )
+    return c.body(null, 204)
+})
+
+// Turning notifications off — for this browser, or for another of the caller's
+// devices from this one, which is the only way to stop a phone you no longer have.
+app.delete('/api/push/subscriptions/:id', async (c) => {
+    const deleted = await deleteSubscription(createDb(c.env.DB), c.get('userId'), c.req.param('id'))
+    if (!deleted) {
+        return c.json({ error: 'not_found' }, 404)
+    }
+    return c.body(null, 204)
+})
+
+// Which notifications this account wants. Account-wide rather than per device:
+// muting an event is a statement about the event, not about one browser.
+app.patch('/api/push/preferences', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = preferencesSchema.safeParse(body)
+    if (!parsed.success) {
+        return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
+    }
+
+    await setPreferences(createDb(c.env.DB), c.get('userId'), parsed.data, nowSeconds())
+    return c.body(null, 204)
+})
+
 // The station catalogue: the closed set of labels the watch can write, with the
 // thermal class each one counts towards. Seeded by migration, so this is a read.
 app.get('/api/stations', async (c) => {
@@ -325,10 +414,35 @@ app.post('/api/sessions/watch', async (c) => {
 
     const db = createDb(c.env.DB)
     const device = c.get('device')
-    const result = await ingestWatchSession(db, c.get('userId'), device, parsed.data)
+    const userId = c.get('userId')
+    const result = await ingestWatchSession(db, userId, device, parsed.data)
 
     // Only on an accepted payload, so a rejected request costs no write.
     await markDeviceSeen(db, device.id, nowSeconds())
+
+    // `created` only. A `merged` result means the visit was already here from a
+    // FIT import, and `duplicate` is the watch's offline queue re-sending
+    // something already delivered — announcing either would be telling someone
+    // about a session they have already seen.
+    //
+    // Behind waitUntil because the watch is holding this response open and
+    // re-queues the whole payload on anything that isn't a 2xx: a slow push
+    // service must not turn a stored session into a retry.
+    if (result.status === 'created') {
+        c.executionCtx.waitUntil(
+            notifySessionUploaded(
+                c.env,
+                db,
+                userId,
+                {
+                    id: result.id,
+                    totalSeconds: parsed.data.totalSeconds,
+                    stayCount: parsed.data.segments.length,
+                },
+                nowSeconds(),
+            ),
+        )
+    }
 
     return c.json(result, result.status === 'created' ? 201 : 200)
 })
