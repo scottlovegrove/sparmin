@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 // The shell is a hand-written static document — nothing type-checks it and no
@@ -39,5 +39,34 @@ describe('index.html link previews', () => {
         const lastTag = html.lastIndexOf('twitter:image')
         expect(lastTag).toBeLessThan(html.indexOf('<script'))
         expect(html.indexOf('og:image')).toBeLessThan(2048)
+    })
+})
+
+describe('index.html installed-app tags', () => {
+    // The manifest link and the service worker registration are absent on purpose —
+    // vite-plugin-pwa injects both into the built document, so pinning them here
+    // would be pinning something this file doesn't own.
+
+    it('names the icon iOS uses for the home screen, and it exists', () => {
+        const href = /<link[^>]*rel="apple-touch-icon"[^>]*>/s
+            .exec(html)?.[0]
+            ?.match(/href="([^"]*)"/)?.[1]
+
+        expect(href).toBe('/apple-touch-icon-180x180.png')
+        expect(existsSync(`public${href}`)).toBe(true)
+    })
+
+    it('declares itself installable under the home-screen name', () => {
+        expect(metaContent('name', 'apple-mobile-web-app-title')).toBe('Sparmin')
+        // The standard one and the prefixed one iOS still reads.
+        expect(metaContent('name', 'mobile-web-app-capable')).toBe('yes')
+        expect(metaContent('name', 'apple-mobile-web-app-capable')).toBe('yes')
+    })
+
+    it('sits after the link previews, so it cannot push og:image out of reach', () => {
+        // WhatsApp's crawler reads only the first few kilobytes, and og:image has to
+        // land inside them. Anything added to the head goes below this line.
+        expect(html.lastIndexOf('twitter:image')).toBeLessThan(html.indexOf('apple-touch-icon'))
+        expect(html.indexOf('apple-touch-icon')).toBeLessThan(html.indexOf('<script'))
     })
 })

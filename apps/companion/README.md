@@ -33,6 +33,80 @@ sender, say) would need the Worker to render tags per path — and shouldn't car
 anything behind the sign-in regardless: an unfurl is fetched and cached by the
 messaging platform's servers, not the recipient's device.
 
+## Installable app (PWA)
+
+The companion installs to a home screen: `vite-plugin-pwa` generates a web manifest
+and a Workbox service worker that precaches the app shell. The manifest and the
+Workbox options live as plain data in `pwa.config.ts`, so `src/pwa-config.test.ts`
+can assert them without loading the build tooling.
+
+**What is cached is the shell, and only the shell.** No `/api` response is ever
+cached, there is no `runtimeCaching`, and there is no offline queue — the app is
+installable and launches instantly, but everything it shows still comes from the
+network. Two things are kept out of the precache deliberately: `og-default.png`,
+which only link-preview crawlers ever fetch, and the lazily-loaded Garmin FIT parser
+chunk, which is most of the app's JavaScript and is no use without a server to post
+to.
+
+### Two things that will break it
+
+**`outDir` and `applyToEnvironment` in `vite.config.ts` are load-bearing.** The
+Cloudflare plugin makes this a two-environment build — `dist/client` for the SPA,
+which is the directory the Worker's `assets` binding serves, and
+`dist/sparmin_companion` for the Worker. `vite-plugin-pwa` knows nothing about
+environments: it reads the top-level `outDir` and registers its build hooks in every
+environment. Left alone it writes `sw.js` to `dist/`, outside the served directory,
+where it is never uploaded; lists `dist/sparmin_companion/index.js` in the precache
+manifest as a URL to fetch, which 404s and aborts the whole install; and emits
+`manifest.webmanifest` into the Worker bundle. All three fail silently — the app
+looks fine and simply isn't a PWA.
+
+**Every navigation under `/api/` must stay on `NAVIGATE_FALLBACK_DENYLIST`.** The
+service worker answers navigations from the precached `index.html`. Almost all `/api`
+traffic is `fetch`, which the navigation route ignores — but the magic-link sign-in
+is a top-level navigation to `/api/auth/magic-link/verify?token=…`. Without the
+denylist the service worker answers it with the SPA shell, the Worker never sees the
+token, no cookie is set, and the user lands back on the sign-in screen having done
+nothing wrong. There is no error anywhere, it only affects people who installed the
+app, and it never reproduces in a fresh incognito window.
+
+### Icons
+
+Five PNGs in `public/`, generated from `public/favicon.svg` and committed:
+
+```bash
+npm run pwa-assets     # by hand, not part of the build
+```
+
+The generator is **not** a dependency of this workspace — the script fetches it with
+`npx`. It brings its own copy of sharp and libvips, a stack of platform binaries that
+every `npm ci` in the monorepo would otherwise install in order to regenerate five
+files from art that never changes. (Sharp is already here via Astro and miniflare;
+keeping the generator out avoids a second, nested copy.)
+
+That is also why `pwa-assets.config.ts` imports nothing. Under `npx` the generator
+lives in a cache directory that is not on the config's resolution path, so importing
+`@vite-pwa/assets-generator/config` from it fails outright. The preset values are
+inlined instead, and regenerating reproduces the committed PNGs byte for byte.
+
+**The plate is `#101418`, and must not be white.** The mark is a blue and orange ring
+around a _white_ droplet, and the generator preset defaults the maskable and apple
+icons to a white background — which erases the middle of it. The near-black the dark
+theme uses gives all three colours something to read against.
+
+### Updates
+
+`registerType: 'prompt'`, and `skipWaiting` is deliberately absent: a new service
+worker waits rather than reloading the page under someone mid-import. Something has
+to offer that update — until the in-app banner exists, a new build simply activates
+once every tab is closed.
+
+### If the service worker ever misbehaves in production
+
+`VitePWA({ selfDestroying: true })` builds a worker that unregisters itself and
+clears its caches. Deploy that, let it reach everyone, then revert. It is the escape
+hatch worth knowing about before you need it.
+
 ## Commands
 
 ```bash
@@ -44,6 +118,7 @@ npm run db:migrate     # apply pending migrations to the local D1
 npm run check          # tsc -b + oxlint + oxfmt --check
 npm run fix            # oxlint --fix + oxfmt
 npm run cf-typegen     # regenerate worker-configuration.d.ts from wrangler.jsonc
+npm run pwa-assets     # regenerate the PWA icons from public/favicon.svg (manual)
 ```
 
 A fresh clone has an empty local D1, so `dev` runs `db:migrate` first (via
