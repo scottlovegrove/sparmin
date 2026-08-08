@@ -22,7 +22,45 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
+    # The companion's version is a monotonic integer, kept in `companion-v<N>` git
+    # tags and nowhere else — not package.json, which stays at 0.0.0. Computed
+    # before the build so it can be baked into the bundle, and only written back
+    # after the deploy succeeds, so a failed deploy leaves the number free.
+    version:
+        runs-on: ubuntu-latest
+        outputs:
+            build: ${{ steps.next.outputs.build }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  # The tags are the version store, and a shallow clone has none.
+                  fetch-depth: 0
+
+            - name: Compute the next build number
+              id: next
+              # Take the highest number, not the newest tag: taggerdate would be at
+              # the mercy of clock skew and of a tag being recreated. The sed keeps
+              # only tags that are `companion-v` followed by digits and nothing
+              # else, so a stray malformed tag is ignored rather than counted — if
+              # it were counted it would sort above every real one and reset the
+              # sequence to 1, which the post-deploy check could not catch because
+              # the number it asserts would agree.
+              #
+              # Empty means no tags at all, i.e. the first ever deploy: start at 0
+              # so this build becomes companion-v1.
+              #
+              # `10#` forces base ten. Arithmetic expansion reads a leading zero as
+              # octal, so a hand-made `companion-v010` would otherwise produce 9
+              # rather than 11, and `companion-v08` would fail outright.
+              run: |
+                  current=$(git for-each-ref 'refs/tags/companion-v*' \
+                      --format='%(refname:strip=2)' \
+                      | sed -n 's/^companion-v\([0-9][0-9]*\)$/\1/p' \
+                      | sort -n | tail -1)
+                  echo "build=$(( 10#${current:-0} + 1 ))" >> "$GITHUB_OUTPUT"
+
     deploy:
+        needs: version
         runs-on: ubuntu-latest
         environment: production
         steps:
@@ -40,6 +78,11 @@ jobs:
             # here rather than trusting that a PR gated everything that lands.
             - name: Run CI check
               working-directory: apps/companion
+              # integrity-check runs `vite build`, which reads this and bakes it
+              # into both the client bundle and the Worker (see the `define` in
+              # vite.config.ts). Unset everywhere else, so a PR build is 'dev'.
+              env:
+                  COMPANION_BUILD: ${{ needs.version.outputs.build }}
               run: npm run integrity-check
 
             # Before the deploy, so the new code never meets the old schema.
@@ -60,3 +103,60 @@ jobs:
               run: npx wrangler deploy
               env:
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    # Records what was deployed. Gated on a green deploy — a job with `needs` is
+    # skipped when a need fails — and the workflow-level concurrency group
+    # serialises runs, so no two can claim the same number.
+    #
+    # Alongside `verify` rather than after it, deliberately. Once `wrangler deploy`
+    # has succeeded, build N is live whether or not the endpoint answers correctly
+    # for it, and a number that is live but untagged gets handed straight back out
+    # by the next run — two deploys answering to one build. Recording the number is
+    # about what happened, not about whether it went well; `verify` is what says
+    # whether it went well, and it fails the run loudly on its own.
+    #
+    # If the deploy succeeds and this job fails, that collision is what you get.
+    # Re-run this job to fix it.
+    tag:
+        needs: [version, deploy]
+        runs-on: ubuntu-latest
+        # The one job that writes to the repo. Everything else stays read-only.
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Tag the deployed build
+              env:
+                  BUILD: ${{ needs.version.outputs.build }}
+              # Pushed with GITHUB_TOKEN, which does not trigger workflows — and
+              # this workflow only listens for pushes to main regardless.
+              run: |
+                  git config user.name 'github-actions[bot]'
+                  git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+                  git tag --annotate "companion-v${BUILD}" --message "companion build ${BUILD}"
+                  git push origin "companion-v${BUILD}"
+
+    # Proves two things at once: the deploy is actually serving, and the build
+    # number really was baked into it. src/lib/app-version.ts falls back to 'dev'
+    # when the `define` didn't substitute — correct under vitest, but in production
+    # it would silently mislabel every build. This is what stops that being silent.
+    #
+    # It does not gate the tag (see above); it fails the run on its own.
+    verify:
+        needs: [version, deploy]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check the live build number
+              env:
+                  BUILD: ${{ needs.version.outputs.build }}
+              run: |
+                  for attempt in 1 2 3 4 5; do
+                      live=$(curl -fsS --max-time 10 \
+                          https://sparmin-app.scottlovegrove.co.uk/api/version \
+                          | jq -r '.version') && break
+                      echo "attempt ${attempt}: not answering yet"
+                      sleep 5
+                  done
+                  echo "live=${live} expected=${BUILD}"
+                  test "$live" = "$BUILD"
