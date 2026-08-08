@@ -20,8 +20,9 @@
         "test": "vitest run",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "wrangler d1 migrations apply DB --local",
-        "check": "tsc -b && oxlint src worker test && oxfmt --check",
-        "fix": "oxlint src worker test --fix && oxfmt",
+        "pwa-assets": "npx -y -p @vite-pwa/assets-generator@1.0.2 pwa-assets-generator",
+        "check": "tsc -b && oxlint src worker test pwa.config.ts && oxfmt --check",
+        "fix": "oxlint src worker test pwa.config.ts --fix && oxfmt",
         "clean": "rimraf dist .wrangler/tmp .wrangler/deploy",
         "integrity-check": "npm-run-all clean check build test"
     },
@@ -48,6 +49,7 @@
         "react": "19.2.7",
         "react-dom": "19.2.7",
         "vite": "8.1.5",
+        "vite-plugin-pwa": "1.3.0",
         "vitest": "4.1.10",
         "wrangler": "4.111.0"
     }
