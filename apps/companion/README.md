@@ -191,6 +191,8 @@ underneath a running preview is invisible to the browser — it revalidates and 
 
 ### Push notifications
 
+Full spec: [`docs/push-notifications-spec.md`](../../docs/push-notifications-spec.md).
+
 A linked watch posts each session as you finish it, and until now the app said
 nothing about it until you next opened it. `src/sw.ts` now shows a notification
 instead, fired from the ingest route behind `waitUntil` so the watch is never held

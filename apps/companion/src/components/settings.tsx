@@ -4,6 +4,7 @@ import { APP_VERSION } from '../lib/app-version'
 import { authClient, signOut, useListPasskeys } from '../lib/auth-client'
 import { ConfirmDialog } from './confirm-dialog'
 import { LinkedWatches } from './linked-watches'
+import { Notifications } from './notifications'
 
 // Passkeys that live on a synced provider (iCloud Keychain, a password manager)
 // survive losing the device; ones bound to a single device don't. Worth saying,
@@ -125,6 +126,8 @@ export function Settings() {
             </section>
 
             <LinkedWatches />
+
+            <Notifications />
 
             <DangerZone />
 
