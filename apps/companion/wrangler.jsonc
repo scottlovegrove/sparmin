@@ -31,13 +31,17 @@
     "observability": {
         "enabled": true,
     },
-    // BETTER_AUTH_SECRET and RESEND_API_KEY are secrets, not vars — set them with
-    // `wrangler secret put`, and in .dev.vars locally (git-ignored). Only the
-    // non-sensitive ones live here.
+    // BETTER_AUTH_SECRET, RESEND_API_KEY and the VAPID key pair are secrets, not
+    // vars — set them with `wrangler secret put`, and in .dev.vars locally
+    // (git-ignored). Only the non-sensitive ones live here.
     "vars": {
         "ENVIRONMENT": "production",
         "BETTER_AUTH_URL": "https://sparmin-app.scottlovegrove.co.uk",
         "EMAIL_FROM": "Sparmin <hello@sparmin.scottlovegrove.co.uk>",
+        // Who a push service should contact about traffic from this server. It is
+        // published in every VAPID token, so it is deliberately public and
+        // deliberately a real address.
+        "VAPID_SUBJECT": "mailto:hello@sparmin.scottlovegrove.co.uk",
     },
     // Drizzle writes migrations to ./migrations; apply them with
     // `wrangler d1 migrations apply DB --local|--remote`, never `drizzle-kit migrate`.

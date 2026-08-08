@@ -18,7 +18,9 @@ not at the root.
   build/run guide is in [`apps/companion/README.md`](./apps/companion/README.md),
   its workspace rules (including the shared test setup) in
   [`apps/companion/AGENTS.md`](./apps/companion/AGENTS.md); the spec and PR plan
-  are in [`docs/spa-logger-spec.md`](./docs/spa-logger-spec.md).
+  are in [`docs/spa-logger-spec.md`](./docs/spa-logger-spec.md), extended by
+  [`docs/watch-sync-spec.md`](./docs/watch-sync-spec.md) and
+  [`docs/push-notifications-spec.md`](./docs/push-notifications-spec.md).
 
 ## Root rules
 

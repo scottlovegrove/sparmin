@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatDuration } from '../lib/format-duration'
 import { SessionDetail } from './session-detail'
 
 type SessionRow = {
@@ -29,15 +30,6 @@ export function formatWhen(startedAt: number, utcOffsetS: number | null) {
         minute: '2-digit',
         timeZone: 'UTC',
     }).format(local)
-}
-
-// Round to minutes first, then split. Splitting first and rounding the remainder
-// lets it carry past the hour without anything noticing — 59:59 renders as "60m".
-export function formatDuration(seconds: number) {
-    const totalMinutes = Math.round(seconds / 60)
-    const hours = Math.floor(totalMinutes / 60)
-    const minutes = totalMinutes % 60
-    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
 }
 
 export function SessionList({

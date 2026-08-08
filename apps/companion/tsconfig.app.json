@@ -17,5 +17,6 @@
         "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
     },
     "include": ["src", "app-version.d.ts"],
-    "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+    // sw.ts is a worker program, not a DOM one — see tsconfig.sw.json.
+    "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/sw.ts"]
 }

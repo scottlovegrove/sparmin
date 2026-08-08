@@ -22,6 +22,10 @@ import type { ManifestOptions } from 'vite-plugin-pwa'
  * individual auth paths would be a second copy of the routing table, and it would
  * drift. Note workbox tests these against `pathname + search`, so anchoring the end
  * would stop the token-bearing URL matching.
+ *
+ * Consumed by `src/sw.ts`, which registers the navigation route by hand —
+ * `navigateFallbackDenylist` is a `generateSW`-only option and means nothing to
+ * `injectManifest`.
  */
 export const NAVIGATE_FALLBACK_DENYLIST = [/^\/api\//]
 
@@ -75,7 +79,13 @@ export const webManifest: Partial<ManifestOptions> = {
     ],
 }
 
-export const workboxOptions = {
+export const injectManifestOptions = {
+    // The register script loads sw.js as a **classic** worker, while this nested
+    // build defaults to ES output. Nothing in the bundle currently survives as a
+    // top-level import or export, so it works — by luck, not by construction. This
+    // makes it structural: the next dependency that doesn't inline cleanly can no
+    // longer break registration outright.
+    rollupFormat: 'iife' as const,
     // No `webmanifest` here on purpose: vite-plugin-pwa adds the manifest to the
     // precache itself, and globbing it too lists it twice.
     globPatterns: ['**/*.{js,css,html,svg,png}'],
@@ -90,5 +100,4 @@ export const workboxOptions = {
         // the edge, so the first import still fetches it once and keeps it.
         '**/assets/parse-fit-*.js',
     ],
-    navigateFallbackDenylist: NAVIGATE_FALLBACK_DENYLIST,
 }

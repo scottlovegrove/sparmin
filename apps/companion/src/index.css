@@ -220,6 +220,51 @@ button:disabled {
     border-top: 1px solid var(--line);
 }
 
+/* A settings switch: the native checkbox, and a two-line label saying what it
+   does and what it currently means. The checkbox stays a real checkbox — it is
+   the one control here that has to be reachable by keyboard and legible to a
+   screen reader, and nothing about the design needs it replaced. */
+.toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    cursor: pointer;
+}
+
+.toggle input {
+    /* Nudged down to sit on the first line of the label rather than above it. */
+    margin-top: 0.15rem;
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--accent);
+}
+
+.toggle > span {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.toggle-name {
+    font-weight: 550;
+}
+
+/* The per-type switches, indented under the master one they sit beneath. */
+.toggle-group {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    padding-left: 1.6rem;
+    border-top: 1px solid var(--line);
+}
+
+.other-devices {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+}
+
 .link {
     background: none;
     border: 0;
