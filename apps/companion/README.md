@@ -220,9 +220,10 @@ cp .dev.vars.example .dev.vars    # git-ignored; put local config + secrets here
 
 A working `.dev.vars` is shared, encrypted, as `.dev.vars.sops` (committed) using
 [SOPS](https://getsops.io/) with an `age` backend — the same key pair as
-`~/shiftsync`, so if `SOPS_AGE_KEY` is already in your shell it Just Works. Only
-values are encrypted; keys and comments stay readable in `git diff`. From the repo
-root:
+`~/shiftsync`, so if `SOPS_AGE_KEY` is already in your shell it Just Works.
+**Variable names stay readable in `git diff`; values and comments do not** — sops
+encrypts comment lines too (`type:comment`), so a diff tells you which keys
+changed but not what any of it says. From the repo root:
 
 ```bash
 npm run secrets:decrypt -w @sparmin/companion   # .dev.vars.sops → .dev.vars (git-ignored)
@@ -235,6 +236,14 @@ To change a shared value: `secrets:edit` (or edit `.dev.vars` then
 fall back to `cp .dev.vars.example .dev.vars` above — everything but
 `BETTER_AUTH_SECRET` is non-sensitive, and that can be any random string for dev.
 The config and public recipient live in `.sops.yaml`.
+
+**What is in here is development-only, and that is the whole rule.** The file
+holds a throwaway VAPID pair so push works out of the box on every machine, and a
+dev `BETTER_AUTH_SECRET`. Production secrets are Cloudflare secrets — the Worker
+reads them from there and never from this file — so they are set with
+`npm run secret` and do not live in the repo, encrypted or otherwise. Anyone with
+`SOPS_AGE_KEY` and read access can decrypt this file; that is fine for values
+that protect nothing real, and the reason production keys stay out.
 
 Passkeys use the `@better-auth/passkey` plugin (pinned to the same version as
 better-auth). It adds one `passkey` table and its own `/api/auth/passkey/*`
