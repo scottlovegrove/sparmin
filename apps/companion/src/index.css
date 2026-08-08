@@ -670,3 +670,33 @@ code {
 .modal-actions .button {
     width: auto;
 }
+
+/* A new build is waiting. Sticky rather than in the flow: it's mounted above the
+   sign-in / signed-in branch, so it has no column to sit inside, and an update
+   offered halfway down a long session list is an update nobody sees. */
+.update-banner {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+}
+
+.update-banner span {
+    margin-right: auto;
+}
+
+/* Inline, unlike the full-width `.button` — three things share one row here. */
+.update-action {
+    padding: 0.35rem 0.8rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+}

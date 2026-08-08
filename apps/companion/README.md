@@ -97,9 +97,85 @@ theme uses gives all three colours something to read against.
 ### Updates
 
 `registerType: 'prompt'`, and `skipWaiting` is deliberately absent: a new service
-worker waits rather than reloading the page under someone mid-import. Something has
-to offer that update — until the in-app banner exists, a new build simply activates
-once every tab is closed.
+worker waits rather than reloading the page under someone mid-import. `UpdateBanner`
+is what offers it — a sticky bar with **Update**, which activates the waiting worker
+and reloads, and **Later**, which hides it.
+
+`useAppUpdate` asks for a new worker hourly _and_ whenever the tab becomes visible: a
+tab left open, or an installed app sitting backgrounded, can go days without a
+navigation. Dismissal is per-detection rather than permanent — the banner records
+which `detectionToken` it was dismissed at, so tapping Later hides that update and a
+genuinely new one brings the banner back.
+
+**`detectionToken` counts distinct waiting workers, by identity, not checks.** The
+same worker stays in `waiting` after Later, so a token bumped on "is something
+waiting?" would advance on the very next poll and put the dismissed banner straight
+back — Later would last about a minute. `noteWaiting` compares against the worker it
+last counted, and both the poll and workbox's `onNeedRefresh` go through it, so
+neither can count the same worker twice.
+
+The banner mounts above the sign-in / signed-in branch in `app.tsx`, so an update is
+offered on every screen including sign-in, from a single service worker registration.
+
+**`update()` reloads on a timer as well as on `controllerchange`, and needs to.**
+Workbox reloads the page when the new worker takes over, but that event only fires if
+there was a controller to change — and a page that installed the service worker on
+this very load is uncontrolled, because nothing here calls `clients.claim()`. Without
+the timer the worker activates, the page never reloads, and the banner just sits
+there: the button reads as broken. If workbox gets there first the timer dies with
+the page, so it only ever fires when it was needed.
+
+### Offline
+
+The precached shell means the app now paints offline. What it paints is
+`OfflineNotice` — "No connection", and a Try again that reloads. Nothing behind it
+works offline and the screen doesn't pretend otherwise.
+
+Detecting it takes three signals, and the obvious one is the least useful.
+
+`useSession()` **does not hang offline** — the fetch rejects in about a millisecond.
+So the pending state clears, the session resolves to nothing, and the app would
+cheerfully offer the sign-in screen to someone with no connection, inviting them to
+type an email that goes nowhere. Its `error` is what actually catches this, and it
+does the bulk of the work.
+
+But **not every session error means offline**, which is what `isUnreachable` is for.
+A 4xx is the server answering, and an expired or rejected session belongs on the
+sign-in screen: routed to the notice instead, the only thing on offer is a Try again
+that can do nothing but repeat the same 401. A transport failure has no real status —
+better-fetch reports one as `500 Fetch Error` — so 500-and-up, or no status at all,
+is unreachable and 4xx is not.
+
+`navigator.onLine === false` catches it before a request is even attempted. The
+inverse is not usable: `true` covers a captive portal, a dead uplink and a Worker
+that is down. `useStalled` covers the opposite failure to a fast rejection — a
+connection accepted and then never answered — and fires after six seconds of pending.
+
+The notice only shows while signed out or still resolving. Once there is a session, a
+dropped connection belongs to the individual panels — they already say "Couldn't
+reach the server" — and replacing the whole app would throw away whatever the user
+was in the middle of.
+
+### Verifying any of this
+
+None of it is unit-testable here: the `unit` vitest project is node-only with no
+jsdom, and service workers, installability and the offline screen only exist in a
+real browser. Check them against `npm run preview`, which is a secure context on
+localhost so the worker registers:
+
+- the worker activates, and a reload leaves the page controlled by it;
+- Cache Storage holds the shell and the icons, and holds neither `og-default.png` nor
+  the `parse-fit-*` chunk;
+- **with the app installed, request a magic link and open it** — you must land signed
+  in, and the verify request must show as a real network hit rather than
+  `(ServiceWorker)`. This is the one that would hurt most and the one a passing test
+  suite says nothing about;
+- offline, a hard reload shows "No connection" rather than a blank page;
+- deploy a second build, and the banner appears, Update lands on it, and Later hides
+  it until a genuinely new detection.
+
+Note that `vite preview` computes asset ETags once at startup, so rebuilding
+underneath a running preview is invisible to the browser — it revalidates and gets a 304. Restart the preview between builds when testing the update flow.
 
 ### If the service worker ever misbehaves in production
 
