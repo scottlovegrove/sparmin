@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { NAVIGATE_FALLBACK_DENYLIST, webManifest, workboxOptions } from '../pwa.config'
+import { NAVIGATE_FALLBACK_DENYLIST, injectManifestOptions, webManifest } from '../pwa.config'
 
 // Nothing else checks any of this: the manifest is data handed to a build plugin, and
 // the denylist only ever runs inside a service worker. Both are pinned here.
@@ -67,15 +67,65 @@ describe('web manifest', () => {
     })
 })
 
-describe('workbox options', () => {
+describe('service worker source', () => {
+    // Under generateSW the denylist was config the plugin read, and the assertions
+    // above were enough. It is now a line of code in src/sw.ts, so nothing stops
+    // that line being deleted — the build still succeeds, the suite still passes,
+    // and magic-link sign-in breaks for installed users only. Hence reading the
+    // source: crude, but it is the only thing standing between here and that.
+    //
+    // Comments are stripped first, and not for tidiness — sw.ts explains in prose
+    // why it does not claim clients, and the un-stripped source therefore contains
+    // the very string the last case asserts is absent. The positive cases have the
+    // same hazard in reverse: a comment naming SKIP_WAITING would satisfy one with
+    // the listener deleted.
+    const source = readFileSync('src/sw.ts', 'utf-8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '')
+
+    it('registers the navigation fallback with the denylist', () => {
+        expect(source).toContain('NAVIGATE_FALLBACK_DENYLIST')
+        expect(source).toContain('createHandlerBoundToURL')
+        expect(source).toMatch(/denylist:\s*NAVIGATE_FALLBACK_DENYLIST/)
+    })
+
+    it('answers SKIP_WAITING, or the update banner has no effect', () => {
+        // workbox-window posts this from updateServiceWorker(true). generateSW
+        // emitted the listener for us; now we own it.
+        expect(source).toContain('SKIP_WAITING')
+        expect(source).toContain('self.skipWaiting()')
+    })
+
+    it('precaches the injected manifest', () => {
+        expect(source).toContain('precacheAndRoute(self.__WB_MANIFEST)')
+        expect(source).toContain('cleanupOutdatedCaches()')
+    })
+
+    it('does not claim clients', () => {
+        // use-app-update.ts reloads on a timer precisely because the page stays
+        // uncontrolled on first load. Claiming here would make that reload race
+        // a controllerchange that now does fire.
+        expect(source).not.toContain('clients.claim')
+    })
+})
+
+describe('inject manifest options', () => {
     it('keeps the crawler-only social card and the FIT parser out of the precache', () => {
-        expect(workboxOptions.globIgnores).toContain('**/images/og-default.png')
-        expect(workboxOptions.globIgnores).toContain('**/assets/parse-fit-*.js')
+        expect(injectManifestOptions.globIgnores).toContain('**/images/og-default.png')
+        expect(injectManifestOptions.globIgnores).toContain('**/assets/parse-fit-*.js')
+    })
+
+    it('builds the worker as a classic script', () => {
+        // vite-plugin-pwa defaults this nested build to ES output, and the
+        // register script loads sw.js with `type: 'classic'`. A surviving
+        // top-level import or export is not a degraded cache — registration
+        // fails outright and the app silently stops being a PWA.
+        expect(injectManifestOptions.rollupFormat).toBe('iife')
     })
 
     it('does not glob the manifest, which the plugin precaches itself', () => {
         // Globbing it too puts it in the precache list twice.
-        for (const pattern of workboxOptions.globPatterns) {
+        for (const pattern of injectManifestOptions.globPatterns) {
             expect(pattern).not.toContain('webmanifest')
         }
     })
@@ -90,6 +140,6 @@ describe('workbox options', () => {
         //
         // If runtime caching is ever genuinely wanted, this test should be changed
         // to require a NetworkOnly rule for ^/api/ as the first entry, not deleted.
-        expect(workboxOptions).not.toHaveProperty('runtimeCaching')
+        expect(injectManifestOptions).not.toHaveProperty('runtimeCaching')
     })
 })

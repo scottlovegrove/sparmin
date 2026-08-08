@@ -2,7 +2,7 @@ import { cloudflare } from '@cloudflare/vite-plugin'
 import react from '@vitejs/plugin-react'
 import { type Plugin, defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
-import { webManifest, workboxOptions } from './pwa.config'
+import { injectManifestOptions, webManifest } from './pwa.config'
 
 // The Cloudflare plugin makes this a two-environment build: `client` (the SPA, into
 // dist/client, which is the directory the Worker's `assets` binding serves) and
@@ -26,8 +26,16 @@ const pwa: Plugin[] = VitePWA({
     // twice. Workbox dedupes identical revisions rather than complaining, which is
     // exactly why this would otherwise go unnoticed.
     includeManifestIcons: false,
+    // The worker is ours, in src/sw.ts, rather than one workbox writes: a `push`
+    // handler has to live somewhere and `generateSW` has no seam for one. The
+    // plugin builds that file in a nested Vite build of its own — `configFile:
+    // false`, none of the plugins above — so the Cloudflare plugin's environments
+    // don't reach it, and `outDir` below is what puts sw.js beside the app.
+    strategies: 'injectManifest',
+    srcDir: 'src',
+    filename: 'sw.ts',
     manifest: webManifest,
-    workbox: workboxOptions,
+    injectManifest: injectManifestOptions,
 }).map((plugin) => ({
     ...plugin,
     applyToEnvironment: (environment) => environment.name === 'client',

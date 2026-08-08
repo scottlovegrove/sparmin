@@ -75,17 +75,34 @@ The README has the reasoning; these are the rules.
   two-environment build. Remove either and the service worker lands outside the
   served directory, or the precache manifest lists the Worker bundle as a URL —
   silently, in both cases.
-- **Every navigation under `/api/` stays on `NAVIGATE_FALLBACK_DENYLIST` in
-  `pwa.config.ts`.** Magic-link sign-in is a top-level navigation to
-  `/api/auth/magic-link/verify`; without the denylist the service worker answers it
-  with the SPA shell and sign-in fails with no error, only for installed users.
+- **`src/sw.ts` is hand-written, and it is a port.** The mode is
+  `injectManifest`, not `generateSW`, because a `push` handler has to live
+  somewhere. Everything in it other than the push and notification listeners
+  reproduces what workbox used to emit — same calls, same order. Before changing any
+  of that, diff it against a `generateSW` build's `sw.js`; the previous output is in
+  the history of this change. It is built by a nested Vite build of the plugin's own
+  (`configFile: false`, none of the root plugins), so the Cloudflare plugin never
+  sees it, and the output must stay valid as a **classic** script — the register code
+  loads it with `type: 'classic'`, so a stray top-level `import`/`export` surviving
+  the bundle breaks registration outright.
+- **Every navigation under `/api/` stays on `NAVIGATE_FALLBACK_DENYLIST`.** It is
+  declared in `pwa.config.ts` and applied by `src/sw.ts`'s `NavigationRoute` —
+  `navigateFallbackDenylist` is a `generateSW` option and does nothing here, so the
+  wiring is code now rather than config. Magic-link sign-in is a top-level navigation
+  to `/api/auth/magic-link/verify`; without the denylist the service worker answers
+  it with the SPA shell and sign-in fails with no error, only for installed users.
+  `src/pwa-config.test.ts` reads `src/sw.ts` as text to hold that line in place.
 - **Offline scope is the app shell.** No `runtimeCaching`, no caching of `/api`
   responses, no IndexedDB, no offline queue — those responses are per-user and sit
   behind a session cookie. If `runtimeCaching` is ever added, its first entry must be
   a `NetworkOnly` for `^/api/`.
-- **`pwa.config.ts` holds plain data only** — no vite imports — so
+- **`pwa.config.ts` holds plain data only** — no vite imports beyond a `type` — so
   `src/pwa-config.test.ts` can assert the manifest and the denylist in the node
-  project.
+  project, and so `src/sw.ts` can import the denylist without dragging the build
+  tooling into the service worker bundle.
+- **`src/sw.ts` type-checks under `tsconfig.sw.json`, on its own.** `self` is a
+  `ServiceWorkerGlobalScope` and there is no `window`, so it can't share a program
+  with the app — it is excluded from `tsconfig.app.json` for that reason.
 - **Icons are committed, not built.** `npm run pwa-assets` is a manual step that
   fetches the generator with `npx` — don't add it as a dependency, it drags a nested
   sharp/libvips into every `npm ci`. `pwa-assets.config.ts` must stay import-free for

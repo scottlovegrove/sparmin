@@ -1,0 +1,24 @@
+{
+    // The service worker on its own, because it is the one file in src/ that is not
+    // a DOM program: `self` is a ServiceWorkerGlobalScope, there is no `window`, and
+    // lib.dom and lib.webworker contradict each other often enough that sharing a
+    // program with the app would type half of src/sw.ts wrong and half of the app
+    // wrong. pwa.config.ts comes along because sw.ts imports the denylist from it.
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["ES2023", "WebWorker"],
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noFallthroughCasesInSwitch": true,
+        "verbatimModuleSyntax": true,
+        "isolatedModules": true,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "types": [],
+        "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.sw.tsbuildinfo"
+    },
+    "include": ["src/sw.ts", "pwa.config.ts"]
+}

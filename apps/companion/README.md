@@ -35,10 +35,19 @@ messaging platform's servers, not the recipient's device.
 
 ## Installable app (PWA)
 
-The companion installs to a home screen: `vite-plugin-pwa` generates a web manifest
-and a Workbox service worker that precaches the app shell. The manifest and the
-Workbox options live as plain data in `pwa.config.ts`, so `src/pwa-config.test.ts`
+The companion installs to a home screen: `vite-plugin-pwa` generates a web manifest,
+and `src/sw.ts` is a Workbox service worker that precaches the app shell. The manifest
+and the glob options live as plain data in `pwa.config.ts`, so `src/pwa-config.test.ts`
 can assert them without loading the build tooling.
+
+The service worker is **written, not generated** — the mode is `injectManifest`. That
+is not a preference: push notifications need a `push` listener, and `generateSW` has
+nowhere to put one. What is in `src/sw.ts` above the push handlers is a line-for-line
+port of what workbox was emitting, so precaching, the update prompt and the navigation
+denylist behave as they always did. The plugin builds that file in a nested Vite build
+of its own, which inherits none of the root config, and the result is loaded as a
+classic script — so nothing in it may survive bundling as a top-level `import` or
+`export`.
 
 **What is cached is the shell, and only the shell.** No `/api` response is ever
 cached, there is no `runtimeCaching`, and there is no offline queue — the app is
@@ -61,8 +70,11 @@ manifest as a URL to fetch, which 404s and aborts the whole install; and emits
 `manifest.webmanifest` into the Worker bundle. All three fail silently — the app
 looks fine and simply isn't a PWA.
 
-**Every navigation under `/api/` must stay on `NAVIGATE_FALLBACK_DENYLIST`.** The
-service worker answers navigations from the precached `index.html`. Almost all `/api`
+**Every navigation under `/api/` must stay on `NAVIGATE_FALLBACK_DENYLIST`.** Since
+the move to `injectManifest` this is applied by the `NavigationRoute` in `src/sw.ts`
+rather than by a config key the plugin reads — `navigateFallbackDenylist` belongs to
+`generateSW` and is silently ignored here. The service worker answers navigations from
+the precached `index.html`. Almost all `/api`
 traffic is `fetch`, which the navigation route ignores — but the magic-link sign-in
 is a top-level navigation to `/api/auth/magic-link/verify?token=…`. Without the
 denylist the service worker answers it with the SPA shell, the Worker never sees the
