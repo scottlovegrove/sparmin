@@ -48,6 +48,17 @@
             name="twitter:image"
             content="https://sparmin-app.scottlovegrove.co.uk/images/og-default.png"
         />
+
+        <!-- Installed-app tags. These sit after the link-preview block, not before
+             it: og:image has to stay within the first couple of kilobytes for
+             WhatsApp's crawler, and src/index-html.test.ts pins that. The manifest
+             link and the service worker registration aren't here — vite-plugin-pwa
+             injects both at build time. -->
+        <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+        <meta name="apple-mobile-web-app-title" content="Sparmin" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <!-- Superseded by the line above, and still what iOS actually reads. -->
+        <meta name="apple-mobile-web-app-capable" content="yes" />
     </head>
     <body>
         <div id="root"></div>

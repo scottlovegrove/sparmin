@@ -12,7 +12,9 @@ file only adds what's specific to this workspace.
 Vitest, two projects (see `vitest.config.ts`):
 
 - **`unit`** — pure client/parser units under `src/**/*.test.ts`, run in node.
-  These read FIT fixtures off disk from `test/fixtures/`.
+  These read FIT fixtures off disk from `test/fixtures/`. Node, and `.ts` only —
+  there is no jsdom and no component testing here, so React components and hooks are
+  verified by hand, not by this suite.
 - **`worker`** — worker/integration tests under `test/**/*.test.ts`, run inside
   workerd via `@cloudflare/vitest-pool-workers` against the real `wrangler.jsonc`
   bindings. Each isolated test DB is migrated and seeded by
@@ -63,6 +65,32 @@ disk; worker tests can't (workerd's filesystem isn't the repo's), so the bytes f
 the one end-to-end ingest test are read in node by `vitest.config.ts` and passed
 through as the `TEST_FIT_FIXTURE` binding. Don't add a second copy of a fixture or
 a parallel loader — extend the existing path.
+
+## PWA
+
+The README has the reasoning; these are the rules.
+
+- **`outDir: 'dist/client'` and `applyToEnvironment` in `vite.config.ts` both stay.**
+  They pin `vite-plugin-pwa` to the client half of the Cloudflare plugin's
+  two-environment build. Remove either and the service worker lands outside the
+  served directory, or the precache manifest lists the Worker bundle as a URL —
+  silently, in both cases.
+- **Every navigation under `/api/` stays on `NAVIGATE_FALLBACK_DENYLIST` in
+  `pwa.config.ts`.** Magic-link sign-in is a top-level navigation to
+  `/api/auth/magic-link/verify`; without the denylist the service worker answers it
+  with the SPA shell and sign-in fails with no error, only for installed users.
+- **Offline scope is the app shell.** No `runtimeCaching`, no caching of `/api`
+  responses, no IndexedDB, no offline queue — those responses are per-user and sit
+  behind a session cookie. If `runtimeCaching` is ever added, its first entry must be
+  a `NetworkOnly` for `^/api/`.
+- **`pwa.config.ts` holds plain data only** — no vite imports — so
+  `src/pwa-config.test.ts` can assert the manifest and the denylist in the node
+  project.
+- **Icons are committed, not built.** `npm run pwa-assets` is a manual step that
+  fetches the generator with `npx` — don't add it as a dependency, it drags a nested
+  sharp/libvips into every `npm ci`. `pwa-assets.config.ts` must stay import-free for
+  that to work. Keep the `#101418` plate on the maskable and apple icons: the
+  preset's default is white and the mark's droplet is white.
 
 ## Build number
 
