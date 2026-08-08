@@ -18,6 +18,10 @@
     --ok: #0f7b4f;
     --warn: #8a6100;
     --bad: #9b2226;
+
+    /* The brand's two ends, shared by the icon and the wordmark. */
+    --cold: #37a6e0;
+    --hot: #f5822a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,6 +36,11 @@
         --ok: #63d297;
         --warn: #e0b252;
         --bad: #f08a8a;
+
+        /* Lifted off the favicon's fixed pair: on the dark ground the originals
+           go muddy, especially the blue. */
+        --cold: #5cc0f0;
+        --hot: #ffa055;
     }
 }
 
@@ -62,9 +71,29 @@ body {
     padding: 0.25rem 0.25rem 0;
 }
 
-.brand {
+.wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
     font-weight: 650;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+    white-space: nowrap;
+}
+
+.wordmark-mark {
+    display: block;
+    flex: none;
+    width: 1.05em;
+    height: 1.05em;
+}
+
+.wordmark-word {
+    background: linear-gradient(96deg, var(--cold) 8%, var(--muted) 46%, var(--hot) 88%);
+    background-clip: text;
+    color: transparent;
+}
+
+.bar .wordmark {
     margin-right: auto;
 }
 
