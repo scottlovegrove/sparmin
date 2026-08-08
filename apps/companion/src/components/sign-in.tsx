@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { authClient } from '../lib/auth-client'
+import { Wordmark } from './wordmark'
 
 type State = { status: 'idle' | 'sending' | 'sent' } | { status: 'error'; message: string }
 
@@ -79,7 +80,9 @@ export function SignIn() {
 
     return (
         <section className="card">
-            <h1>Sparmin</h1>
+            <h1>
+                <Wordmark />
+            </h1>
             <p className="muted">Your spa sessions, from your watch.</p>
             <form onSubmit={handleSubmit}>
                 <label htmlFor="email">Email</label>

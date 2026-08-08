@@ -7,6 +7,7 @@ import { Settings } from './components/settings'
 import { SignIn } from './components/sign-in'
 import { StatsPanel } from './components/stats-panel'
 import { UpdateBanner } from './components/update-banner'
+import { Wordmark } from './components/wordmark'
 import { signOut, useSession } from './lib/auth-client'
 import { isUnreachable } from './lib/session-error'
 import { useOnline } from './lib/use-online'
@@ -19,7 +20,7 @@ function Home({ email }: { email: string }) {
     return (
         <main className="shell">
             <header className="bar">
-                <span className="brand">Sparmin</span>
+                <Wordmark />
                 <span className="muted small">{email}</span>
                 <Link href="/settings" className="link">
                     Settings
