@@ -5,7 +5,7 @@ import { stations } from '../src/db/schema'
 import { APP_VERSION } from '../src/lib/app-version'
 import { formatUserCode } from '../src/lib/device-code'
 import { ingestPayloadSchema, replaceLapsSchema } from '../src/lib/session-payload'
-import { watchPayloadSchema } from '../src/lib/watch-payload'
+import { countStays, watchPayloadSchema } from '../src/lib/watch-payload'
 import { deleteAccount } from './account'
 import { createAuth, currentUserId } from './auth'
 import { createDb } from './db'
@@ -437,7 +437,9 @@ app.post('/api/sessions/watch', async (c) => {
                 {
                     id: result.id,
                     totalSeconds: parsed.data.totalSeconds,
-                    stayCount: parsed.data.segments.length,
+                    // The stays only. Counting laps would count the walks between
+                    // stations too, and announce a visit as busier than it was.
+                    stayCount: countStays(parsed.data),
                 },
                 nowSeconds(),
             ),

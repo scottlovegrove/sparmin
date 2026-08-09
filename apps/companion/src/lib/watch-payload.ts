@@ -69,6 +69,19 @@ export type WatchActivity = z.infer<typeof watchActivitySchema>
 export type WatchSegment = z.infer<typeof watchSegmentSchema>
 export type WatchPayload = z.infer<typeof watchPayloadSchema>
 
+//! How many stays at a station the visit holds — a second visit to the same
+//! station counts again, because it is another stay.
+//!
+//! Not `segments.length`: the walks between stations are laps of their own, so
+//! that figure roughly doubles the count and makes a visit sound like far more
+//! stations than were actually done. The activity rollups are the watch's own list
+//! of what counts as a station — they exclude the walks — so a lap is a stay when
+//! one of them names it.
+export function countStays(payload: WatchPayload): number {
+    const stations = new Set(payload.activities.map((activity) => activity.activityId))
+    return payload.segments.filter((segment) => stations.has(segment.activityId)).length
+}
+
 //! ISO-8601 to unix seconds. The watch formats UTC to the second, so this is
 //! exact rather than rounded.
 export function toUnixSeconds(iso: string): number {
