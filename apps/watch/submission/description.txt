@@ -10,7 +10,7 @@ Your sessions in a browser (optional)
 
 Sparmin has a companion web app. Link your watch to it once — Settings, then Link account, then type the short code it shows into the website — and every session sends itself as you finish it. Nothing to export, no files to move around.
 
-- Sessions recorded away from your phone are kept and sent next time you open the app with your phone nearby.
+- Sessions recorded away from your phone are kept, and send themselves as soon as your phone is back in range. You don't have to open anything.
 - The watch shows which account it is linked to, and can unlink itself. Remove it from your account in the browser instead and it notices, forgets the account and stops sending.
 - Sending never affects the recording. The activity is saved to your watch and to Garmin Connect first, and always.
 

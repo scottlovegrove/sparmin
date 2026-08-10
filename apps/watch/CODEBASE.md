@@ -66,8 +66,11 @@ in a new family also needs a new size row in `rasterise-icons.sh`.
 
 ```
 source/
-├─ SparminApp.mc          # AppBase entry. Owns the single SessionManager;
-│                         # getInitialView() -> StripView + StripDelegate. getApp().
+├─ SparminApp.mc          # AppBase entry, for BOTH processes: getInitialView()
+│                         # -> StripView + StripDelegate in the app,
+│                         # getServiceDelegate() in the background. (:background),
+│                         # so the SessionManager is built on demand rather than
+│                         # in the constructor. getApp().
 ├─ SessionManager.mc      # THE state machine (§ below) + in-memory model +
 │                         # aggregation + payload + Storage persistence.
 │                         # Also holds `class ActivityAggregate`.
@@ -92,8 +95,13 @@ source/
 ├─ ActivityIcons.mc       # module: activityId -> drawable + lazy bitmap cache,
 │                         # shared by the strip and the summary.
 ├─ BackendClient.mc       # POST a finished session + offline queue. Wired from
-│                         # ConfirmEndDelegate (after the FIT is saved) and
-│                         # flushed on app start. 401 clears the token.
+│                         # ConfirmEndDelegate (after the FIT is saved), flushed
+│                         # on app start and by the background service. 401
+│                         # clears the token; any other 4xx drops the payload.
+│                         # syncBackgroundEvent() books/cancels the retry.
+├─ SessionSyncService.mc  # ServiceDelegate: the five-minute background retry that
+│                         # delivers what the phone was out of reach for. One
+│                         # payload per wake, then Background.exit().
 ├─ Backend.mc             # module: the companion's URL. One constant, so the
 │                         # pairing flow and the upload cannot disagree.
 ├─ LinkConfig.mc          # module: the device token + this watch's install id in
@@ -108,7 +116,7 @@ source/
 ├─ Uuid.mc / Iso.mc       # module: session id (v4) + ISO-8601 UTC.
 ├─ Version.mc             # module: the app version string, shown on the About
 │                         # page. Hand-bumped at each release.
-├─ Tests.mc               # 32 (:test) cases + FakeRecorder. Run in the simulator.
+├─ Tests.mc               # 40 (:test) cases + FakeRecorder. Run in the simulator.
 └─ views/
    ├─ StripView.mc        # home screen (IDLE/TRANSITION/IN_ACTIVITY): strip,
    │  StripDelegate.mc    # timers, HR, icons, drag-scroll animation, focus label

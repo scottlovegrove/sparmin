@@ -9,6 +9,10 @@ import Toybox.Math;
 //! The token is a credential. It grants one capability — send sessions for its
 //! owner — and nothing else, but it is still the thing to clear the moment the
 //! backend says it is no longer valid.
+//!
+//! `(:background)`: the background retry needs the token to send with, and
+//! clears it when the backend rejects it.
+(:background)
 module LinkConfig {
 
     const TOKEN_KEY = "deviceToken";
