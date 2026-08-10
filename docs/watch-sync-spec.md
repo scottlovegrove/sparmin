@@ -349,6 +349,64 @@ it — that is exactly what §3.4 is for.
   `Application.Storage` is a memory risk on a watch, and a session that failed to
   send for weeks can still be recovered from its FIT.
 
+### 4.5 Draining the queue without the app
+
+`send()` is called once, at the end of a session, and samples `phoneConnected` at
+that instant. That instant is the worst one available: Bluetooth is 2.4 GHz, water
+absorbs 2.4 GHz, and a wrist still in the water has no link to a phone an arm's
+length away. The payload is queued.
+
+Until this section existed, the only thing that drained the queue was
+`flushQueue()` on app start, so a queued session waited for the wearer to open
+Sparmin again. Observed delivery lag on real sessions was 41 minutes, 87 minutes
+and nine hours — never once at the end of the session itself.
+
+**A background service closes the gap.**
+
+- `Background.registerForTemporalEvent(Duration(300))` — five minutes is the
+  system floor; asking for less throws `InvalidBackgroundTimeException`.
+- **Registered only while the queue is non-empty.** `BackendClient.syncBackgroundEvent()`
+  runs after every change to the queue and reconciles registration against
+  `queuedCount() > 0`. An up-to-date watch has no temporal event at all, so the
+  feature costs nothing when there is nothing to do.
+- **One payload per wake.** A background process is killed if it has not exited
+  within 30 seconds, and may be killed earlier to release memory. `flushQueue()`
+  removes a payload from the queue *before* posting it, so a chain interrupted
+  mid-drain loses whatever it was carrying. `flushOnce()` posts one and calls
+  back; the service then calls `Background.exit()`. A queue of three takes
+  fifteen minutes, which is a price worth paying for a window one request wide.
+
+**What the API forces on the rest of the app:**
+
+- Background memory is **32 KB** on the older supported devices (fēnix 5 family,
+  vívoactive 3, fr55, Venu Sq), 64 KB on vívoactive 5 and fr745. Only code
+  annotated `(:background)` is compiled into that image: `BackendClient`,
+  `Backend`, `LinkConfig`, `WatchLog`, `SessionSyncService` and the app class.
+- **The app class is the entry point of both processes**, so `SparminApp` is
+  `(:background)` — and everything its constructor touches would be too. The
+  `SessionManager` is therefore built on demand instead of as a member
+  initialiser; building it at construction would pull the FIT recorder, and
+  `ActivityRecording` with it, into a process that must not record anything.
+- Foreground-only members carry `(:typecheck(disableBackgroundCheck))`, which is
+  how the type checker is told a reference is never followed in the background.
+- The manifest gains `<iq:uses-permission id="Background"/>`, which is visible to
+  the user at install.
+
+**Retry budget.** `MAX_ATTEMPTS` was 5, sized for one attempt per app launch. At a
+five-minute cadence that is 25 minutes before a session is discarded for good,
+which a single bad morning would exhaust. Two changes hold the line:
+
+- **A 4xx is terminal.** The server understood the payload and refused it;
+  retrying cannot change its answer, so it is dropped on the spot rather than
+  occupying the head of the queue until its attempts run out. 401 keeps its
+  existing, stronger meaning (§2.4): clear the token and the whole queue.
+- **Transient failures get 20 attempts**, which at five minutes is a little over
+  an hour and a half of trying.
+
+Nothing here can lose a visit that matters: every session is in Garmin Connect as
+a FIT, and §3 makes a later import merge cleanly with anything the watch did
+eventually deliver.
+
 ---
 
 ## 5. Security

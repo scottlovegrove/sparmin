@@ -12,6 +12,10 @@ import Toybox.System;
 //!
 //! `System.println` is kept alongside it for the simulator, where it is the
 //! quickest thing to watch while developing.
+//!
+//! `(:background)`: a retry that only ever runs while nobody is looking is
+//! exactly the thing that needs to leave a trace.
+(:background)
 module WatchLog {
 
     const STORAGE_KEY = "log";

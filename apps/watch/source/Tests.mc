@@ -615,6 +615,66 @@ function testQueueTrimLeavesAShortQueueAlone(logger) {
     return true;
 }
 
+//! A 4xx is the server saying it understood the payload and will not have it.
+//! Retrying cannot change that answer, so the payload goes rather than sitting
+//! at the head of the queue burning attempts — and, now that a background
+//! service retries every five minutes, holding up everything behind it.
+(:test)
+function testRefusedPayloadIsDroppedRatherThanRetried(logger) {
+    var client = new BackendClient();
+    Application.Storage.deleteValue(client.QUEUE_KEY);
+    LinkConfig.setToken("a-token");
+    client.setInFlight({ "watchSessionId" => "malformed" });
+
+    client.onResponse(400, null);
+
+    Test.assertEqual(client.queuedCount(), 0);
+    return true;
+}
+
+//! A 5xx or a transport error might yet come good, so the payload waits its turn
+//! again instead of being thrown away.
+(:test)
+function testTransientFailureKeepsThePayload(logger) {
+    var client = new BackendClient();
+    Application.Storage.deleteValue(client.QUEUE_KEY);
+    LinkConfig.setToken("a-token");
+    client.setInFlight({ "watchSessionId" => "worth-another-go" });
+
+    client.onResponse(503, null);
+
+    Test.assertEqual(client.queuedCount(), 1);
+    return true;
+}
+
+//! The background service asks for one payload and then waits to be told it can
+//! exit. When there is nothing to send it must be told so synchronously, or the
+//! process sits there until the system kills it at thirty seconds.
+(:test)
+function testFlushOnceDeclinesWithAnEmptyQueue(logger) {
+    var client = new BackendClient();
+    Application.Storage.deleteValue(client.QUEUE_KEY);
+    LinkConfig.setToken("a-token");
+
+    Test.assert(!client.flushOnce(null));
+    return true;
+}
+
+//! Same again for a watch that isn't linked: there is nowhere to send to, and
+//! the callback must not be the thing the caller waits on.
+(:test)
+function testFlushOnceDeclinesWhenNotLinked(logger) {
+    var client = new BackendClient();
+    Application.Storage.setValue(client.QUEUE_KEY, [{ "watchSessionId" => "orphan" }]);
+    LinkConfig.clearToken();
+
+    Test.assert(!client.flushOnce(null));
+    // And the payload is still there, not quietly consumed by the attempt.
+    Test.assertEqual(client.queuedCount(), 1);
+    Application.Storage.deleteValue(client.QUEUE_KEY);
+    return true;
+}
+
 //! Forgetting an account must leave nothing behind that could reach the next
 //! one: not the token, not the queue, and not the payload already on the wire —
 //! whose callback would otherwise re-queue it after the unlink.
