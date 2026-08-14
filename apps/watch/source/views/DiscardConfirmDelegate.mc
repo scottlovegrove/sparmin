@@ -67,6 +67,7 @@ class DiscardConfirmDelegate extends WatchUi.InputDelegate {
     }
 
     private function _discard() as Void {
+        WatchLog.add("session: discarded");
         _session.discardSession();   // throws the FIT away, back to IDLE
         var dv = new DiscardedView();
         WatchUi.switchToView(dv, new DiscardedDelegate(dv), WatchUi.SLIDE_UP);

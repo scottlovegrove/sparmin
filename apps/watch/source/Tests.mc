@@ -736,3 +736,139 @@ function testClock12Hour(logger) {
     Test.assertEqual(Fmt.clock(23, 59, false), "11:59");
     return true;
 }
+
+// ---- Diagnostic log ----
+
+//! Every test here starts from an empty buffer and cursor, since both live in
+//! Storage and would otherwise carry over from whatever ran before.
+function resetLog() as Void {
+    WatchLog.clear();
+    Application.Storage.deleteValue(WatchLog.SEQ_KEY);
+    Application.Storage.deleteValue((new LogClient()).CURSOR_KEY);
+}
+
+(:test)
+function testLogKeepsEntriesOldestFirst(logger) {
+    resetLog();
+
+    WatchLog.add("first");
+    WatchLog.add("second");
+
+    var entries = WatchLog.read();
+    Test.assertEqual(entries.size(), 2);
+    Test.assertEqual(WatchLog.textOf(entries[0]), "first");
+    Test.assertEqual(WatchLog.textOf(entries[1]), "second");
+    return true;
+}
+
+//! The sequence is the upload cursor, so it has to separate two lines written in
+//! the same second — which a timestamp cannot.
+(:test)
+function testLogSequenceAlwaysAdvances(logger) {
+    resetLog();
+
+    WatchLog.add("first");
+    WatchLog.add("second");
+
+    var entries = WatchLog.read();
+    Test.assert(WatchLog.seqOf(entries[1]) > WatchLog.seqOf(entries[0]));
+    return true;
+}
+
+(:test)
+function testLogDropsTheOldestPastTheCap(logger) {
+    resetLog();
+
+    for (var i = 0; i < WatchLog.MAX_LINES + 5; i += 1) {
+        WatchLog.add("line " + i);
+    }
+
+    var entries = WatchLog.read();
+    Test.assertEqual(entries.size(), WatchLog.MAX_LINES);
+    // The first five are gone, and the newest is the one just written.
+    Test.assertEqual(WatchLog.textOf(entries[0]), "line 5");
+    Test.assertEqual(WatchLog.textOf(entries[entries.size() - 1]),
+        "line " + (WatchLog.MAX_LINES + 4));
+    return true;
+}
+
+//! A long error must not crowd out the history around it, which is usually the
+//! part that explains it.
+(:test)
+function testLogClipsALongLine(logger) {
+    resetLog();
+    var long = "";
+    for (var i = 0; i < 200; i += 1) {
+        long += "x";
+    }
+
+    WatchLog.add(long);
+
+    Test.assertEqual(WatchLog.textOf(WatchLog.read()[0]).length(), WatchLog.MAX_TEXT);
+    return true;
+}
+
+//! Entries from before the stamp carried a date are plain strings. They are
+//! skipped rather than shown, since there is no date in them to recover.
+(:test)
+function testLogSkipsEntriesFromTheOldFormat(logger) {
+    resetLog();
+    Application.Storage.setValue(WatchLog.STORAGE_KEY, ["09:20:59 send: no phone, queued"]);
+
+    WatchLog.add("current");
+
+    var entries = WatchLog.read();
+    Test.assertEqual(entries.size(), 1);
+    Test.assertEqual(WatchLog.textOf(entries[0]), "current");
+    return true;
+}
+
+//! What the upload sends: everything past the cursor, and nothing before it.
+(:test)
+function testLogSinceReturnsOnlyWhatIsNew(logger) {
+    resetLog();
+    WatchLog.add("sent");
+    var sent = WatchLog.seqOf(WatchLog.read()[0]);
+    WatchLog.add("new");
+
+    var fresh = WatchLog.since(sent);
+
+    Test.assertEqual(fresh.size(), 1);
+    Test.assertEqual(WatchLog.textOf(fresh[0]), "new");
+    return true;
+}
+
+(:test)
+function testLogSinceIsEmptyWhenNothingHasHappened(logger) {
+    resetLog();
+    WatchLog.add("sent");
+    var sent = WatchLog.seqOf(WatchLog.read()[0]);
+
+    Test.assertEqual(WatchLog.since(sent).size(), 0);
+    return true;
+}
+
+//! An unsent watch starts from zero, so the first upload carries the whole buffer.
+(:test)
+function testUploadCursorStartsAtNothingSent(logger) {
+    resetLog();
+    WatchLog.add("first");
+
+    Test.assertEqual(new LogClient().sentSeq(), 0);
+    Test.assertEqual(WatchLog.since(new LogClient().sentSeq()).size(), 1);
+    return true;
+}
+
+//! The cursor only ever moves on a success, so a failed upload re-sends rather
+//! than losing the one line that explained what happened.
+(:test)
+function testUploadCursorHoldsAfterAFailure(logger) {
+    resetLog();
+    WatchLog.add("first");
+    var client = new LogClient();
+
+    client.onResponse(500, null);
+
+    Test.assertEqual(client.sentSeq(), 0);
+    return true;
+}

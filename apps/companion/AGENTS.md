@@ -57,6 +57,10 @@ exists to stop.
   one route that uses `waitUntil` (the push notification). Don't call the route
   without one: `c.executionCtx` throws, and without the wait the push is still in
   flight when the assertions run.
+- **`deviceLogPayload(options)`** / **`postDeviceLogs(token, body)`** — the
+  diagnostic lines a watch uploads, and posting them as one. Bearer token, no
+  cookie, and no `ExecutionContext` needed — unlike the session route, this one
+  does no `waitUntil` work.
 - **`pushSubscription(options)`** / **`subscribePush(who, body?)`** — a
   `PushSubscription.toJSON()`-shaped body, and registering one. The keys in
   `PUSH_KEYS` are RFC 8291 §5's real receiver pair, not invented strings: the send

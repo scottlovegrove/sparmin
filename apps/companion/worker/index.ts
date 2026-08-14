@@ -4,11 +4,18 @@ import { z } from 'zod'
 import { stations } from '../src/db/schema'
 import { APP_VERSION } from '../src/lib/app-version'
 import { formatUserCode } from '../src/lib/device-code'
+import { deviceLogPayloadSchema } from '../src/lib/device-log-payload'
 import { ingestPayloadSchema, replaceLapsSchema } from '../src/lib/session-payload'
 import { countStays, watchPayloadSchema } from '../src/lib/watch-payload'
 import { deleteAccount } from './account'
 import { createAuth, currentUserId } from './auth'
 import { createDb } from './db'
+import {
+    DEFAULT_PAGE_SIZE as DEFAULT_LOG_PAGE_SIZE,
+    MAX_PAGE_SIZE as MAX_LOG_PAGE_SIZE,
+    listDeviceLogs,
+    recordDeviceLogs,
+} from './device-logs'
 import {
     approveLink,
     describePending,
@@ -71,12 +78,16 @@ function isPublic(pathname: string) {
     return PUBLIC_PATHS.has(pathname) || pathname.startsWith('/api/auth/')
 }
 
-// The one route a device token can reach. A token grants exactly one capability
-// — ingest, for its owner — so bearer auth is scoped to this path rather than
-// accepted anywhere a cookie would be. There is no fallback in either direction:
-// a cookie is not a substitute for a linked watch, and a token is not a
-// substitute for a session.
-const DEVICE_INGEST_PATH = '/api/sessions/watch'
+// The routes a device token can reach: post a session, and post its own
+// diagnostic log. Both write for the token's owner and neither reads anything
+// back, which is the whole of what the credential is for — so bearer auth is
+// scoped to these rather than accepted anywhere a cookie would be. There is no
+// fallback in either direction: a cookie is not a substitute for a linked watch,
+// and a token is not a substitute for a session.
+//
+// Keyed by method as well as path, because `/api/device-logs` is a device write
+// and a browser read at the same address, and only the write is a watch's to make.
+const DEVICE_TOKEN_ROUTES = new Set(['POST /api/sessions/watch', 'POST /api/device-logs'])
 
 // Registered before any route, so a route added later is guarded by default
 // rather than by remembering to guard it. The session is resolved once here and
@@ -87,7 +98,7 @@ app.use('/api/*', async (c, next) => {
         return next()
     }
 
-    if (pathname === DEVICE_INGEST_PATH) {
+    if (DEVICE_TOKEN_ROUTES.has(`${c.req.method} ${pathname}`)) {
         const bearer = c.req.header('authorization')?.match(/^Bearer (.+)$/)?.[1]
         const device = bearer == null ? null : await deviceForToken(createDb(c.env.DB), bearer)
         if (device == null) {
@@ -160,6 +171,26 @@ const listQuerySchema = z
 const statsQuerySchema = z
     .object({ from: isoBoundary(false), to: isoBoundary(true) })
     .refine((q) => q.from <= q.to, {
+        message: '`from` must not be after `to`',
+        path: ['from'],
+    })
+
+// Same range bounds as the session list, plus an optional device filter for an
+// account with more than one watch linked.
+const deviceLogQuerySchema = z
+    .object({
+        limit: z.coerce
+            .number()
+            .int()
+            .positive()
+            .max(MAX_LOG_PAGE_SIZE)
+            .default(DEFAULT_LOG_PAGE_SIZE),
+        offset: z.coerce.number().int().nonnegative().default(0),
+        deviceId: z.string().min(1).max(64).optional(),
+        from: isoBoundary(false).optional(),
+        to: isoBoundary(true).optional(),
+    })
+    .refine((q) => q.from == null || q.to == null || q.from <= q.to, {
         message: '`from` must not be after `to`',
         path: ['from'],
     })
@@ -447,6 +478,45 @@ app.post('/api/sessions/watch', async (c) => {
     }
 
     return c.json(result, result.status === 'created' ? 201 : 200)
+})
+
+// A watch uploading its own diagnostic log, next time it has a phone. Device
+// token, like the session ingest — and answering 200 to a re-send for the same
+// reason: the watch re-sends anything it is not certain arrived.
+app.post('/api/device-logs', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = deviceLogPayloadSchema.safeParse(body)
+    if (!parsed.success) {
+        return c.json({ error: 'invalid_payload', issues: parsed.error.issues }, 400)
+    }
+
+    const db = createDb(c.env.DB)
+    const device = c.get('device')
+    const now = nowSeconds()
+    const result = await recordDeviceLogs(db, c.get('userId'), device.id, parsed.data, now)
+
+    // Only on an accepted payload, so a rejected request costs no write.
+    await markDeviceSeen(db, device.id, now)
+
+    return c.json(result, 200)
+})
+
+// Reading them back. Cookie only — a watch writes its log and never reads anyone's.
+app.get('/api/device-logs', async (c) => {
+    const query = deviceLogQuerySchema.safeParse({
+        limit: c.req.query('limit'),
+        offset: c.req.query('offset'),
+        deviceId: c.req.query('deviceId'),
+        from: c.req.query('from'),
+        to: c.req.query('to'),
+    })
+    if (!query.success) {
+        return c.json({ error: 'invalid_query', issues: query.error.issues }, 400)
+    }
+
+    const { limit, offset } = query.data
+    const lines = await listDeviceLogs(createDb(c.env.DB), c.get('userId'), query.data)
+    return c.json({ lines, limit, offset })
 })
 
 // The user's sessions, newest first, optionally bounded by an ISO date range.

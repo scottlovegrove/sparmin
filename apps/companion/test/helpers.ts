@@ -317,6 +317,35 @@ export async function postWatchSession(token: string, body: unknown): Promise<Re
     return res
 }
 
+// ---- Device logs ----
+
+// The diagnostic lines a watch uploads. Defaults are two lines a minute apart, so
+// a suite that cares about ordering gets it without spelling out timestamps.
+export function deviceLogPayload(
+    options: { appVersion?: string | null; lines?: { at: string; text: string }[] } = {},
+) {
+    return {
+        appVersion: options.appVersion === undefined ? '0.8.0' : options.appVersion,
+        lines: options.lines ?? [
+            { at: '2026-08-14T08:26:18Z', text: 'session: 23:46 free 30112' },
+            { at: '2026-08-14T08:27:18Z', text: 'app: stopping' },
+        ],
+    }
+}
+
+// POST diagnostic lines the way a linked watch does: a bearer token, no cookie.
+export async function postDeviceLogs(token: string, body: unknown): Promise<Response> {
+    return app.request(
+        '/api/device-logs',
+        {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        },
+        env,
+    )
+}
+
 // ---- Push notifications ----
 
 // RFC 8291 §5's receiver keys. Real ones on purpose: the send path imports them

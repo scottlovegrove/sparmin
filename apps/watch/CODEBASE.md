@@ -111,12 +111,18 @@ source/
 │                         # queue with one in-flight slot.
 ├─ WatchLog.mc            # module: rolling diagnostic log in Storage, read on the
 │                         # watch via Settings -> Diagnostics. Connect IQ gives an
-│                         # app no way to write a file USB can read.
+│                         # app no way to write a file USB can read. Entries are
+│                         # [sequence, epoch, text]; the sequence is the upload
+│                         # cursor, since two lines can share a second.
+├─ LogClient.mc           # POSTs the log to the companion on app start, so it can
+│                         # be read with dates on a real screen. Deliberately not
+│                         # (:background) — diagnostics must not compete with a
+│                         # session for the background pool.
 ├─ Fmt.mc                 # module: duration ("m:ss") + hr formatting.
 ├─ Uuid.mc / Iso.mc       # module: session id (v4) + ISO-8601 UTC.
 ├─ Version.mc             # module: the app version string, shown on the About
 │                         # page. Hand-bumped at each release.
-├─ Tests.mc               # 40 (:test) cases + FakeRecorder. Run in the simulator.
+├─ Tests.mc               # 49 (:test) cases + FakeRecorder. Run in the simulator.
 └─ views/
    ├─ StripView.mc        # home screen (IDLE/TRANSITION/IN_ACTIVITY): strip,
    │  StripDelegate.mc    # timers, HR, icons, drag-scroll animation, focus label

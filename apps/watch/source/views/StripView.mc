@@ -18,6 +18,11 @@ class StripView extends WatchUi.View {
     private var _visualStart as Lang.Float = 0.0;  // eased window position, in tiles
     private var _hrDisplay;                // Number or null
     private var _isTouch as Lang.Boolean;
+    //! How often a live session leaves a line in the log. Often enough to show how
+    //! far a visit got and which way free memory was moving; rare enough that the
+    //! buffer still holds the rest of the session around it.
+    const HEARTBEAT_S = 300;
+    private var _lastBeat as Lang.Number = 0;
     private var _w as Lang.Number = 0;
     private var _h as Lang.Number = 0;
     private var _cursorShown as Lang.Boolean = false; // reveal the focus ring on touch after a button press
@@ -89,7 +94,29 @@ class StripView extends WatchUi.View {
         var info = Activity.getActivityInfo();
         _session.foldHr(HrSampler.currentForStats(info));   // ignored unless IN_ACTIVITY
         _hrDisplay = HrSampler.currentForDisplay(info);
+        _heartbeat();
         WatchUi.requestUpdate();
+    }
+
+    //! Leave a mark in the log while a session is live.
+    //!
+    //! An app that is terminated rather than crashing writes nothing on its way
+    //! out, so without this the log's account of a lost session stops at whatever
+    //! the wearer last pressed — which the FIT already records. These lines are
+    //! what say how much further it got, and free memory alongside them is what
+    //! would show a session being squeezed out rather than struck down.
+    private function _heartbeat() as Void {
+        if (_session.getState() == STATE_IDLE) {
+            _lastBeat = 0;
+            return;
+        }
+        var now = Time.now().value();
+        if (_lastBeat != 0 && now - _lastBeat < HEARTBEAT_S) {
+            return;
+        }
+        _lastBeat = now;
+        WatchLog.add("session: " + Fmt.duration(_session.elapsedSeconds(now))
+            + " free " + System.getSystemStats().freeMemory);
     }
 
     //! Ease the strip toward the controller's current window. Called by the

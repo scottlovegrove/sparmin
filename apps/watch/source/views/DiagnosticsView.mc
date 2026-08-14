@@ -57,7 +57,7 @@ class DiagnosticsView extends WatchUi.View {
                 break;
             }
             dc.drawText(width / 2, top + i * lineHeight, Graphics.FONT_XTINY,
-                _lines[index], Graphics.TEXT_JUSTIFY_CENTER);
+                WatchLog.line(_lines[index]), Graphics.TEXT_JUSTIFY_CENTER);
         }
     }
 }

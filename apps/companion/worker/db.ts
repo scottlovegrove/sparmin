@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1'
 import {
     deviceLinkCodes,
+    deviceLogs,
     devices,
     notificationPrefs,
     pushSubscriptions,
@@ -15,6 +16,7 @@ const schema = {
     stationIntervals,
     devices,
     deviceLinkCodes,
+    deviceLogs,
     pushSubscriptions,
     notificationPrefs,
 }

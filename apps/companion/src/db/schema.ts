@@ -107,6 +107,45 @@ export const deviceLinkCodes = sqliteTable('device_link_codes', {
     consumedAt: integer('consumed_at'),
 })
 
+// Lines from a watch's own diagnostic log, uploaded the next time it has a phone.
+//
+// Connect IQ gives an app no way to write a file a computer can read — the only
+// thing that lands in GARMIN/APPS/LOGS/ is the system's own crash log, and it
+// writes nothing at all when the OS terminates an app rather than the app
+// throwing. So the watch keeps a small ring buffer of its own and ships it here,
+// where the lines have real dates on them and can be read without squinting at a
+// wrist. The buffer outlives the process, so a run that ended badly is uploaded
+// by the next one.
+//
+// `recorded_at` is the watch's clock and `received_at` is ours; they can differ by
+// hours, because the upload waits for a phone.
+export const deviceLogs = sqliteTable(
+    'device_logs',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
+        deviceId: text('device_id')
+            .notNull()
+            .references(() => devices.id, { onDelete: 'cascade' }),
+        recordedAt: integer('recorded_at').notNull(),
+        receivedAt: integer('received_at').notNull(),
+        // Which build wrote the line. The whole point of reading these is to tell
+        // what changed between one visit and the next.
+        appVersion: text('app_version'),
+        line: text('line').notNull(),
+    },
+    (table) => [
+        // What makes an upload idempotent. The watch re-sends anything it is not
+        // certain arrived, and two identical lines from one device in one second
+        // are indistinguishable anyway — so collapsing them loses nothing and
+        // spares the caller having to track what it already sent.
+        uniqueIndex('device_logs_dedupe').on(table.deviceId, table.recordedAt, table.line),
+        index('idx_device_logs_user_recorded').on(table.userId, table.recordedAt),
+    ],
+)
+
 // One imported spa visit. Totals come from the FIT session message verbatim —
 // per-station rollups are derived from station_intervals, never stored here.
 export const sessions = sqliteTable(
@@ -247,6 +286,7 @@ export type Station = typeof stations.$inferSelect
 export type Session = typeof sessions.$inferSelect
 export type StationInterval = typeof stationIntervals.$inferSelect
 export type Device = typeof devices.$inferSelect
+export type DeviceLog = typeof deviceLogs.$inferSelect
 export type DeviceLinkCode = typeof deviceLinkCodes.$inferSelect
 export type PushSubscription = typeof pushSubscriptions.$inferSelect
 export type NotificationPrefs = typeof notificationPrefs.$inferSelect
