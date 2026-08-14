@@ -66,6 +66,11 @@ class BackendClient {
         WatchLog.add("link: forgetting account, dropping " + queuedCount());
         LinkConfig.clearToken();
         Application.Storage.deleteValue(QUEUE_KEY);
+        // The diagnostic log goes the same way as the queue, for the same reason:
+        // lines written while this watch belonged to one account must not be
+        // delivered into the next one. Marked sent rather than deleted — they are
+        // still the wearer's own log, still readable under Settings.
+        WatchLog.markAllSent();
         // A POST already on the wire outlives this call, and its callback would
         // otherwise re-queue the payload it was carrying — putting a session
         // belonging to the account just left back into a queue the next account
@@ -251,6 +256,7 @@ class BackendClient {
             WatchLog.add("send: rejected, unlinking and clearing " + queuedCount());
             LinkConfig.clearToken();
             Application.Storage.deleteValue(QUEUE_KEY);
+            WatchLog.markAllSent();
         } else if (responseCode >= 400 && responseCode < 500) {
             WatchLog.add("send: refused " + responseCode + ", dropped");
         } else {

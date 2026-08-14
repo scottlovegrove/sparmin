@@ -179,6 +179,11 @@ class StripDelegate extends WatchUi.InputDelegate {
             return;
         }
         _session.selectActivity(id, now());
+        // The FIT records this too, but only as the label on the lap that just
+        // closed — so a session that ends badly leaves the newest lap wearing the
+        // previous one's name. This line is the one that says what was actually
+        // chosen, and when.
+        WatchLog.add("session: at " + id);
         WatchUi.requestUpdate();
     }
 
@@ -212,8 +217,10 @@ class StripDelegate extends WatchUi.InputDelegate {
     //! app at idle — where it's the way out once the cursor has claimed Back.
     private function _endOrExit() as Void {
         if (_session.getState() == STATE_IDLE) {
+            WatchLog.add("app: exiting");
             System.exit();   // never returns
         } else {
+            WatchLog.add("session: end requested");
             _session.requestEnd(now());
             var cev = new ConfirmEndView(_view);
             WatchUi.pushView(cev, new ConfirmEndDelegate(cev), WatchUi.SLIDE_UP);

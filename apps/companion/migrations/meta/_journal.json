@@ -36,6 +36,13 @@
       "when": 1786197704049,
       "tag": "0007_push_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786715055857,
+      "tag": "0008_device_logs",
+      "breakpoints": true
     }
   ]
 }
