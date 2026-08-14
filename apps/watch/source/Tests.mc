@@ -744,7 +744,7 @@ function testClock12Hour(logger) {
 function resetLog() as Void {
     WatchLog.clear();
     Application.Storage.deleteValue(WatchLog.SEQ_KEY);
-    Application.Storage.deleteValue((new LogClient()).CURSOR_KEY);
+    Application.Storage.deleteValue(WatchLog.SENT_KEY);
 }
 
 (:test)
@@ -854,21 +854,56 @@ function testUploadCursorStartsAtNothingSent(logger) {
     resetLog();
     WatchLog.add("first");
 
-    Test.assertEqual(new LogClient().sentSeq(), 0);
-    Test.assertEqual(WatchLog.since(new LogClient().sentSeq()).size(), 1);
+    Test.assertEqual(WatchLog.sentSeq(), 0);
+    Test.assertEqual(WatchLog.since(WatchLog.sentSeq()).size(), 1);
     return true;
 }
 
 //! The cursor only ever moves on a success, so a failed upload re-sends rather
-//! than losing the one line that explained what happened.
+//! than losing the one line that explained what happened. Seeded part-way
+//! through, so a failure path that reset the cursor would fail here too.
 (:test)
 function testUploadCursorHoldsAfterAFailure(logger) {
     resetLog();
-    WatchLog.add("first");
-    var client = new LogClient();
+    WatchLog.add("sent");
+    var sent = WatchLog.seqOf(WatchLog.read()[0]);
+    WatchLog.markSent(sent);
+    WatchLog.add("unsent");
 
-    client.onResponse(500, null);
+    new LogClient().onResponse(500, null);
 
-    Test.assertEqual(client.sentSeq(), 0);
+    Test.assertEqual(WatchLog.sentSeq(), sent);
+    Test.assertEqual(WatchLog.since(WatchLog.sentSeq()).size(), 1);
+    return true;
+}
+
+//! A rejected token means the account this watch posts to is no longer its own.
+//! Anything still waiting was written for that account and must not be delivered
+//! into whichever one is linked next — but it stays readable on the watch.
+(:test)
+function testRejectedTokenMarksTheBacklogSentWithoutErasingIt(logger) {
+    resetLog();
+    LinkConfig.setToken("a-token");
+    WatchLog.add("written while linked");
+
+    new LogClient().onResponse(401, null);
+
+    Test.assertEqual(LinkConfig.isLinked(), false);
+    Test.assertEqual(WatchLog.since(WatchLog.sentSeq()).size(), 0);
+    Test.assert(WatchLog.read().size() > 0);
+    return true;
+}
+
+//! Unlinking from the account screen does the same, so the next account linked
+//! never receives the last one's diagnostics.
+(:test)
+function testForgettingTheAccountMarksTheBacklogSent(logger) {
+    resetLog();
+    LinkConfig.setToken("a-token");
+    WatchLog.add("written while linked");
+
+    new BackendClient().forget();
+
+    Test.assertEqual(WatchLog.since(WatchLog.sentSeq()).size(), 0);
     return true;
 }

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a66d8891-632b-4df2-8113-26f7fa3dce47",
+  "id": "9ad95586-ef01-470f-b148-ae22b17d781e",
   "prevId": "55e87737-e15f-40e0-ab52-9cab6fecc30c",
   "tables": {
     "device_link_codes": {
@@ -173,6 +173,13 @@
           "name": "idx_device_logs_user_recorded",
           "columns": [
             "user_id",
+            "recorded_at"
+          ],
+          "isUnique": false
+        },
+        "idx_device_logs_recorded": {
+          "name": "idx_device_logs_recorded",
+          "columns": [
             "recorded_at"
           ],
           "isUnique": false

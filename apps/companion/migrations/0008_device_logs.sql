@@ -11,4 +11,5 @@ CREATE TABLE `device_logs` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `device_logs_dedupe` ON `device_logs` (`device_id`,`recorded_at`,`line`);--> statement-breakpoint
-CREATE INDEX `idx_device_logs_user_recorded` ON `device_logs` (`user_id`,`recorded_at`);
+CREATE INDEX `idx_device_logs_user_recorded` ON `device_logs` (`user_id`,`recorded_at`);--> statement-breakpoint
+CREATE INDEX `idx_device_logs_recorded` ON `device_logs` (`recorded_at`);

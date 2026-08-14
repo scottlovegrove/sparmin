@@ -143,6 +143,10 @@ export const deviceLogs = sqliteTable(
         // spares the caller having to track what it already sent.
         uniqueIndex('device_logs_dedupe').on(table.deviceId, table.recordedAt, table.line),
         index('idx_device_logs_user_recorded').on(table.userId, table.recordedAt),
+        // For the retention sweep, which runs on every upload and is the only
+        // read that starts from `recorded_at` alone. Without it the sweep is a
+        // full scan of the table it exists to keep from growing.
+        index('idx_device_logs_recorded').on(table.recordedAt),
     ],
 )
 

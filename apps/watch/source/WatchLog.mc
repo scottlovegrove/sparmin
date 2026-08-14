@@ -29,6 +29,10 @@ module WatchLog {
 
     const STORAGE_KEY = "log";
     const SEQ_KEY = "logSeq";
+    //! How far the companion has been brought up to date. Kept here rather than in
+    //! LogClient because unlinking has to be able to move it, and unlinking is
+    //! handled in the background process, which LogClient is not compiled into.
+    const SENT_KEY = "logSentSeq";
     //! Enough to hold a whole link attempt, a session's worth of heartbeats and
     //! the queue activity around them. Bounded rather than generous because the
     //! whole buffer is read into memory on every write, and this module runs in
@@ -122,6 +126,27 @@ module WatchLog {
 
     function clear() as Void {
         Application.Storage.deleteValue(STORAGE_KEY);
+    }
+
+    //! The sequence number the companion has been brought up to date with.
+    function sentSeq() as Lang.Number {
+        var stored = Application.Storage.getValue(SENT_KEY);
+        return (stored instanceof Lang.Number) ? stored : 0;
+    }
+
+    function markSent(seq) as Void {
+        Application.Storage.setValue(SENT_KEY, seq);
+    }
+
+    //! Give up on sending what is here, without throwing it away.
+    //!
+    //! Called when the account this watch posts to changes or stops honouring it.
+    //! Lines written for one account must never arrive in another's, and the
+    //! wearer unlinking is not a reason to wipe a log they can still read on the
+    //! watch — so the cursor jumps to the end rather than the buffer emptying.
+    function markAllSent() as Void {
+        var stored = Application.Storage.getValue(SEQ_KEY);
+        markSent((stored instanceof Lang.Number) ? stored : 0);
     }
 
     //! Monotonic across restarts, because it is what the upload cursor compares

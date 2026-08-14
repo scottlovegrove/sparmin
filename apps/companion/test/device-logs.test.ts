@@ -61,6 +61,24 @@ describe('a watch uploading its diagnostic log', () => {
         expect(row?.app_version).toBe('0.8.0')
     })
 
+    // The watch numbers its entries precisely because two can share a second, so
+    // the text has to be part of what makes a line unique. Drop it from the key
+    // and one of these disappears silently.
+    it('keeps two different lines written in the same second', async () => {
+        const res = await postDeviceLogs(
+            token,
+            deviceLogPayload({
+                lines: [
+                    { at: '2026-08-14T08:26:18Z', text: 'session: at hot_tub' },
+                    { at: '2026-08-14T08:26:18Z', text: 'session: 23:46 free 30112' },
+                ],
+            }),
+        )
+
+        expect(await res.json()).toEqual({ stored: 2 })
+        expect(await countRows('device_logs')).toBe(2)
+    })
+
     it('treats a re-send as a success rather than a conflict', async () => {
         await postDeviceLogs(token, deviceLogPayload())
 

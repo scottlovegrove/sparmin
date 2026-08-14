@@ -15,11 +15,6 @@ import Toybox.System;
 //! is exactly the case that has no crash log to read.
 class LogClient {
 
-    //! The last sequence number known to have reached the companion. A sequence
-    //! rather than a timestamp: two lines can share a second, and a cursor that
-    //! cannot tell them apart drops one of them.
-    const CURSOR_KEY = "logSentSeq";
-
     private var _pending;   // cursor this upload will commit to, or null when idle
 
     function initialize() {
@@ -35,13 +30,13 @@ class LogClient {
         if (!System.getDeviceSettings().phoneConnected) {
             return;
         }
-        var entries = WatchLog.since(sentSeq());
+        var entries = WatchLog.since(WatchLog.sentSeq());
         if (entries.size() == 0) {
             return;
         }
 
         var lines = [];
-        var cursor = sentSeq();
+        var cursor = WatchLog.sentSeq();
         for (var i = 0; i < entries.size(); i += 1) {
             var entry = entries[i];
             lines.add({
@@ -72,10 +67,10 @@ class LogClient {
 
     //! Public so `method(:onResponse)` can reach it; not for callers.
     //!
-    //! The cursor moves only on a success. Anything else leaves it where it was,
-    //! so the same lines go again next launch — the companion collapses a repeat,
-    //! and re-sending a line costs nothing next to losing the one line that
-    //! explained what happened.
+    //! The cursor moves only on a success. A transient failure leaves it where it
+    //! was, so the same lines go again next launch — the companion collapses a
+    //! repeat, and re-sending a line costs nothing next to losing the one line
+    //! that explained what happened.
     function onResponse(
         responseCode as Lang.Number,
         data as Null or Lang.Dictionary or Lang.String or PersistedContent.Iterator
@@ -84,18 +79,23 @@ class LogClient {
         _pending = null;
 
         if (responseCode == 200 || responseCode == 201) {
-            Application.Storage.setValue(CURSOR_KEY, cursor);
+            WatchLog.markSent(cursor);
+            return;
+        }
+        if (responseCode == 401) {
+            // The token is gone or revoked, and BackendClient answers a 401 on
+            // the session route the same way. Everything waiting is written for
+            // an account this watch is no longer attached to, so it is marked
+            // sent rather than left to be delivered into whichever account is
+            // linked next. The lines stay readable on the watch.
+            LinkConfig.clearToken();
+            WatchLog.markAllSent();
+            WatchLog.add("logs: rejected, unlinking");
             return;
         }
         // Logged rather than surfaced: this is diagnostics, and a wearer who
         // cannot upload a log has nothing to do about it. The line itself goes up
         // with the next attempt.
         WatchLog.add("logs: upload failed " + responseCode);
-    }
-
-    //! How far the companion has been brought up to date.
-    function sentSeq() as Lang.Number {
-        var stored = Application.Storage.getValue(CURSOR_KEY);
-        return (stored instanceof Lang.Number) ? stored : 0;
     }
 }
