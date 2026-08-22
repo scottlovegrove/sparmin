@@ -28,6 +28,32 @@ function sweepExpired(db: Db, now: number) {
 }
 
 /**
+ * Columns one line binds, and D1's ceiling on bound parameters per statement.
+ *
+ * The pair is what sets `ROWS_PER_INSERT`, and both are here so the arithmetic is
+ * checkable rather than a magic number: a statement over the cap is refused by D1
+ * outright — `too many SQL variables` — however well formed it is.
+ */
+const COLUMNS_PER_ROW = 6
+const D1_MAX_BOUND_PARAMS = 100
+
+/**
+ * Rows per INSERT.
+ *
+ * A watch sends its whole undelivered buffer, which is up to sixty lines, and one
+ * statement carrying all of them binds three hundred and sixty parameters against
+ * a limit of a hundred. That failed in production on every upload but the first —
+ * a 500 the watch reads as transient, so its cursor never moved and the same
+ * buffer went again next launch, for ever. Chunked, each statement stays inside
+ * the cap and the batch keeps them in one transaction.
+ *
+ * Local SQLite allows far more variables than D1 does, so no test on miniflare
+ * can catch a regression here by volume alone — `device-logs.test.ts` asserts the
+ * arithmetic directly instead.
+ */
+export const ROWS_PER_INSERT = Math.floor(D1_MAX_BOUND_PARAMS / COLUMNS_PER_ROW)
+
+/**
  * Store what a watch just uploaded, and report how much of it was new.
  *
  * Duplicates are dropped by the unique index rather than checked for: the watch
@@ -50,15 +76,25 @@ export async function recordDeviceLogs(
         line: line.text,
     }))
 
-    const inserted = await db
-        .insert(deviceLogs)
-        .values(rows)
-        .onConflictDoNothing()
-        .returning({ id: deviceLogs.id })
+    const inserts = []
+    for (let i = 0; i < rows.length; i += ROWS_PER_INSERT) {
+        inserts.push(
+            db
+                .insert(deviceLogs)
+                .values(rows.slice(i, i + ROWS_PER_INSERT))
+                .onConflictDoNothing()
+                .returning({ id: deviceLogs.id }),
+        )
+    }
+
+    // The payload schema guarantees at least one line, which is what makes the
+    // first statement safe to name — `batch` wants a non-empty tuple.
+    const [first, ...rest] = inserts
+    const results = await db.batch([first, ...rest])
 
     await sweepExpired(db, now)
 
-    return { stored: inserted.length }
+    return { stored: results.reduce((total, inserted) => total + inserted.length, 0) }
 }
 
 export type DeviceLogRow = {

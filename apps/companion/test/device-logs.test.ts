@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import app from '../worker'
-import { RETENTION_S } from '../worker/device-logs'
+import { RETENTION_S, ROWS_PER_INSERT } from '../worker/device-logs'
 import { type SignedIn, signIn } from './auth-helper'
 import {
     countRows,
@@ -46,6 +46,29 @@ describe('a watch uploading its diagnostic log', () => {
         expect(res.status).toBe(200)
         expect(await res.json()).toEqual({ stored: 2 })
         expect(await countRows('device_logs')).toBe(2)
+    })
+
+    // The regression that kept every real upload out of the table: one statement
+    // for the whole payload, over D1's hundred-parameter cap, refused as `too many
+    // SQL variables` on anything past sixteen lines. Local SQLite binds far more
+    // than D1 will, so the volume test below cannot fail for that reason on
+    // miniflare — the arithmetic is asserted directly, and the volume case guards
+    // the count that chunking has to keep adding up.
+    it('keeps each insert inside the D1 bound-parameter cap', () => {
+        expect(ROWS_PER_INSERT * 6).toBeLessThanOrEqual(100)
+    })
+
+    it('stores a whole watch buffer in one upload', async () => {
+        const lines = Array.from({ length: 60 }, (_, i) => ({
+            at: isoSeconds(new Date(Date.UTC(2026, 7, 14, 8, 0, i))),
+            text: `session: ${i}:01 free 30112`,
+        }))
+
+        const res = await postDeviceLogs(token, deviceLogPayload({ lines }))
+
+        expect(res.status).toBe(200)
+        expect(await res.json()).toEqual({ stored: 60 })
+        expect(await countRows('device_logs')).toBe(60)
     })
 
     it('keeps the watch clock and the arrival time apart', async () => {
