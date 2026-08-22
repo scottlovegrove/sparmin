@@ -105,6 +105,12 @@ class StripView extends WatchUi.View {
     //! the wearer last pressed — which the FIT already records. These lines are
     //! what say how much further it got, and free memory alongside them is what
     //! would show a session being squeezed out rather than struck down.
+    //!
+    //! Battery is here for the other way a session ends without the app doing
+    //! anything: the watch closing it to save power. That leaves an orderly
+    //! shutdown and no other trace, so a percentage falling toward the end of a
+    //! run is the only thing that would tell it apart from a system takeover.
+    //! `c` marks charging, which is what a watch on a charger reads like.
     private function _heartbeat() as Void {
         if (_session.getState() == STATE_IDLE) {
             _lastBeat = 0;
@@ -115,8 +121,11 @@ class StripView extends WatchUi.View {
             return;
         }
         _lastBeat = now;
+        var stats = System.getSystemStats();
         WatchLog.add("session: " + Fmt.duration(_session.elapsedSeconds(now))
-            + " free " + System.getSystemStats().freeMemory);
+            + " free " + stats.freeMemory
+            + " bat " + stats.battery.toNumber()
+            + ((stats.charging == true) ? "c" : ""));
     }
 
     //! Ease the strip toward the controller's current window. Called by the

@@ -848,6 +848,45 @@ function testLogSinceIsEmptyWhenNothingHasHappened(logger) {
     return true;
 }
 
+//! The shutdown line carries what the shutdown took with it. Idle first: the
+//! ordinary way out, and the one that must not read as a lost session.
+(:test)
+function testStoppingLineSaysNothingWasLiveAtIdle(logger) {
+    var sm = new SessionManager(new FakeRecorder());
+
+    Test.assertEqual(stoppingLine(sm, 1000), "app: stopping, idle");
+    Test.assertEqual(stoppingLine(null, 1000), "app: stopping, idle");
+    return true;
+}
+
+//! Mid-session, it says so and says how far in — the question a bare
+//! "app: stopping" left to be inferred from the gap to the last heartbeat.
+(:test)
+function testStoppingLineCarriesTheLiveSession(logger) {
+    var sm = new SessionManager(new FakeRecorder());
+    sm.startSession(1000);
+    sm.selectActivity("finnish_sauna", 1010);
+
+    Test.assertEqual(stoppingLine(sm, 1000 + 2701), "app: stopping, live 45:01 rec");
+    return true;
+}
+
+//! A session live but no longer recording is a save already under way, which in
+//! the log is otherwise indistinguishable from one struck down mid-visit.
+(:test)
+function testStoppingLineSeparatesASaveFromALoss(logger) {
+    var sm = new SessionManager(new FakeRecorder());
+    sm.startSession(1000);
+    sm.selectActivity("finnish_sauna", 1010);
+    sm.requestEnd(1500);
+    sm.confirmEnd(1600);
+
+    var line = stoppingLine(sm, 1600);
+
+    Test.assert(line.find("norec") != null);
+    return true;
+}
+
 //! An unsent watch starts from zero, so the first upload carries the whole buffer.
 (:test)
 function testUploadCursorStartsAtNothingSent(logger) {

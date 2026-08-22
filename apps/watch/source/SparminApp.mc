@@ -1,6 +1,7 @@
 import Toybox.Application;
 import Toybox.Lang;
 import Toybox.System;
+import Toybox.Time;
 import Toybox.WatchUi;
 
 //! Application entry point. Owns the single SessionManager (with the real FIT
@@ -48,9 +49,15 @@ class SparminApp extends Application.AppBase {
     //! that ends with this line in the log was closed by something; one that ends
     //! without it was killed outright, or the watch restarted underneath it.
     //! Neither leaves a CIQ_LOG.YML, so telling them apart is otherwise guesswork.
+    //!
+    //! What it took with it is on the line too. A bare "app: stopping" says an
+    //! orderly shutdown happened and nothing else, which leaves the question it
+    //! was written to answer — was a session live at the time? — to be inferred
+    //! from how long ago the last heartbeat was, and a heartbeat is five minutes
+    //! apart.
     function onStop(state as Dictionary?) as Void {
         if (_isForeground) {
-            WatchLog.add("app: stopping");
+            WatchLog.add(stoppingLine(_session, Time.now().value()));
         }
     }
 
@@ -118,6 +125,23 @@ class SparminApp extends Application.AppBase {
         var view = new StripView(getSessionManager());
         return [view, new StripDelegate(view)];
     }
+}
+
+//! What `onStop` writes, given the session the app was holding.
+//!
+//! Takes the SessionManager rather than reading anything itself, so the one part
+//! of a shutdown line that can be got wrong — whether it says a session was live,
+//! and how far in — is pinned by a unit test with a fake recorder.
+//!
+//! `rec` is whether the FIT recorder was still running as the app went. A session
+//! live but not recording is the shape of a save that had already begun, and it
+//! is otherwise indistinguishable in the log from one struck down mid-visit.
+function stoppingLine(session, now) as Lang.String {
+    if (session == null || session.getState() == STATE_IDLE) {
+        return "app: stopping, idle";
+    }
+    return "app: stopping, live " + Fmt.duration(session.elapsedSeconds(now))
+        + (session.isRecording() ? " rec" : " norec");
 }
 
 //! Convenience accessor for the singleton application instance.
