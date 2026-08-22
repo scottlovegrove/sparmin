@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { formatDuration } from '../lib/format-duration'
 import { type Stay, formatStay, summarise } from '../lib/session-summary'
+import { ConfirmDialog } from './confirm-dialog'
 
 type Detail = { session: { id: string }; intervals: Stay[] }
 type StationOption = { id: number; name: string; isTransition: boolean }
@@ -44,12 +45,22 @@ function rowElapsed(row: EditRow): number {
     return last.endedAt - first.startedAt
 }
 
-export function SessionDetail({ id, onChanged }: { id: string; onChanged?: () => void }) {
+type SessionDetailProps = {
+    readonly id: string
+    readonly onChanged?: () => void
+    // The session this view is of no longer exists, so the view can't stay open.
+    // The list owns that decision, not us.
+    readonly onDeleted?: () => void
+}
+
+export function SessionDetail({ id, onChanged, onDeleted }: SessionDetailProps) {
     const [state, setState] = useState<State>({ status: 'loading' })
     const [stations, setStations] = useState<StationOption[] | null>(null)
     const [rows, setRows] = useState<EditRow[] | null>(null)
     const [saving, setSaving] = useState(false)
     const [editError, setEditError] = useState<string | null>(null)
+    const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     useEffect(() => {
         const aborter = new AbortController()
@@ -147,6 +158,27 @@ export function SessionDetail({ id, onChanged }: { id: string; onChanged?: () =>
             setEditError((err as Error).message)
         } finally {
             setSaving(false)
+        }
+    }
+
+    // A visit is a handful of laps and nothing references it, so removing one is a
+    // straight DELETE — no soft-delete, no undo. The confirm is the whole safety
+    // net, which is why the modal spells out that the laps go with it.
+    async function deleteSession() {
+        setIsDeleting(true)
+        setEditError(null)
+        try {
+            const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' })
+            if (!res.ok) {
+                throw new Error(`The server returned ${res.status}`)
+            }
+            // Gone — the list closes this view and refetches, so there's no state
+            // to reset here. Leave `isDeleting` set: we're about to unmount.
+            onDeleted?.()
+        } catch (err) {
+            setEditError((err as Error).message)
+            setIsConfirmingDelete(false)
+            setIsDeleting(false)
         }
     }
 
@@ -265,13 +297,30 @@ export function SessionDetail({ id, onChanged }: { id: string; onChanged?: () =>
                 )}
             </p>
             {editError != null && <p className="error small">{editError}</p>}
-            <button
-                type="button"
-                className="link edit-laps"
-                onClick={() => void startEditing(stays)}
-            >
-                Edit laps
-            </button>
+            <div className="detail-actions">
+                <button type="button" className="link" onClick={() => void startEditing(stays)}>
+                    Edit laps
+                </button>
+                <button
+                    type="button"
+                    className="link destructive"
+                    onClick={() => setIsConfirmingDelete(true)}
+                >
+                    Delete session
+                </button>
+            </div>
+            {isConfirmingDelete && (
+                <ConfirmDialog
+                    title="Delete this session?"
+                    message="The visit and every lap in it will be removed. This can't be undone."
+                    confirmText="Delete"
+                    isDestructive
+                    busy={isDeleting}
+                    busyText="Deleting…"
+                    onConfirm={() => void deleteSession()}
+                    onCancel={() => setIsConfirmingDelete(false)}
+                />
+            )}
         </div>
     )
 }
