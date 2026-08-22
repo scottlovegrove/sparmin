@@ -652,10 +652,22 @@ button:disabled {
     color: var(--text);
 }
 
-/* The quiet way into editing a session's laps, tucked under its breakdown. */
-.edit-laps {
+/* The quiet way into editing or removing a session, tucked under its breakdown:
+   two text links rather than buttons, because neither is the point of the view. */
+.detail-actions {
+    display: flex;
+    gap: 1rem;
     margin-top: 0.5rem;
+}
+
+.detail-actions .link {
     font-size: 0.8rem;
+}
+
+/* The one destructive link. Red rather than accent so it doesn't read as the
+   twin of "Edit laps" sitting beside it. */
+.link.destructive {
+    color: var(--bad);
 }
 
 /* Edit mode: a station picker and a duration per lap, with the merge control
@@ -700,8 +712,9 @@ code {
     background: var(--bg);
 }
 
-/* Destructive action: a filled red button for the one thing that can't be undone
-   (account deletion). Same footprint as `.button`, different intent. */
+/* Destructive action: a filled red button for the things that can't be undone —
+   deleting an account, or a session. Same footprint as `.button`, different
+   intent. */
 .button.danger {
     background: var(--bad);
     color: var(--card);

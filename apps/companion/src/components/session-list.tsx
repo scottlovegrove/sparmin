@@ -116,7 +116,34 @@ export function SessionList({
                                         {isOpen ? '▾' : '▸'}
                                     </span>
                                 </button>
-                                {isOpen && <SessionDetail id={session.id} onChanged={onChanged} />}
+                                {isOpen && (
+                                    <SessionDetail
+                                        id={session.id}
+                                        onChanged={onChanged}
+                                        // The row this detail hangs off is about to
+                                        // disappear from the refetched list, so close
+                                        // it first — leaving `openId` on a deleted id
+                                        // reopens a detail that can only 404.
+                                        onDeleted={() => {
+                                            setOpenId(null)
+                                            // Drop the row here as well as asking for
+                                            // a refetch: the visit is gone either way,
+                                            // and waiting on the round trip would
+                                            // leave it on screen in the meantime.
+                                            setState((current) =>
+                                                current.status === 'ready'
+                                                    ? {
+                                                          ...current,
+                                                          sessions: current.sessions.filter(
+                                                              (row) => row.id !== session.id,
+                                                          ),
+                                                      }
+                                                    : current,
+                                            )
+                                            onChanged?.()
+                                        }}
+                                    />
+                                )}
                             </li>
                         )
                     })}
